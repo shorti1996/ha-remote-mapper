@@ -120,12 +120,21 @@ async def ws_get_remote(
 async def ws_get_slot(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
 ) -> None:
-    """Single slot record; null = Empty."""
+    """Single slot record; null = Empty.
+
+    Materialized slots get a live automation summary — the automation is
+    canonical, the store holds only the pointer.
+    """
+    from .materializer import async_get_live_view
+
     if _store(hass).get_remote(msg["entry_id"]) is None:
         connection.send_error(msg["id"], ERR_NOT_FOUND, "Unknown remote")
         return
     slot = _store(hass).get_slot(msg["entry_id"], msg["action_id"])
-    connection.send_result(msg["id"], {"slot": slot})
+    live = None
+    if slot and slot.get("materialized"):
+        live = await async_get_live_view(hass, slot)
+    connection.send_result(msg["id"], {"slot": slot, "live": live})
 
 
 @websocket_api.websocket_command(
@@ -135,34 +144,76 @@ async def ws_get_slot(
         vol.Required("action_id"): str,
         vol.Optional("sequence"): vol.Any(list, None),
         vol.Optional("sequence_yaml"): str,
+        vol.Optional("materialized"): bool,
     }
 )
 @websocket_api.async_response
 async def ws_save_slot(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
 ) -> None:
-    """Write a slot's sequence (validated server-side before persisting)."""
+    """Write a slot (validated server-side); handles the materialize toggle.
+
+    Draft-then-commit: nothing touches HA's automation store until this
+    save. Toggle on → automation created from the sequence; toggle off →
+    provided (or live-fetched) actions land back in the store and the
+    automation is deleted.
+    """
+    from .materializer import (
+        async_dematerialize,
+        async_materialize,
+    )
+
     store = _store(hass)
     if store.get_remote(msg["entry_id"]) is None:
         connection.send_error(msg["id"], ERR_NOT_FOUND, "Unknown remote")
         return
-    if "sequence" not in msg and "sequence_yaml" not in msg:
+
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    slot = store.get_slot(msg["entry_id"], msg["action_id"])
+    was_materialized = bool(slot and slot.get("materialized"))
+    target_materialized = msg.get("materialized", was_materialized)
+
+    sequence: list | None = None
+    if "sequence" in msg or "sequence_yaml" in msg:
+        try:
+            sequence = await _validated_sequence(hass, msg)
+        except Exception as err:
+            connection.send_error(msg["id"], ERR_INVALID_SEQUENCE, str(err))
+            return
+    elif not was_materialized:
         connection.send_error(msg["id"], ERR_INVALID_SEQUENCE, "No sequence given")
         return
 
-    try:
-        sequence = await _validated_sequence(hass, msg)
-    except Exception as err:
-        connection.send_error(msg["id"], ERR_INVALID_SEQUENCE, str(err))
-        return
+    if was_materialized and not target_materialized:
+        # Dematerialize: sequence=None pulls the automation's current
+        # actions (external edits are canonical)
+        await async_dematerialize(
+            hass, store, msg["entry_id"], msg["action_id"], sequence
+        )
+    else:
+        if sequence is not None:
+            slot = slot or default_slot()
+            slot["sequence"] = sequence
+            # Manual edit breaks the canonical snapshot-scene link (§4)
+            slot["scene_id"] = None
+            store.async_set_slot(msg["entry_id"], msg["action_id"], slot)
+        if target_materialized:
+            try:
+                await async_materialize(
+                    hass,
+                    store,
+                    msg["entry_id"],
+                    msg["action_id"],
+                    entry.title if entry else "Remote",
+                )
+            except Exception as err:
+                connection.send_error(msg["id"], ERR_INVALID_SEQUENCE, str(err))
+                return
 
-    slot = store.get_slot(msg["entry_id"], msg["action_id"]) or default_slot()
-    slot["sequence"] = sequence
-    # Manual edit breaks the canonical snapshot-scene link (design §4)
-    slot["scene_id"] = None
-    store.async_set_slot(msg["entry_id"], msg["action_id"], slot)
     _fire_updated(hass, msg["entry_id"], "slot_saved")
-    connection.send_result(msg["id"], {"slot": slot})
+    connection.send_result(
+        msg["id"], {"slot": store.get_slot(msg["entry_id"], msg["action_id"])}
+    )
 
 
 @websocket_api.websocket_command(
@@ -176,8 +227,18 @@ async def ws_save_slot(
 async def ws_clear_slot(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
 ) -> None:
-    """Remove a slot record (back to Empty)."""
-    _store(hass).async_clear_slot(msg["entry_id"], msg["action_id"])
+    """Remove a slot record (back to Empty).
+
+    A materialized slot's automation is integration-owned by definition —
+    clearing deletes it (M5 adds the remembered-choice policy).
+    """
+    from .materializer import _get_config_store
+
+    store = _store(hass)
+    slot = store.get_slot(msg["entry_id"], msg["action_id"])
+    if slot and slot.get("materialized") and slot.get("automation_id"):
+        await _get_config_store(hass).async_delete(slot["automation_id"])
+    store.async_clear_slot(msg["entry_id"], msg["action_id"])
     _fire_updated(hass, msg["entry_id"], "slot_cleared")
     connection.send_result(msg["id"], {})
 

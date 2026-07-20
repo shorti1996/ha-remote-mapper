@@ -1,0 +1,257 @@
+"""In-process automations.yaml management (materialization).
+
+Replicates what the native editor's admin-only HTTP view does
+(config/view.py + config/automation.py) because backend code cannot call
+those views: load yaml → upsert/delete by id → atomic write → targeted
+automation.reload. One asyncio.Lock serializes our writes; the small race
+window against simultaneous UI edits is accepted (plan §8.2).
+
+Mode switch, not one-shot export: while materialized the automation is
+canonical — the slot store keeps only a pointer.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from typing import TYPE_CHECKING, Any
+
+from homeassistant.components.automation import DATA_COMPONENT as AUTOMATION_DATA
+from homeassistant.components.automation.config import async_validate_config_item
+from homeassistant.config import AUTOMATION_CONFIG_PATH
+from homeassistant.const import CONF_ID, SERVICE_RELOAD
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
+from homeassistant.util.file import write_utf8_file_atomic
+from homeassistant.util.yaml import dump, load_yaml
+
+from .const import AUTOMATION_ALIAS_PREFIX, DOMAIN, MANAGED_DESCRIPTION_MARKER
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
+
+    from .store import RemoteMapperStore
+
+_LOGGER = logging.getLogger(__name__)
+
+AUTOMATION_DOMAIN = "automation"
+EDIT_URL = "/config/automation/edit/{}"
+
+
+def automation_config_id(entry_id: str, action_id: str) -> str:
+    """Deterministic automation id for a slot — idempotent re-materialize."""
+    return f"{DOMAIN}_{entry_id}_{action_id}"
+
+
+def build_payload(
+    remote_title: str, action_id: str, trigger: dict[str, Any], sequence: list[Any]
+) -> dict[str, Any]:
+    """Automation payload — plural keys (2024.10+ editor convention)."""
+    return {
+        "alias": f"{AUTOMATION_ALIAS_PREFIX} {remote_title} · {action_id}",
+        "description": (
+            f"{MANAGED_DESCRIPTION_MARKER} Edits here are canonical. "
+            "Disable the toggle in the remote card to remove."
+        ),
+        "triggers": [trigger],
+        "conditions": [],
+        "actions": sequence,
+        "mode": "single",
+    }
+
+
+class AutomationConfigStore:
+    """Serialized in-process reads/writes of automations.yaml."""
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        """Initialize."""
+        self.hass = hass
+        self._lock = asyncio.Lock()
+        self._path = hass.config.path(AUTOMATION_CONFIG_PATH)
+
+    def _read_sync(self) -> list[dict[str, Any]]:
+        try:
+            data = load_yaml(self._path)
+        except FileNotFoundError:
+            return []
+        if not isinstance(data, list):
+            return []
+        return data
+
+    def _write_sync(self, data: list[dict[str, Any]]) -> None:
+        write_utf8_file_atomic(self._path, dump(data))
+
+    async def async_get(self, config_id: str) -> dict[str, Any] | None:
+        """Live entity raw_config preferred; file fallback."""
+        if (component := self.hass.data.get(AUTOMATION_DATA)) is not None:
+            for entity in component.entities:
+                if entity.unique_id == config_id and entity.raw_config is not None:
+                    return dict(entity.raw_config)
+        async with self._lock:
+            data = await self.hass.async_add_executor_job(self._read_sync)
+        for item in data:
+            if item.get(CONF_ID) == config_id:
+                return dict(item)
+        return None
+
+    async def async_upsert(self, config_id: str, payload: dict[str, Any]) -> None:
+        """Validate, upsert by id (foreign entries untouched), reload."""
+        await async_validate_config_item(self.hass, config_id, dict(payload))
+        new_value = {CONF_ID: config_id, **payload}
+        async with self._lock:
+            data = await self.hass.async_add_executor_job(self._read_sync)
+            for index, item in enumerate(data):
+                if item.get(CONF_ID) == config_id:
+                    data[index] = new_value
+                    break
+            else:
+                data.append(new_value)
+            await self.hass.async_add_executor_job(self._write_sync, data)
+        # Targeted reload — same as the view's post_write_hook
+        await self.hass.services.async_call(
+            AUTOMATION_DOMAIN, SERVICE_RELOAD, {CONF_ID: config_id}, blocking=True
+        )
+
+    async def async_delete(self, config_id: str) -> bool:
+        """Remove entry from yaml + drop the registry entity."""
+        removed = False
+        async with self._lock:
+            data = await self.hass.async_add_executor_job(self._read_sync)
+            filtered = [item for item in data if item.get(CONF_ID) != config_id]
+            if len(filtered) != len(data):
+                removed = True
+                await self.hass.async_add_executor_job(self._write_sync, filtered)
+        registry = er.async_get(self.hass)
+        if entity_id := registry.async_get_entity_id(
+            AUTOMATION_DOMAIN, AUTOMATION_DOMAIN, config_id
+        ):
+            registry.async_remove(entity_id)
+        return removed
+
+
+def _get_config_store(hass: HomeAssistant) -> AutomationConfigStore:
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    if "automation_config_store" not in domain_data:
+        domain_data["automation_config_store"] = AutomationConfigStore(hass)
+    return domain_data["automation_config_store"]
+
+
+def automation_entity_id(hass: HomeAssistant, config_id: str) -> str | None:
+    """Map config id → entity id (deep-links use config id, services entity id)."""
+    return er.async_get(hass).async_get_entity_id(
+        AUTOMATION_DOMAIN, AUTOMATION_DOMAIN, config_id
+    )
+
+
+async def async_materialize(
+    hass: HomeAssistant,
+    store: RemoteMapperStore,
+    entry_id: str,
+    action_id: str,
+    title: str,
+) -> str:
+    """Create/update the slot's automation; returns the config id."""
+    from .adapters import get_adapter
+
+    remote = store.get_remote(entry_id)
+    slot = store.get_slot(entry_id, action_id)
+    if remote is None or slot is None:
+        raise HomeAssistantError(f"No slot {entry_id}/{action_id} to materialize")
+
+    adapter = get_adapter(remote["source"])
+    trigger = adapter.build_trigger(action_id, remote["source_config"])
+    config_id = automation_config_id(entry_id, action_id)
+    payload = build_payload(title, action_id, trigger, slot["sequence"])
+
+    await _get_config_store(hass).async_upsert(config_id, payload)
+
+    slot["materialized"] = True
+    slot["automation_id"] = config_id
+    store.async_set_slot(entry_id, action_id, slot)
+    return config_id
+
+
+async def async_get_live_view(
+    hass: HomeAssistant, slot: dict[str, Any]
+) -> dict[str, Any] | None:
+    """Summary of the materialized automation for the card."""
+    config_id = slot.get("automation_id")
+    if not config_id:
+        return None
+    raw = await _get_config_store(hass).async_get(config_id)
+    if raw is None:
+        return None
+    return {
+        "config_id": config_id,
+        "entity_id": automation_entity_id(hass, config_id),
+        "alias": raw.get("alias"),
+        "actions": raw.get("actions", raw.get("action", [])),
+        "edit_url": EDIT_URL.format(config_id),
+    }
+
+
+async def async_dematerialize(
+    hass: HomeAssistant,
+    store: RemoteMapperStore,
+    entry_id: str,
+    action_id: str,
+    sequence: list[Any] | None,
+    delete_automation: bool = True,
+) -> None:
+    """Fold the automation back into the store.
+
+    sequence=None pulls the automation's current actions (the external
+    edits are canonical). M5 wires delete_automation to the
+    owned_scene_cleanup policy; disabled-not-deleted keeps the automation
+    but drops our pointer.
+    """
+    slot = store.get_slot(entry_id, action_id)
+    if slot is None:
+        raise HomeAssistantError(f"No slot {entry_id}/{action_id}")
+    config_id = slot.get("automation_id")
+
+    if sequence is None:
+        sequence = []
+        if config_id and (raw := await _get_config_store(hass).async_get(config_id)):
+            actions = raw.get("actions", raw.get("action", []))
+            sequence = actions if isinstance(actions, list) else [actions]
+
+    if config_id:
+        if delete_automation:
+            await _get_config_store(hass).async_delete(config_id)
+        elif entity_id := automation_entity_id(hass, config_id):
+            await hass.services.async_call(
+                AUTOMATION_DOMAIN, "turn_off", {"entity_id": entity_id}, blocking=True
+            )
+
+    slot["sequence"] = sequence
+    slot["materialized"] = False
+    slot["automation_id"] = None
+    store.async_set_slot(entry_id, action_id, slot)
+
+
+async def async_check_orphans(
+    hass: HomeAssistant, store: RemoteMapperStore, entry_id: str
+) -> list[str]:
+    """Reset slots whose automation vanished (deleted behind our back)."""
+    remote = store.get_remote(entry_id)
+    if remote is None:
+        return []
+    orphaned: list[str] = []
+    for action_id, slot in remote.get("slots", {}).items():
+        if not slot.get("materialized"):
+            continue
+        config_id = slot.get("automation_id")
+        if config_id and await _get_config_store(hass).async_get(config_id):
+            continue
+        slot["materialized"] = False
+        slot["automation_id"] = None
+        store.async_set_slot(entry_id, action_id, slot)
+        orphaned.append(action_id)
+    if orphaned:
+        _LOGGER.warning(
+            "Remote %s: automations for %s vanished — slots reset to card-only",
+            entry_id,
+            orphaned,
+        )
+    return orphaned

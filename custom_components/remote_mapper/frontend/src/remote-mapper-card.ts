@@ -71,6 +71,14 @@ interface ImportScan {
   skipped: Array<{ entity_id: string; alias: string; reason: string }>;
 }
 
+interface LiveAutomation {
+  config_id: string;
+  entity_id: string | null;
+  alias: string | null;
+  actions: unknown[];
+  edit_url: string;
+}
+
 declare global {
   interface Window {
     customCards?: Array<Record<string, unknown>>;
@@ -86,6 +94,8 @@ export class RemoteMapperCard extends LitElement {
   @state() private _editingAction?: string;
   @state() private _draft = "";
   @state() private _draftError?: string;
+  @state() private _draftMaterialized = false;
+  @state() private _editingLive?: LiveAutomation;
   @state() private _flash?: string;
   @state() private _importScan?: ImportScan;
   @state() private _importSelected: Set<number> = new Set();
@@ -227,11 +237,31 @@ export class RemoteMapperCard extends LitElement {
     this._editingAction = actionId;
     this._draft = JSON.stringify(slot?.sequence ?? [], null, 2);
     this._draftError = undefined;
+    this._draftMaterialized = slot?.materialized ?? false;
+    this._editingLive = undefined;
+    if (slot?.materialized) {
+      // The automation is canonical — fetch its current actions so a
+      // dematerialize save folds the live version back in (draft-only
+      // until Save; Cancel is a true no-op).
+      void this._hass!.callWS<{ slot: SlotRecord; live: LiveAutomation | null }>(
+        {
+          type: "remote_mapper/get_slot",
+          entry_id: this._entryId,
+          action_id: actionId,
+        }
+      ).then((res) => {
+        if (this._editingAction === actionId && res.live) {
+          this._editingLive = res.live;
+          this._draft = JSON.stringify(res.live.actions ?? [], null, 2);
+        }
+      });
+    }
   }
 
   private _closeEditor(): void {
     this._editingAction = undefined;
     this._draftError = undefined;
+    this._editingLive = undefined;
   }
 
   private async _saveDraft(): Promise<void> {
@@ -241,6 +271,7 @@ export class RemoteMapperCard extends LitElement {
         entry_id: this._entryId,
         action_id: this._editingAction,
         sequence_yaml: this._draft,
+        materialized: this._draftMaterialized,
       });
       this._closeEditor();
     } catch (err) {
@@ -497,9 +528,28 @@ export class RemoteMapperCard extends LitElement {
       <div class="modal-backdrop" @click=${this._closeEditor}>
         <div class="modal" @click=${(e: Event) => e.stopPropagation()}>
           <h3>${this._editingAction}</h3>
-          <p class="hint">
-            Sequence (YAML or JSON) — same format as automation actions.
-          </p>
+          ${this._editingLive
+            ? html`<p class="hint">
+                Linked to <b>${this._editingLive.alias}</b> —
+                <a href=${this._editingLive.edit_url}>Edit in HA</a>. Unticking
+                "automation" below deletes it on Save and moves its actions
+                into this card. Cancel keeps things as they are.
+              </p>`
+            : html`<p class="hint">
+                Sequence (YAML or JSON) — same format as automation actions.
+              </p>`}
+          <label class="hint">
+            <input
+              type="checkbox"
+              .checked=${this._draftMaterialized}
+              @change=${(e: Event) => {
+                this._draftMaterialized = (
+                  e.target as HTMLInputElement
+                ).checked;
+              }}
+            />
+            Create as automation (editable/traceable in HA)
+          </label>
           <textarea
             .value=${this._draft}
             spellcheck="false"

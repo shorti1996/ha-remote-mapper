@@ -102,6 +102,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     entry.async_on_unload(dispatcher.async_detach)
     hass.data[DOMAIN][entry.entry_id] = {"dispatcher": dispatcher}
+
+    async def _check_orphans(_event: Any = None) -> None:
+        from .const import EVENT_UPDATED
+        from .materializer import async_check_orphans
+
+        orphaned = await async_check_orphans(hass, store, entry.entry_id)
+        if orphaned:
+            hass.bus.async_fire(
+                EVENT_UPDATED,
+                {
+                    "entry_id": entry.entry_id,
+                    "kind": "orphans_reset",
+                    "action_ids": orphaned,
+                },
+            )
+
+    # Deferred: the automation component may not be loaded yet at our
+    # setup; the yaml fallback makes the check safe either way.
+    if hass.state is CoreState.running:
+        entry.async_create_task(hass, _check_orphans())
+    else:
+        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _check_orphans)
     return True
 
 
