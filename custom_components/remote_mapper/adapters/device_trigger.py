@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
+import voluptuous as vol
 from homeassistant.components.device_automation import (
     DeviceAutomationType,
     async_get_device_automations,
@@ -88,10 +89,17 @@ class DeviceTriggerAdapter:
         return {**template, "subtype": action_id}
 
     def _template_trigger(self, device_id: str) -> dict[str, Any]:
-        """Base dict for not-yet-discovered subtypes."""
-        if probed := self._probe_cache.get(device_id):
-            return dict(probed[0])
-        # Nothing probed at all — assume the Z2M MQTT convention.
+        """Base dict for not-yet-discovered subtypes.
+
+        Only subtype-carrying triggers are usable templates — a device
+        also exposes its entities' device triggers (sensor/button/…)
+        which have no subtype; cloning one of those and injecting a
+        subtype fails the provider schema ("extra keys not allowed").
+        """
+        for trigger in self._probe_cache.get(device_id, []):
+            if trigger.get("subtype") is not None:
+                return dict(trigger)
+        # Nothing subtype-shaped probed — assume the Z2M MQTT convention.
         return {
             "platform": "device",
             "domain": "mqtt",
@@ -136,7 +144,24 @@ class DeviceTriggerAdapter:
                     }
                 )
 
-        validated = await async_validate_trigger_config(hass, configs)
+        # Validate per-config: one bad trigger (renamed subtype, foreign
+        # provider quirk) must not take down the whole remote.
+        validated: list[dict[str, Any]] = []
+        for config_item in configs:
+            try:
+                validated.extend(
+                    await async_validate_trigger_config(hass, [config_item])
+                )
+            except vol.Invalid as err:
+                _LOGGER.warning(
+                    "Skipping trigger for %s/%s — %s (config: %s)",
+                    device_id,
+                    config_item.get("id"),
+                    err,
+                    config_item,
+                )
+        if not validated:
+            raise HomeAssistantError(f"No valid trigger config for device {device_id}")
 
         async def _handle(
             run_variables: dict[str, Any], context: Context | None = None

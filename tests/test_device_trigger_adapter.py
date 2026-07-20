@@ -96,6 +96,68 @@ async def test_subscribe_placeholder_arms_on_discovery(
     unsub()
 
 
+async def test_subscribe_with_foreign_entity_triggers(
+    hass, remote_device, adapter
+) -> None:
+    """Devices expose their entities' device triggers too (no subtype).
+
+    Regression: cloning one of those as the placeholder template injected
+    a subtype into a schema that forbids it ("extra keys not allowed"),
+    killing entry setup for real remotes.
+    """
+    from unittest.mock import patch
+
+    from custom_components.remote_mapper.adapters import device_trigger as dt_mod
+
+    foreign = {
+        "platform": "device",
+        "domain": "sensor",
+        "device_id": remote_device,
+        "entity_id": "abcdef0123456789",
+        "type": "battery_level",
+        "metadata": {},
+    }
+    mqtt_trigger = {
+        "platform": "device",
+        "domain": "mqtt",
+        "device_id": remote_device,
+        "type": "action",
+        "subtype": "1_single",
+        "metadata": {},
+    }
+
+    received: list[str] = []
+    with patch.object(
+        dt_mod,
+        "async_get_device_automations",
+        return_value={remote_device: [foreign, mqtt_trigger]},
+    ):
+        # foreign first — the old template picked probed[0] blindly
+        unsub = await adapter.async_subscribe(
+            hass,
+            {"device_id": remote_device},
+            ["1_single", "9_never_seen"],
+            lambda action_id, raw: received.append(action_id),
+            "Test Remote",
+        )
+
+    fire_remote_action(hass, "1_single")
+    await hass.async_block_till_done()
+    assert received == ["1_single"]
+    unsub()
+
+    # default_actions must not surface the foreign trigger either
+    with patch.object(
+        dt_mod,
+        "async_get_device_automations",
+        return_value={remote_device: [foreign, mqtt_trigger]},
+    ):
+        actions = await adapter.async_default_actions(
+            hass, {"device_id": remote_device}
+        )
+    assert actions == ["1_single"]
+
+
 async def test_subscribe_unknown_device_raises(
     hass, mqtt_stopped_cleanly, adapter
 ) -> None:
