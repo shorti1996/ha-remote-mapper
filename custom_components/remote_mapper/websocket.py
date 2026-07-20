@@ -46,6 +46,12 @@ def _fire_updated(hass: HomeAssistant, entry_id: str, kind: str) -> None:
 async def _validated_sequence(hass: HomeAssistant, msg: dict) -> list[dict[str, Any]]:
     """Parse (optionally from YAML) and validate a sequence.
 
+    Validation is a GATE — the returned sequence is the RAW input, never
+    the validated output. Validators rewrite values into runtime objects
+    (template strings → Template, durations → timedelta) that neither
+    JSON-serialize (WS responses, Store persistence) nor yaml-dump
+    (materializer). The dispatcher re-validates at run time.
+
     Raises vol.Invalid / HomeAssistantError on bad input — callers map
     that to ERR_INVALID_SEQUENCE.
     """
@@ -55,8 +61,13 @@ async def _validated_sequence(hass: HomeAssistant, msg: dict) -> list[dict[str, 
         sequence = msg["sequence"]
     if sequence in (None, ""):
         sequence = []
+    if isinstance(sequence, dict):
+        sequence = [sequence]
+    if not isinstance(sequence, list):
+        raise vol.Invalid("Sequence must be a list of actions")
     validated = cv.SCRIPT_SCHEMA(sequence)
-    return await async_validate_actions_config(hass, validated)
+    await async_validate_actions_config(hass, validated)
+    return sequence
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/ping"})

@@ -231,7 +231,16 @@ async def test_apply_import(hass, hass_ws_client, remote_device) -> None:
                 "alias": "Pilot",
                 "trigger": _device_trigger(remote_device, "1_single"),
                 "action": SEQ_B1,
-            }
+            },
+            {
+                # templates must survive import as raw strings (regression:
+                # persisting the VALIDATED config stored Template objects,
+                # which broke WS serialization and store saves)
+                "id": "auto_tmpl",
+                "alias": "Templated",
+                "trigger": _device_trigger(remote_device, "1_double"),
+                "action": SEQ_B2,
+            },
         ],
     )
 
@@ -250,8 +259,11 @@ async def test_apply_import(hass, hass_ws_client, remote_device) -> None:
     )
     res = await client.receive_json()
     assert res["success"]
-    assert res["result"]["applied"] == ["1_single"]
-    assert res["result"]["disabled"] == ["automation.pilot"]
+    assert res["result"]["applied"] == ["1_single", "1_double"]
+    assert res["result"]["disabled"] == [
+        "automation.pilot",
+        "automation.templated",
+    ]
 
     # Original disabled — not deleted
     state = hass.states.get("automation.pilot")
@@ -264,6 +276,20 @@ async def test_apply_import(hass, hass_ws_client, remote_device) -> None:
         "entity_id": "automation.pilot",
         "config_id": "auto_b",
     }
+
+    # Template stays a raw string in the store…
+    tmpl_slot = store.get_slot(entry.entry_id, "1_double")
+    assert tmpl_slot["sequence"] == SEQ_B2
+    assert isinstance(tmpl_slot["sequence"][0]["if"][0]["value_template"], str)
+    # …and the full remote view survives WS JSON serialization
+    await client.send_json_auto_id(
+        {"type": f"{DOMAIN}/get_remote", "entry_id": entry.entry_id}
+    )
+    res = await client.receive_json()
+    assert res["success"], res
+    assert res["result"]["slots"]["1_double"]["sequence"] == SEQ_B2
+    # …and the debounced store save can serialize it
+    await store.async_flush()
 
     # The physical event now fires exactly once (slot, not the automation)
     calls.clear()

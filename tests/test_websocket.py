@@ -157,6 +157,53 @@ async def test_save_slot_yaml_and_validation(
     assert res["error"]["code"] == "invalid_sequence"
 
 
+async def test_save_slot_keeps_templates_raw(
+    hass, hass_ws_client, remote_device
+) -> None:
+    """Templates persist as strings (validated output must never be stored)."""
+    entry = await _setup_remote(hass, remote_device)
+    client = await hass_ws_client(hass)
+
+    async_mock_service(hass, "test", "automation")
+    sequence = [
+        {
+            "if": [
+                {
+                    "condition": "template",
+                    "value_template": "{{ states('light.x') == 'on' }}",
+                }
+            ],
+            "then": [{"action": "test.automation"}],
+        }
+    ]
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/save_slot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_single",
+            "sequence": sequence,
+        },
+    )
+    assert res["success"], res
+    assert res["result"]["slot"]["sequence"] == sequence
+
+    # get_remote must JSON-serialize (this is where Template objects blew up)
+    res = await _ws(
+        client, {"type": f"{DOMAIN}/get_remote", "entry_id": entry.entry_id}
+    )
+    assert res["success"], res
+    assert res["result"]["slots"]["1_single"]["sequence"] == sequence
+
+    await hass.data[DOMAIN]["store"].async_flush()
+
+    # The slot still executes through runtime validation
+    fire_remote_action(hass, "1_single")
+    await hass.async_block_till_done()
+    slot = hass.data[DOMAIN]["store"].get_slot(entry.entry_id, "1_single")
+    assert slot["last_error"] is None
+
+
 async def test_archive_slot(hass, hass_ws_client, remote_device) -> None:
     """Archive flag flips; archiving an empty slot errors."""
     entry = await _setup_remote(hass, remote_device)
