@@ -62,6 +62,7 @@ interface RemoteData {
   layout: { actions?: string[] };
   card_layout: CanvasLayout | null;
   slots: Record<string, SlotRecord>;
+  stale_actions?: string[];
 }
 
 interface RemoteListItem {
@@ -711,6 +712,13 @@ export class RemoteMapperCard extends LitElement implements EditHost {
           : nothing}
         ${slot?.archived
           ? html`<span class="tile-badge">archived</span>`
+          : nothing}
+        ${this._remote!.stale_actions?.includes(w.id)
+          ? html`<span
+              class="tile-badge warn"
+              title="The source no longer reports this action (renamed upstream?)"
+              >stale</span
+            >`
           : nothing}
         ${editing && selected
           ? html`${(["nw", "ne", "sw", "se"] as const).map(

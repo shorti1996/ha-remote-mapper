@@ -69,6 +69,11 @@ function t(t,e,i,s){var o,r=arguments.length,n=r<3?e:null===s?s=Object.getOwnPro
               >!</span
             >`:B}
         ${s?.archived?W`<span class="tile-badge">archived</span>`:B}
+        ${this._remote.stale_actions?.includes(t.id)?W`<span
+              class="tile-badge warn"
+              title="The source no longer reports this action (renamed upstream?)"
+              >stale</span
+            >`:B}
         ${e&&i?W`${["nw","ne","sw","se"].map(e=>W`
                 <span
                   class="handle ${e}"

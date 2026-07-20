@@ -8,13 +8,41 @@ from homeassistant.data_entry_flow import FlowResultType
 from custom_components.remote_mapper.const import DOMAIN
 
 
-async def test_full_flow(hass, remote_device) -> None:
-    """Device pick → probed actions (+ custom) → entry with layout."""
+async def test_z2m_topic_flow(hass, mqtt_stopped_cleanly) -> None:
+    """Manual raw-topic source creates a working entry."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
     )
-    assert result["type"] is FlowResultType.FORM
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "z2m_topic"}
+    )
+    assert result["step_id"] == "z2m_topic"
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"topic": "zigbee2mqtt/kitchen_remote", "actions": ["1_single", "1_hold"]},
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["title"] == "kitchen_remote"
+    assert result["data"] == {
+        "source": "z2m_mqtt",
+        "source_config": {"topic": "zigbee2mqtt/kitchen_remote"},
+        "layout": {"actions": ["1_single", "1_hold"]},
+    }
+
+
+async def test_full_flow(hass, remote_device) -> None:
+    """Menu → device pick → probed actions (+ custom) → entry with layout."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_USER}
+    )
+    assert result["type"] is FlowResultType.MENU
     assert result["step_id"] == "user"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "device"}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "device"
 
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {"device_id": remote_device}
@@ -42,6 +70,9 @@ async def test_reprobe_reshows_form(hass, remote_device) -> None:
         DOMAIN, context={"source": SOURCE_USER}
     )
     result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "device"}
+    )
+    result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {"device_id": remote_device}
     )
     result = await hass.config_entries.flow.async_configure(
@@ -55,6 +86,9 @@ async def test_empty_actions_error(hass, remote_device) -> None:
     """Submitting no actions shows an error, not an entry."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "device"}
     )
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {"device_id": remote_device}
@@ -72,6 +106,9 @@ async def test_duplicate_device_aborts(hass, remote_device) -> None:
         DOMAIN, context={"source": SOURCE_USER}
     )
     result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "device"}
+    )
+    result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {"device_id": remote_device}
     )
     await hass.config_entries.flow.async_configure(
@@ -81,6 +118,9 @@ async def test_duplicate_device_aborts(hass, remote_device) -> None:
 
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "device"}
     )
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {"device_id": remote_device}

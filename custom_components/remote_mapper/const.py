@@ -36,9 +36,15 @@ CONF_SOURCE_CONFIG: Final = "source_config"
 CONF_LAYOUT: Final = "layout"
 CONF_ACTIONS: Final = "actions"
 CONF_DEVICE_ID: Final = "device_id"
+CONF_TOPIC: Final = "topic"
+CONF_ENTITY_ID: Final = "entity_id"
+CONF_VALUE_TEMPLATE: Final = "value_template"
 
 # Adapter ids
 ADAPTER_DEVICE_TRIGGER: Final = "device_trigger"
+ADAPTER_Z2M_MQTT: Final = "z2m_mqtt"
+ADAPTER_EVENT_ENTITY: Final = "event_entity"
+ADAPTER_MQTT_GENERIC: Final = "mqtt_generic"
 
 # Options keys
 CONF_SNAPSHOT_ENTITIES: Final = "snapshot_entities"

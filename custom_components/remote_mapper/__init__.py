@@ -103,7 +103,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(dispatcher.async_detach)
     hass.data[DOMAIN][entry.entry_id] = {"dispatcher": dispatcher}
 
-    async def _check_orphans(_event: Any = None) -> None:
+    async def _post_setup(_event: Any = None) -> None:
         from .const import EVENT_UPDATED
         from .materializer import async_check_orphans
 
@@ -117,14 +117,74 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     "action_ids": orphaned,
                 },
             )
+        await _async_drift_check(hass, store, entry, action_ids)
 
-    # Deferred: the automation component may not be loaded yet at our
-    # setup; the yaml fallback makes the check safe either way.
+    # Deferred: the automation component (and lazy MQTT discovery) may
+    # not be ready at our setup; the yaml fallback keeps it safe anyway.
     if hass.state is CoreState.running:
-        entry.async_create_task(hass, _check_orphans())
+        entry.async_create_task(hass, _post_setup())
     else:
-        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _check_orphans)
+        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _post_setup)
     return True
+
+
+async def _async_drift_check(
+    hass: HomeAssistant,
+    store: RemoteMapperStore,
+    entry: ConfigEntry,
+    configured_actions: list[str],
+) -> None:
+    """Additive drift diff (design §9, plan M7).
+
+    Re-probe the source: newly discovered actions are ADDED to the
+    layout; configured actions the source no longer reports are flagged
+    stale (card badge) — never removed, mappings are user state.
+    An empty probe is skipped: fallback adapters can't enumerate, and a
+    broker hiccup must not flag everything stale.
+    """
+    from .adapters import get_adapter
+    from .const import EVENT_UPDATED
+
+    remote = store.get_remote(entry.entry_id)
+    if remote is None:
+        return
+    adapter = get_adapter(remote["source"])
+    probed = await adapter.async_default_actions(hass, remote["source_config"])
+    if not probed:
+        return
+
+    added = [a for a in probed if a not in configured_actions]
+    stale = sorted(a for a in configured_actions if a not in probed)
+    changed = False
+    if added:
+        remote["layout"][CONF_ACTIONS] = [*configured_actions, *added]
+        changed = True
+        _LOGGER.info(
+            "Remote %s: newly discovered actions %s added to layout",
+            entry.title,
+            added,
+        )
+    if remote.get("stale_actions") != stale:
+        remote["stale_actions"] = stale
+        changed = True
+        if stale:
+            _LOGGER.warning(
+                "Remote %s: configured actions %s no longer reported by the "
+                "source (renamed upstream?) — flagged stale",
+                entry.title,
+                stale,
+            )
+    if changed:
+        store.async_schedule_save()
+        hass.bus.async_fire(
+            EVENT_UPDATED,
+            {
+                "entry_id": entry.entry_id,
+                "kind": "drift",
+                "added": added,
+                "stale": stale,
+            },
+        )
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

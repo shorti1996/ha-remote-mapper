@@ -105,6 +105,7 @@ async def ws_get_remote(
             "layout": remote.get("layout", {}),
             "card_layout": remote.get("card_layout"),
             "slots": remote.get("slots", {}),
+            "stale_actions": remote.get("stale_actions", []),
         },
     )
 

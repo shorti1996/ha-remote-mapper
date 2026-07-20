@@ -3,7 +3,16 @@
     "step": {
       "user": {
         "title": "Add remote",
-        "description": "Pick the device whose buttons you want to map (Zigbee2MQTT, ZHA, or any device publishing device triggers).",
+        "menu_options": {
+          "device": "Device with triggers (Zigbee2MQTT, ZHA, …) — recommended",
+          "z2m_topic": "Zigbee2MQTT raw topic",
+          "event_entity": "Event entity (event.*_action)",
+          "mqtt_generic": "Generic MQTT topic + template"
+        }
+      },
+      "device": {
+        "title": "Pick device",
+        "description": "Pick the device whose buttons you want to map.",
         "data": {
           "device_id": "Device"
         }
@@ -15,10 +24,35 @@
           "actions": "Actions",
           "reprobe": "Probe again"
         }
+      },
+      "z2m_topic": {
+        "title": "Zigbee2MQTT raw topic",
+        "description": "The device topic, e.g. zigbee2mqtt/bedroom_remote. Type the action ids the remote publishes (press buttons and watch the topic to find them).",
+        "data": {
+          "topic": "Topic",
+          "actions": "Action ids"
+        }
+      },
+      "event_entity": {
+        "title": "Event entity",
+        "description": "Actions default to the entity's event_types; override to rename.",
+        "data": {
+          "entity_id": "Event entity",
+          "actions": "Action ids (optional override)"
+        }
+      },
+      "mqtt_generic": {
+        "title": "Generic MQTT",
+        "description": "Any topic publishing button events. The optional template extracts the action id from the payload (e.g. {{ value_json.button }}); without it the raw payload is the id.",
+        "data": {
+          "topic": "Topic",
+          "value_template": "Value template",
+          "actions": "Action ids"
+        }
       }
     },
     "error": {
-      "no_actions": "No actions selected. Press each button and probe again, or enter action ids manually."
+      "no_actions": "No actions given. Press each button and probe again, or enter action ids manually."
     },
     "abort": {
       "already_configured": "This remote is already configured."

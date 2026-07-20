@@ -2,28 +2,53 @@
 
 Home Assistant custom integration (with bundled Lovelace card) that turns
 physical remotes (Zigbee/MQTT/…) into first-class dashboard objects: each
-remote gets a card mirroring its buttons; each button × event can be assigned
-an action, executed by the integration or materialized as a native HA
-automation. Includes one-tap snapshot-to-scene.
+remote gets a card mirroring its buttons; each button × event ("slot") can
+be assigned an action, executed by the integration or materialized as a
+native HA automation. Includes one-tap snapshot-to-scene.
 
-Status: **M0 — skeleton**. Backend registers a hello-world WebSocket command
-(`remote_mapper/ping`) and serves a stub card that performs the handshake.
-See `remote-mapper-design.md` and `ai/03-implementation-plan.md` for the full
-design and milestone plan.
+## Features
+
+- **Canvas card** — drag slot tiles once into an arrangement mirroring the
+  physical device (long-press or pencil to edit; undo, D-pad nudge,
+  resize). Layout persists server-side with the remote, not the dashboard.
+- **Slot editor tiers** — quick chips (activate scene / toggle entity /
+  run script via native HA pickers), YAML editor for arbitrary sequences
+  (full automation-action syntax: `choose`, `if/then`, templates, …).
+- **Tap to test** — tapping an assigned tile fires its sequence
+  (a dashboard gesture, distinct from the physical button event).
+- **Materialize toggle** — per slot: "create as automation". On = the slot
+  lives in HA's automation system (native editor, traces, `related`
+  search); off = folds the automation (with any external edits) back into
+  the card. Mode switch, not export.
+- **Snapshot-to-scene** — set the room how you like it, press 📸: current
+  states of the remote's entity set become a persistent scene bound to the
+  button. Re-snapshot updates the same scene in place.
+- **Scene ownership** — only scenes the integration created are ever
+  prompted about; one remembered choice (ask/always/never) covers scene
+  and automation cleanup.
+- **Import assistant** — absorbs existing button automations (one big
+  `choose` keyed on trigger ids, or one automation per button) into slots
+  losslessly; sources are disabled, never deleted; anything unclassifiable
+  is flagged, never dropped.
+- **Drift handling** — newly discovered actions are added automatically;
+  actions the source stops reporting get a "stale" badge.
+
+## Sources (adapters)
+
+| Adapter | Use for | Enumerates actions? |
+|---|---|---|
+| **Device triggers** (default) | Z2M, ZHA — any device publishing device triggers | yes (press each button once — Z2M discovery is lazy) |
+| Zigbee2MQTT raw topic | Z2M without HA discovery | no (type ids manually) |
+| Event entity | `event.*_action` entities (experimental in Z2M) | yes (`event_types`) |
+| Generic MQTT | deCONZ, ESPHome, custom firmware | no |
 
 ## Installation
 
-### HACS (custom repository)
+HACS → custom repository (category: Integration) → install → restart →
+*Settings → Devices & services → Add integration → Remote Mapper*.
 
-Add this repo as a custom repository (category: Integration), install, restart
-HA, then add the integration via *Settings → Devices & Services*.
-
-### Lovelace resource
-
-With Lovelace in **storage mode** (default) the card resource is registered
-automatically.
-
-With Lovelace in **YAML mode**, add the resource manually:
+With Lovelace in **storage mode** (default) the card resource registers
+automatically. In **YAML mode** add it manually:
 
 ```yaml
 lovelace:
@@ -33,29 +58,46 @@ lovelace:
       type: module
 ```
 
+Card usage: add `custom:remote-mapper-card`; with a single remote no
+config is needed, otherwise set `entry_id`.
+
 ## Development
 
-Requirements: [uv](https://docs.astral.sh/uv/) (Python ≥ 3.14 fetched
+Requirements: [uv](https://docs.astral.sh/uv/) (Python ≥ 3.14.2 fetched
 automatically), Node 22+, Docker.
 
 ```sh
-make dev        # build the card (unminified, sourcemaps)
-make build      # production card build (committed to www/)
+make dev        # card build (unminified, sourcemaps)
+make build      # production card build (output committed in www/)
 make test       # pytest (pytest-homeassistant-custom-component)
 make lint       # ruff check + format check
 make ha-up      # dev HA (stable) + mosquitto on :8123 / :1883
 make ha-logs    # follow HA logs
 ```
 
-`docker/compose.yaml` mounts `custom_components/remote_mapper` read-only into
-the dev HA instance. A synthetic remote can be simulated with
-`mosquitto_pub -t zigbee2mqtt/test_remote -m '{"action": "1_single"}'` once
-the MQTT integration is configured against the bundled broker
-(host `mosquitto`, port 1883, anonymous). Optional real Zigbee2MQTT:
-`docker compose -f docker/compose.yaml --profile z2m up -d` (adjust the
-serial adapter device first).
+`docker/compose.yaml` mounts `custom_components/remote_mapper` read-only
+into the dev HA. Simulate a remote against the bundled broker:
 
-## Versioning
+```sh
+mosquitto_pub -t "homeassistant/device_automation/x/action_1_single/config" -r \
+  -m '{"automation_type":"trigger","topic":"zigbee2mqtt/x/action","payload":"1_single","type":"action","subtype":"1_single","device":{"identifiers":["zigbee2mqtt_x"],"name":"X"}}'
+mosquitto_pub -t "zigbee2mqtt/x/action" -m "1_single"
+```
 
-`make bump-version VERSION=x.y.z` syncs `manifest.json`, the frontend
-`package.json`, `pyproject.toml`, and `VERSION`.
+Live smoke test against a running HA (see `ai/local-ha-testing.md`):
+`HA_TOKEN=... MQTT_HOST=... uv run python scripts/e2e_live.py`.
+
+The card's canvas engine is vendored from the in-house widget-canvas
+repo (`frontend/src/canvas/`, provenance headers in each file); once that
+repo tags a release exporting `src/lib.ts`, the copies collapse into a
+pinned npm git dependency.
+
+## Release
+
+```sh
+make bump-version VERSION=x.y.z   # syncs manifest, package.json, pyproject, VERSION
+git commit ... && git tag vx.y.z && git push --tags
+```
+
+The release workflow verifies tag == versions, rebuilds the card,
+fails on www/ drift, and attaches the HACS zip.
