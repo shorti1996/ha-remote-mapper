@@ -207,12 +207,23 @@ async def test_foreign_automations_preserved(
     assert len(items) == 2
     assert items[0] == FOREIGN
 
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/clear_slot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_single",
+        },
+    )
+    # Materialized automation is an owned artifact — policy dialog first
+    assert res["result"]["needs_decision"] is True
     await _ws(
         client,
         {
             "type": f"{DOMAIN}/clear_slot",
             "entry_id": entry.entry_id,
             "action_id": "1_single",
+            "decision": "delete",
         },
     )
     assert _automations_yaml(hass) == [FOREIGN]
@@ -237,12 +248,23 @@ async def test_clear_materialized_deletes_automation(
     )
     assert len(_automations_yaml(hass)) == 1
 
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/clear_slot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_single",
+        },
+    )
+    assert res["result"]["needs_decision"] is True
+    assert "automation" in res["result"]["artifacts"]
     await _ws(
         client,
         {
             "type": f"{DOMAIN}/clear_slot",
             "entry_id": entry.entry_id,
             "action_id": "1_single",
+            "decision": "delete",
         },
     )
     assert _automations_yaml(hass) == []

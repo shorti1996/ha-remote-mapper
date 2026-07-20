@@ -23,5 +23,19 @@
     "abort": {
       "already_configured": "This remote is already configured."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Remote options",
+        "data": {
+          "snapshot_entities": "Default snapshot entities (\"this remote controls…\")",
+          "owned_scene_cleanup": "When clearing a slot with an owned scene/automation"
+        },
+        "data_description": {
+          "owned_scene_cleanup": "ask = confirm each time; always_delete / never_delete = remembered choice (set here to reset)."
+        }
+      }
+    }
   }
 }

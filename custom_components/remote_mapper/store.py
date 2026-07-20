@@ -119,6 +119,37 @@ class RemoteMapperStore:
         if remote and remote["slots"].pop(action_id, None) is not None:
             self.async_schedule_save()
 
+    # ── owned scenes (ownership registry, design §7) ─────────────────
+
+    def get_owned_scene(self, scene_id: str) -> dict[str, Any] | None:
+        """Registry entry for a scene created by this integration."""
+        return self.data["owned_scenes"].get(scene_id)
+
+    def async_register_owned_scene(
+        self, scene_id: str, created_for: str, entities: list[str]
+    ) -> None:
+        """Record ownership; entities enable in-place re-snapshot."""
+        self.data["owned_scenes"][scene_id] = {
+            "created_for": created_for,
+            "created_at": dt_util.utcnow().isoformat(),
+            "entities": entities,
+        }
+        self.async_schedule_save()
+
+    def async_drop_owned_scene(self, scene_id: str) -> None:
+        """Drop ownership (scene becomes indistinguishable from hand-made)."""
+        if self.data["owned_scenes"].pop(scene_id, None) is not None:
+            self.async_schedule_save()
+
+    def owned_scenes_for(self, entry_id: str) -> list[str]:
+        """Owned scene ids belonging to one remote."""
+        prefix = f"{entry_id}/"
+        return [
+            scene_id
+            for scene_id, record in self.data["owned_scenes"].items()
+            if record.get("created_for", "").startswith(prefix)
+        ]
+
     def async_record_run(
         self, entry_id: str, action_id: str, error: str | None
     ) -> None:

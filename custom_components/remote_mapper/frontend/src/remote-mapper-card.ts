@@ -96,6 +96,8 @@ export class RemoteMapperCard extends LitElement {
   @state() private _draftError?: string;
   @state() private _draftMaterialized = false;
   @state() private _editingLive?: LiveAutomation;
+  @state() private _clearArtifacts?: Record<string, unknown>;
+  @state() private _clearRemember = false;
   @state() private _flash?: string;
   @state() private _importScan?: ImportScan;
   @state() private _importSelected: Set<number> = new Set();
@@ -279,13 +281,39 @@ export class RemoteMapperCard extends LitElement {
     }
   }
 
-  private async _clearSlot(): Promise<void> {
-    await this._hass!.callWS({
+  private async _clearSlot(decision?: string): Promise<void> {
+    const res = await this._hass!.callWS<{
+      needs_decision?: boolean;
+      artifacts?: Record<string, unknown>;
+    }>({
       type: "remote_mapper/clear_slot",
       entry_id: this._entryId,
       action_id: this._editingAction,
+      ...(decision
+        ? { decision, remember: this._clearRemember }
+        : {}),
     });
+    if (res.needs_decision) {
+      this._clearRemember = false;
+      this._clearArtifacts = res.artifacts;
+      return;
+    }
+    this._clearArtifacts = undefined;
     this._closeEditor();
+  }
+
+  private async _snapshot(reSnapshot: boolean): Promise<void> {
+    try {
+      await this._hass!.callWS({
+        type: "remote_mapper/create_snapshot",
+        entry_id: this._entryId,
+        action_id: this._editingAction,
+        re_snapshot: reSnapshot,
+      });
+      this._closeEditor();
+    } catch (err) {
+      this._draftError = (err as { message?: string }).message ?? String(err);
+    }
   }
 
   private async _openImport(): Promise<void> {
@@ -563,9 +591,23 @@ export class RemoteMapperCard extends LitElement {
           <div class="buttons">
             <button @click=${this._saveDraft}>Save</button>
             <button @click=${this._closeEditor}>Cancel</button>
+            <button
+              title="Capture the current room state as a scene on this button"
+              @click=${() => this._snapshot(false)}
+            >
+              📸 Snapshot
+            </button>
+            ${slot?.scene_id
+              ? html`<button
+                  title="Same scene, same entities, new states"
+                  @click=${() => this._snapshot(true)}
+                >
+                  Re-snapshot
+                </button>`
+              : nothing}
             ${slot
               ? html`
-                  <button class="danger" @click=${this._clearSlot}>
+                  <button class="danger" @click=${() => this._clearSlot()}>
                     Clear
                   </button>
                   <button @click=${this._toggleArchived}>
@@ -574,6 +616,48 @@ export class RemoteMapperCard extends LitElement {
                 `
               : nothing}
           </div>
+          ${this._clearArtifacts ? this._renderClearDialog() : nothing}
+        </div>
+      </div>
+    `;
+  }
+
+  private _renderClearDialog() {
+    const artifacts = this._clearArtifacts!;
+    const parts: string[] = [];
+    if (artifacts.scene) {
+      parts.push(
+        `scene ${(artifacts.scene as { entity_id?: string }).entity_id ?? ""}`
+      );
+    }
+    if (artifacts.automation) {
+      parts.push("its automation");
+    }
+    return html`
+      <div class="decision">
+        <p><b>Also delete ${parts.join(" and ")}?</b></p>
+        <label class="hint">
+          <input
+            type="checkbox"
+            .checked=${this._clearRemember}
+            @change=${(e: Event) => {
+              this._clearRemember = (e.target as HTMLInputElement).checked;
+            }}
+          />
+          Remember my choice
+        </label>
+        <div class="buttons">
+          <button class="danger" @click=${() => this._clearSlot("delete")}>
+            Delete
+          </button>
+          <button @click=${() => this._clearSlot("keep")}>Keep</button>
+          <button
+            @click=${() => {
+              this._clearArtifacts = undefined;
+            }}
+          >
+            Cancel
+          </button>
         </div>
       </div>
     `;
@@ -616,6 +700,15 @@ export class RemoteMapperCard extends LitElement {
     .warn {
       color: var(--warning-color, #ffa600);
       font-size: 0.85em;
+    }
+    .decision {
+      margin-top: 12px;
+      padding: 12px;
+      border: 1px solid var(--warning-color, #ffa600);
+      border-radius: 8px;
+    }
+    .decision p {
+      margin: 0 0 8px;
     }
     .content {
       padding: 0 16px 16px;

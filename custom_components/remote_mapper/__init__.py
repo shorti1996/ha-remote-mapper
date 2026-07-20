@@ -136,8 +136,15 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Drop the remote's store data when the entry is deleted."""
+    """Drop the remote's data + owned artifacts when the entry is deleted.
+
+    Bulk cleanup follows the owned_scene_cleanup policy; only
+    always_delete removes artifacts (nothing is deleted silently).
+    """
+    from .cleanup import async_cleanup_entry
+
     store: RemoteMapperStore | None = hass.data.get(DOMAIN, {}).get("store")
     if store is not None:
+        await async_cleanup_entry(hass, store, entry)
         store.async_remove_remote(entry.entry_id)
         await store.async_flush()

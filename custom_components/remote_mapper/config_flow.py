@@ -5,26 +5,82 @@ from __future__ import annotations
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
+from homeassistant.core import callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.selector import selector
 
 from .adapters import get_adapter
 from .const import (
     ADAPTER_DEVICE_TRIGGER,
+    CLEANUP_ALWAYS_DELETE,
+    CLEANUP_ASK,
+    CLEANUP_NEVER_DELETE,
     CONF_ACTIONS,
     CONF_DEVICE_ID,
     CONF_LAYOUT,
+    CONF_OWNED_SCENE_CLEANUP,
+    CONF_SNAPSHOT_ENTITIES,
     CONF_SOURCE,
     CONF_SOURCE_CONFIG,
     DOMAIN,
 )
 
 
+class RemoteMapperOptionsFlow(OptionsFlow):
+    """Per-remote options: snapshot default entity set + cleanup policy."""
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Show/save the options form."""
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+
+        options = self.config_entry.options
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_SNAPSHOT_ENTITIES,
+                        default=list(options.get(CONF_SNAPSHOT_ENTITIES, [])),
+                    ): selector({"entity": {"multiple": True}}),
+                    vol.Optional(
+                        CONF_OWNED_SCENE_CLEANUP,
+                        default=options.get(CONF_OWNED_SCENE_CLEANUP, CLEANUP_ASK),
+                    ): selector(
+                        {
+                            "select": {
+                                "options": [
+                                    CLEANUP_ASK,
+                                    CLEANUP_ALWAYS_DELETE,
+                                    CLEANUP_NEVER_DELETE,
+                                ],
+                                "mode": "dropdown",
+                            }
+                        }
+                    ),
+                }
+            ),
+        )
+
+
 class RemoteMapperConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for one remote."""
 
     VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> RemoteMapperOptionsFlow:
+        """Return the options flow handler."""
+        return RemoteMapperOptionsFlow()
 
     def __init__(self) -> None:
         """Initialize."""

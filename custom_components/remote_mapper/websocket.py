@@ -221,26 +221,95 @@ async def ws_save_slot(
         vol.Required("type"): f"{DOMAIN}/clear_slot",
         vol.Required("entry_id"): str,
         vol.Required("action_id"): str,
+        vol.Optional("decision"): vol.In(["delete", "keep"]),
+        vol.Optional("remember", default=False): bool,
     }
 )
 @websocket_api.async_response
 async def ws_clear_slot(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
 ) -> None:
-    """Remove a slot record (back to Empty).
+    """Remove a slot record (back to Empty), applying the cleanup policy.
 
-    A materialized slot's automation is integration-owned by definition —
-    clearing deletes it (M5 adds the remembered-choice policy).
+    Owned artifacts (snapshot scene, materialized automation) fall under
+    one remembered choice. Policy "ask" without a decision returns
+    needs_decision — the card shows the dialog and re-calls.
     """
-    from .materializer import _get_config_store
+    from . import cleanup
 
     store = _store(hass)
-    slot = store.get_slot(msg["entry_id"], msg["action_id"])
-    if slot and slot.get("materialized") and slot.get("automation_id"):
-        await _get_config_store(hass).async_delete(slot["automation_id"])
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    artifacts = cleanup.collect_artifacts(
+        hass, store, msg["entry_id"], msg["action_id"]
+    )
+
+    if artifacts:
+        policy = cleanup.get_policy(entry)
+        decision = msg.get("decision")
+        if decision is None:
+            if policy == "ask":
+                connection.send_result(
+                    msg["id"], {"needs_decision": True, "artifacts": artifacts}
+                )
+                return
+            decision = "delete" if policy == "always_delete" else "keep"
+        elif msg["remember"] and entry is not None:
+            cleanup.async_remember_policy(hass, entry, decision)
+        await cleanup.async_cleanup_artifacts(hass, store, artifacts, decision)
+
     store.async_clear_slot(msg["entry_id"], msg["action_id"])
     _fire_updated(hass, msg["entry_id"], "slot_cleared")
     connection.send_result(msg["id"], {})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/create_snapshot",
+        vol.Required("entry_id"): str,
+        vol.Required("action_id"): str,
+        vol.Optional("name"): str,
+        vol.Optional("entities"): [str],
+        vol.Optional("re_snapshot", default=False): bool,
+    }
+)
+@websocket_api.async_response
+async def ws_create_snapshot(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    """Snapshot current state → persistent scene bound to the slot.
+
+    Entity list defaults to the remote's snapshot_entities option
+    (applied server-side); re_snapshot reuses the owned scene's set.
+    """
+    from .const import CONF_SNAPSHOT_ENTITIES
+    from .snapshot import async_create_snapshot
+
+    store = _store(hass)
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    if entry is None or store.get_remote(msg["entry_id"]) is None:
+        connection.send_error(msg["id"], ERR_NOT_FOUND, "Unknown remote")
+        return
+
+    entities = msg.get("entities") or list(
+        entry.options.get(CONF_SNAPSHOT_ENTITIES, [])
+    )
+    name = msg.get("name") or f"{entry.title} {msg['action_id']}"
+
+    try:
+        result = await async_create_snapshot(
+            hass,
+            store,
+            msg["entry_id"],
+            msg["action_id"],
+            entities,
+            name,
+            re_snapshot=msg["re_snapshot"],
+        )
+    except Exception as err:
+        connection.send_error(msg["id"], ERR_INVALID_SEQUENCE, str(err))
+        return
+    _fire_updated(hass, msg["entry_id"], "snapshot_created")
+    connection.send_result(msg["id"], result)
 
 
 @websocket_api.websocket_command(
@@ -418,6 +487,7 @@ def async_register_websocket_commands(hass: HomeAssistant) -> None:
         ws_get_slot,
         ws_save_slot,
         ws_clear_slot,
+        ws_create_snapshot,
         ws_archive_slot,
         ws_save_layout,
         ws_probe_device,
