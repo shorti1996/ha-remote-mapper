@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import shutil
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.automation import DATA_COMPONENT as AUTOMATION_DATA
@@ -74,11 +76,26 @@ class AutomationConfigStore:
             data = load_yaml(self._path)
         except FileNotFoundError:
             return []
-        if not isinstance(data, list):
+        # load_yaml returns {} for an empty file
+        if data is None or data == {}:
             return []
+        if not isinstance(data, list):
+            # NEVER coerce unexpected content to [] — a later write would
+            # destroy the user's automations. Refuse to touch the file.
+            raise HomeAssistantError(
+                f"{self._path} does not contain a list — refusing to modify it"
+            )
         return data
 
     def _write_sync(self, data: list[dict[str, Any]]) -> None:
+        # Last-known-good sidecar: one pre-write copy, cheap insurance
+        # against read/serialize bugs eating hand-written config.
+        try:
+            existing = Path(self._path)
+            if existing.is_file() and existing.stat().st_size > 3:
+                shutil.copyfile(self._path, f"{self._path}.remote_mapper_backup")
+        except OSError:
+            _LOGGER.warning("Could not write backup for %s", self._path)
         write_utf8_file_atomic(self._path, dump(data))
 
     async def async_get(self, config_id: str) -> dict[str, Any] | None:

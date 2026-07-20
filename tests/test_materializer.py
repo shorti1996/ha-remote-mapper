@@ -272,6 +272,60 @@ async def test_clear_materialized_deletes_automation(
     assert store.get_slot(entry.entry_id, "1_single") is None
 
 
+async def test_non_list_yaml_refused(hass, hass_ws_client, remote_device) -> None:
+    """Unexpected automations.yaml content must never be coerced to [].
+
+    Regression guard: coercing would make the next write destroy the
+    user's automations.
+    """
+    entry = await _setup(hass, remote_device)
+    client = await hass_ws_client(hass)
+
+    path = Path(hass.config.path("automations.yaml"))
+    path.write_text("not_a_list:\n  nested: true\n")
+
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/save_slot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_single",
+            "sequence": SEQ,
+            "materialized": True,
+        },
+    )
+    assert not res["success"]
+    assert "refusing" in res["error"]["message"]
+    # file untouched
+    assert path.read_text() == "not_a_list:\n  nested: true\n"
+
+
+async def test_write_leaves_backup(hass, hass_ws_client, remote_device) -> None:
+    """Pre-write sidecar backup preserves the previous file content."""
+    entry = await _setup(hass, remote_device)
+    client = await hass_ws_client(hass)
+
+    from custom_components.remote_mapper.materializer import _get_config_store
+
+    store = _get_config_store(hass)
+    await hass.async_add_executor_job(store._write_sync, [FOREIGN])
+
+    await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/save_slot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_single",
+            "sequence": SEQ,
+            "materialized": True,
+        },
+    )
+    backup = Path(hass.config.path("automations.yaml.remote_mapper_backup"))
+    assert backup.exists()
+    assert load_yaml(str(backup)) == [FOREIGN]
+    backup.unlink()
+
+
 async def test_orphan_reset_on_reload(hass, hass_ws_client, remote_device) -> None:
     """Deleted-behind-our-back automation → slot reset at entry reload."""
     entry = await _setup(hass, remote_device)
