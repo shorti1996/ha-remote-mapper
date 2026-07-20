@@ -3,11 +3,22 @@
     "step": {
       "user": {
         "title": "Add remote",
-        "description": "M0 placeholder — the device picker with button probing replaces this in M1.",
+        "description": "Pick the device whose buttons you want to map (Zigbee2MQTT, ZHA, or any device publishing device triggers).",
         "data": {
-          "name": "Name"
+          "device_id": "Device"
+        }
+      },
+      "actions": {
+        "title": "Button actions",
+        "description": "Found {found} action(s) on {device}. Zigbee2MQTT publishes an action only after its button has been pressed once — press each button/gesture now, enable \"Probe again\", and submit to refresh. You can also type action ids manually (e.g. 1_single, 1_hold).",
+        "data": {
+          "actions": "Actions",
+          "reprobe": "Probe again"
         }
       }
+    },
+    "error": {
+      "no_actions": "No actions selected. Press each button and probe again, or enter action ids manually."
     },
     "abort": {
       "already_configured": "This remote is already configured."

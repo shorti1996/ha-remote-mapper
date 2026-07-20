@@ -33,6 +33,12 @@ EVENT_UPDATED: Final = f"{DOMAIN}_updated"
 # Config entry data keys
 CONF_SOURCE: Final = "source"
 CONF_SOURCE_CONFIG: Final = "source_config"
+CONF_LAYOUT: Final = "layout"
+CONF_ACTIONS: Final = "actions"
+CONF_DEVICE_ID: Final = "device_id"
+
+# Adapter ids
+ADAPTER_DEVICE_TRIGGER: Final = "device_trigger"
 
 # Options keys
 CONF_SNAPSHOT_ENTITIES: Final = "snapshot_entities"

@@ -317,8 +317,12 @@ whole list = sequence.
 
 ## 8. Remaining open questions
 
-1. Diagnostic sensor entities in v1 — decide at M1 (device attach alone may
-   suffice).
+1. ~~Diagnostic sensor entities in v1 — decide at M1 (device attach alone may
+   suffice).~~ **Decided at M1: no sensors in v1.** Device attach gives the
+   device-page grouping; `last_run`/`last_error` live per-slot in the store
+   and surface in the card (M2 badges). Sensor entities would duplicate that
+   with registry/state overhead. Revisit only if users want automations on
+   remote activity.
 2. Materializer write race vs simultaneous UI edits (view's mutation_lock is
    private) — accepted; revisit only if real-world corruption reports.
 3. v2: native `remote_mapper.button` custom trigger (2026.7 integrations can
