@@ -1,0 +1,39 @@
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    ports:
+      - "8123:8123"
+    volumes:
+      - ./ha-config:/config
+      - ../custom_components/remote_mapper:/config/custom_components/remote_mapper:ro
+    environment:
+      - TZ=Europe/Warsaw
+    depends_on:
+      - mosquitto
+    restart: unless-stopped
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    restart: unless-stopped
+
+  # Optional: real Z2M against a coordinator. Start with:
+  #   docker compose -f docker/compose.yaml --profile z2m up -d
+  zigbee2mqtt:
+    image: ghcr.io/koenkk/zigbee2mqtt:latest
+    profiles: ["z2m"]
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./z2m-data:/app/data
+      - /run/udev:/run/udev:ro
+    environment:
+      - TZ=Europe/Warsaw
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+    depends_on:
+      - mosquitto
+    restart: unless-stopped

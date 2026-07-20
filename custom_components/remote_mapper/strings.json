@@ -1,0 +1,16 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add remote",
+        "description": "M0 placeholder — the device picker with button probing replaces this in M1.",
+        "data": {
+          "name": "Name"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This remote is already configured."
+    }
+  }
+}
