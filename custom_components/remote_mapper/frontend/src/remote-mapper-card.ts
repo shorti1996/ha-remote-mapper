@@ -55,6 +55,22 @@ interface RemoteListItem {
   title: string;
 }
 
+interface ImportProposal {
+  action_id: string;
+  sequence: unknown[];
+  source_entity_id: string;
+  source_config_id: string | null;
+  alias: string;
+  disable_source: boolean;
+  mixed: boolean;
+  conflict: boolean;
+}
+
+interface ImportScan {
+  proposals: ImportProposal[];
+  skipped: Array<{ entity_id: string; alias: string; reason: string }>;
+}
+
 declare global {
   interface Window {
     customCards?: Array<Record<string, unknown>>;
@@ -71,6 +87,11 @@ export class RemoteMapperCard extends LitElement {
   @state() private _draft = "";
   @state() private _draftError?: string;
   @state() private _flash?: string;
+  @state() private _importScan?: ImportScan;
+  @state() private _importSelected: Set<number> = new Set();
+  @state() private _importOverwrite = false;
+  @state() private _importBusy = false;
+  @state() private _importError?: string;
 
   private _hass?: HomeAssistant;
   private _config?: RemoteMapperCardConfig;
@@ -236,6 +257,53 @@ export class RemoteMapperCard extends LitElement {
     this._closeEditor();
   }
 
+  private async _openImport(): Promise<void> {
+    this._importError = undefined;
+    this._importOverwrite = false;
+    this._importBusy = false;
+    try {
+      const scan = await this._hass!.callWS<ImportScan>({
+        type: "remote_mapper/scan_import",
+        entry_id: this._entryId,
+      });
+      this._importSelected = new Set(
+        scan.proposals.flatMap((p, i) => (p.conflict ? [] : [i]))
+      );
+      this._importScan = scan;
+    } catch (err) {
+      this._error = String(err);
+    }
+  }
+
+  private _closeImport(): void {
+    this._importScan = undefined;
+  }
+
+  private async _applyImport(): Promise<void> {
+    const scan = this._importScan!;
+    const proposals = scan.proposals.filter((_, i) =>
+      this._importSelected.has(i)
+    );
+    if (!proposals.length) {
+      this._closeImport();
+      return;
+    }
+    this._importBusy = true;
+    try {
+      await this._hass!.callWS({
+        type: "remote_mapper/apply_import",
+        entry_id: this._entryId,
+        proposals,
+        overwrite: this._importOverwrite,
+      });
+      this._closeImport();
+    } catch (err) {
+      this._importError = (err as { message?: string }).message ?? String(err);
+    } finally {
+      this._importBusy = false;
+    }
+  }
+
   private async _toggleArchived(): Promise<void> {
     const slot = this._remote?.slots[this._editingAction!];
     if (!slot) return;
@@ -281,15 +349,26 @@ export class RemoteMapperCard extends LitElement {
       <ha-card>
         <div class="header">
           <span class="title">${this._remote.title}</span>
-          <button
-            class="pencil ${this._editMode ? "active" : ""}"
-            title=${this._editMode ? "Done" : "Edit slots"}
-            @click=${() => {
-              this._editMode = !this._editMode;
-            }}
-          >
-            ${this._editMode ? "✓" : "✎"}
-          </button>
+          <span class="header-buttons">
+            ${this._editMode
+              ? html`<button
+                  class="pencil"
+                  title="Import existing automations"
+                  @click=${this._openImport}
+                >
+                  ⇪
+                </button>`
+              : nothing}
+            <button
+              class="pencil ${this._editMode ? "active" : ""}"
+              title=${this._editMode ? "Done" : "Edit slots"}
+              @click=${() => {
+                this._editMode = !this._editMode;
+              }}
+            >
+              ${this._editMode ? "✓" : "✎"}
+            </button>
+          </span>
         </div>
         <div
           class="grid"
@@ -298,7 +377,92 @@ export class RemoteMapperCard extends LitElement {
           ${actions.map((actionId) => this._renderTile(actionId))}
         </div>
         ${this._editingAction !== undefined ? this._renderEditor() : nothing}
+        ${this._importScan ? this._renderImport() : nothing}
       </ha-card>
+    `;
+  }
+
+  private _renderImport() {
+    const scan = this._importScan!;
+    return html`
+      <div class="modal-backdrop" @click=${this._closeImport}>
+        <div class="modal" @click=${(e: Event) => e.stopPropagation()}>
+          <h3>Import automations</h3>
+          ${scan.proposals.length === 0
+            ? html`<p class="hint">No importable automations found.</p>`
+            : html`
+                <p class="hint">
+                  Selected slots take over; source automations are
+                  <b>disabled</b>, not deleted.
+                </p>
+                <ul class="import-list">
+                  ${scan.proposals.map(
+                    (p, i) => html`
+                      <li>
+                        <label>
+                          <input
+                            type="checkbox"
+                            .checked=${this._importSelected.has(i)}
+                            @change=${(e: Event) => {
+                              const next = new Set(this._importSelected);
+                              if ((e.target as HTMLInputElement).checked) {
+                                next.add(i);
+                              } else {
+                                next.delete(i);
+                              }
+                              this._importSelected = next;
+                            }}
+                          />
+                          <b>${p.action_id}</b> ← ${p.alias}
+                          ${p.conflict
+                            ? html`<span class="warn">(overwrites slot)</span>`
+                            : nothing}
+                          ${p.mixed
+                            ? html`<span class="warn"
+                                >(mixed remotes — source stays enabled)</span
+                              >`
+                            : nothing}
+                        </label>
+                      </li>
+                    `
+                  )}
+                </ul>
+              `}
+          ${scan.skipped.length
+            ? html`
+                <p class="hint">Needs manual import:</p>
+                <ul class="import-list">
+                  ${scan.skipped.map(
+                    (s) => html`<li>${s.alias} — <code>${s.reason}</code></li>`
+                  )}
+                </ul>
+              `
+            : nothing}
+          ${scan.proposals.some((p) => p.conflict)
+            ? html`<label class="hint">
+                <input
+                  type="checkbox"
+                  .checked=${this._importOverwrite}
+                  @change=${(e: Event) => {
+                    this._importOverwrite = (
+                      e.target as HTMLInputElement
+                    ).checked;
+                  }}
+                />
+                Overwrite already-assigned slots
+              </label>`
+            : nothing}
+          ${this._importError
+            ? html`<p class="error">${this._importError}</p>`
+            : nothing}
+          <div class="buttons">
+            <button ?disabled=${this._importBusy} @click=${this._applyImport}>
+              Apply
+            </button>
+            <button @click=${this._closeImport}>Cancel</button>
+          </div>
+        </div>
+      </div>
     `;
   }
 
@@ -386,6 +550,22 @@ export class RemoteMapperCard extends LitElement {
     }
     .pencil.active {
       color: var(--primary-color);
+    }
+    .header-buttons {
+      display: flex;
+      align-items: center;
+    }
+    .import-list {
+      margin: 4px 0 8px;
+      padding-left: 18px;
+      font-size: 0.85em;
+    }
+    .import-list li {
+      margin: 2px 0;
+    }
+    .warn {
+      color: var(--warning-color, #ffa600);
+      font-size: 0.85em;
     }
     .content {
       padding: 0 16px 16px;

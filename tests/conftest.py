@@ -27,10 +27,24 @@ async def mqtt_stopped_cleanly(hass, mqtt_client_mock, mqtt_mock):
     the strict lingering-timer check active for our own timers.
     """
     yield
+    # Detach automation triggers first — their MQTT unsubscribes would
+    # otherwise re-arm the debouncer during hass teardown
+    if hass.services.has_service("automation", "turn_off"):
+        for entity_id in hass.states.async_entity_ids("automation"):
+            await hass.services.async_call(
+                "automation", "turn_off", {"entity_id": entity_id}, blocking=True
+            )
+    # Disconnect cleans the subscribe/unsubscribe debouncers
+    # (EnsureJobAfterCooldown timers from mqtt/util.py)
+    await mqtt_mock.async_disconnect()
+    # Socket close cancels the client's misc-loop timer
     mqtt_client_mock.on_socket_close(
         mqtt_client_mock, None, Mock(fileno=Mock(return_value=-1))
     )
     await hass.async_block_till_done()
+    # Anything processed above (e.g. late discovery) may have re-armed a
+    # debouncer — clean once more.
+    await mqtt_mock.async_disconnect()
 
 
 @pytest.fixture

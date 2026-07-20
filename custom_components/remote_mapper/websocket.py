@@ -253,6 +253,76 @@ async def ws_probe_device(
 
 @websocket_api.websocket_command(
     {
+        vol.Required("type"): f"{DOMAIN}/scan_import",
+        vol.Required("entry_id"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_scan_import(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    """Scan existing automations on the remote's device for import."""
+    from .importer import ImportScanner
+
+    store = _store(hass)
+    remote = store.get_remote(msg["entry_id"])
+    if remote is None:
+        connection.send_error(msg["id"], ERR_NOT_FOUND, "Unknown remote")
+        return
+    device_id = remote.get("source_config", {}).get("device_id")
+    if not device_id:
+        connection.send_error(
+            msg["id"], ERR_NOT_FOUND, "Import needs a device-based remote"
+        )
+        return
+    scanner = ImportScanner(hass, msg["entry_id"], device_id)
+    connection.send_result(msg["id"], scanner.scan(store))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/apply_import",
+        vol.Required("entry_id"): str,
+        vol.Required("proposals"): [dict],
+        vol.Optional("overwrite", default=False): bool,
+    }
+)
+@websocket_api.async_response
+async def ws_apply_import(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    """Apply selected import proposals; sources disabled, never deleted."""
+    from .importer import async_apply
+
+    store = _store(hass)
+    if store.get_remote(msg["entry_id"]) is None:
+        connection.send_error(msg["id"], ERR_NOT_FOUND, "Unknown remote")
+        return
+
+    validated_proposals = []
+    for proposal in msg["proposals"]:
+        try:
+            sequence = await _validated_sequence(
+                hass, {"sequence": proposal.get("sequence", [])}
+            )
+        except Exception as err:
+            connection.send_error(
+                msg["id"],
+                ERR_INVALID_SEQUENCE,
+                f"{proposal.get('action_id')}: {err}",
+            )
+            return
+        validated_proposals.append({**proposal, "sequence": sequence})
+
+    result = await async_apply(
+        hass, store, msg["entry_id"], validated_proposals, msg["overwrite"]
+    )
+    _fire_updated(hass, msg["entry_id"], "import_applied")
+    connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command(
+    {
         vol.Required("type"): f"{DOMAIN}/run_slot",
         vol.Required("entry_id"): str,
         vol.Required("action_id"): str,
@@ -290,6 +360,8 @@ def async_register_websocket_commands(hass: HomeAssistant) -> None:
         ws_archive_slot,
         ws_save_layout,
         ws_probe_device,
+        ws_scan_import,
+        ws_apply_import,
         ws_run_slot,
     ):
         websocket_api.async_register_command(hass, command)
