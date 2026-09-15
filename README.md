@@ -55,10 +55,16 @@ device, where every button shows what it does and lets you change it.
 - **Real automations when you want them.** Tick *Create as automation* on
   any button: it becomes a native HA automation (traces, the HA editor,
   "related" search). Untick to fold it back into the card. Your choice,
-  per button, reversible.
+  per button, reversible. The card is the map; HA's editors stay the
+  workshop.
 
-- **Import what you already have.** Existing automations for the remote
-  are absorbed into the card; the originals are disabled, never deleted.
+- **Keep what you already have.** Existing automations for the remote are
+  **linked**: they stay native and enabled, the card shows them by name
+  with their on/off state, and one tap opens them in HA's automation
+  editor (scenes and scripts they use get their own edit buttons). Prefer
+  the card as the single place? Choose **absorb** instead: the actions
+  move into the card and the original is disabled, never deleted.
+  "Link existing automation" is also a quick action for any button.
 
 - **Appearance.** Colors and pad opacity in the card editor; follows your
   theme and HA's font-size setting out of the box.

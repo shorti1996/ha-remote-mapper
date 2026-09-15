@@ -83,6 +83,10 @@ interface SlotRecord {
   scene_id: string | null;
   materialized: boolean;
   automation_id: string | null;
+  /** false = linked to a native automation we did not create. */
+  owned?: boolean;
+  /** Set by get_remote for materialized/linked slots. */
+  automation_entity_id?: string | null;
   archived: boolean;
   last_run: string | null;
   last_error: string | null;
@@ -116,6 +120,9 @@ interface ImportProposal {
   /** Several automations shared this trigger — sequences concatenated. */
   merged?: boolean;
   sources?: Array<{ entity_id: string; alias: string }>;
+  /** link = keep native (default); absorb = copy in, disable original. */
+  linkable?: boolean;
+  mode?: "link" | "absorb";
 }
 
 interface ImportScan {
@@ -129,9 +136,11 @@ interface LiveAutomation {
   alias: string | null;
   actions: unknown[];
   edit_url: string;
+  owned?: boolean;
+  state?: string | null;
 }
 
-type QuickMode = "scene" | "toggle" | "script" | "wled_preset" | "custom";
+type QuickMode = "scene" | "toggle" | "script" | "wled_preset" | "link" | "custom";
 
 declare global {
   interface Window {
@@ -580,7 +589,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
         const slot = this._remote.slots[a.action_id];
         out[a.action_id] = {
           assigned: !!slot,
-          archived: !!slot?.archived,
+          archived: !!slot?.archived || this._automationState(slot) === "off",
           summary: this._slotSummary(slot),
           error: slot?.last_error ?? null,
           stale: stale.has(a.action_id),
@@ -682,11 +691,27 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     }
   }
 
-  /** User name if set, else a name inferred from the sequence (naming.ts). */
+  private _isLinked(slot: SlotRecord | undefined): boolean {
+    return !!slot?.materialized && !!slot.automation_id && slot.owned === false;
+  }
+
+  /** Live state of a materialized/linked slot's automation ("on"/"off"). */
+  private _automationState(slot: SlotRecord | undefined): string | undefined {
+    const entity = slot?.automation_entity_id;
+    return entity ? this._hass?.states?.[entity]?.state : undefined;
+  }
+
+  /** User name if set, else the automation's name, else inferred (naming.ts). */
   private _slotSummary(slot: SlotRecord | undefined): string {
     if (!slot) return "unassigned";
     if (slot.name) return slot.name;
-    if (slot.materialized) return "automation";
+    if (slot.materialized) {
+      const entity = slot.automation_entity_id;
+      const friendly = entity
+        ? this._hass?.states?.[entity]?.attributes?.friendly_name
+        : undefined;
+      return typeof friendly === "string" && friendly ? friendly : "automation";
+    }
     return inferName(slot.sequence ?? [], this._hass) || "empty";
   }
 
@@ -700,6 +725,10 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     this._modalOpenedAt = Date.now();
     this._quickMode = quick.mode === "custom" ? "scene" : quick.mode;
     this._quickEntity = quick.entity;
+    if (this._isLinked(slot)) {
+      this._quickMode = "link";
+      this._quickEntity = slot?.automation_entity_id ?? "";
+    }
     this._quickOption = quick.option;
     this._editorTab = quick.mode === "custom" && sequence.length ? "yaml" : "quick";
     this._draft = JSON.stringify(sequence, null, 2);
@@ -750,7 +779,15 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       materialized: this._draftMaterialized,
       name: this._draftName.trim() || null,
     };
-    if (this._editorTab === "quick") {
+    if (this._editorTab === "quick" && this._quickMode === "link") {
+      if (!this._quickEntity) {
+        this._draftError = "Pick an automation first";
+        return;
+      }
+      // Link: no sequence, no materialize toggle — the automation is canonical
+      delete msg.materialized;
+      msg.link_entity_id = this._quickEntity;
+    } else if (this._editorTab === "quick") {
       if (!this._quickEntity) {
         this._draftError = "Pick an entity first";
         return;
@@ -829,16 +866,23 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   // ── hand back to HA ────────────────────────────────────────────────
 
   /** What the release will do, counted from the current slots. */
-  private _releasePlan(): { imported: number; materialized: number; built: number } {
+  private _releasePlan(): {
+    imported: number;
+    linked: number;
+    materialized: number;
+    built: number;
+  } {
     let imported = 0;
+    let linked = 0;
     let materialized = 0;
     let built = 0;
     for (const slot of Object.values(this._remote?.slots ?? {})) {
       if (slot.imported_from) imported++;
+      else if (this._isLinked(slot)) linked++;
       else if (slot.materialized) materialized++;
       else if (slot.sequence?.length && !slot.archived) built++;
     }
-    return { imported, materialized, built };
+    return { imported, linked, materialized, built };
   }
 
   private async _release(): Promise<void> {
@@ -894,6 +938,10 @@ export class RemoteMapperCard extends LitElement implements EditHost {
             <li>
               <b>${plan.imported}</b> imported event(s): the original
               automation(s) are <b>re-enabled</b>, the mapping goes away.
+            </li>
+            <li>
+              <b>${plan.linked}</b> linked event(s): the native automation is
+              <b>left untouched</b>.
             </li>
             <li>
               <b>${plan.materialized}</b> automation-backed event(s): the
@@ -1250,8 +1298,13 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                     const slot = remote.slots[a.action_id];
                     const path = this._automationEditPath(slot);
                     if (path) {
-                      return this._iconButton("mdi:robot", "Open in HA's automation editor", () =>
-                        this._navigate(path)
+                      const off = this._automationState(slot) === "off";
+                      const linked = this._isLinked(slot);
+                      return this._iconButton(
+                        off ? "mdi:robot-off" : "mdi:robot",
+                        `${linked ? "Linked automation" : "Automation"}${off ? " (DISABLED)" : ""} — open in HA's editor`,
+                        () => this._navigate(path),
+                        { active: linked && !off }
                       );
                     }
                     return this._importedSources(slot).map((src) => {
@@ -1467,15 +1520,19 @@ export class RemoteMapperCard extends LitElement implements EditHost {
           <h3>${this._editingAction}</h3>
           ${this._editingLive
             ? html`<p class="hint">
-                Linked to <b>${this._editingLive.alias}</b> —
+                ${this._editingLive.owned === false ? "Linked to" : "Backed by"}
+                <b>${this._editingLive.alias}</b>
+                ${this._editingLive.state === "off" ? html`<span class="warn">(disabled)</span>` : nothing}
+                —
                 <button
                   class="link"
                   @click=${() => this._navigate(this._editingLive!.edit_url)}
                 >
                   open in HA's automation editor
-                </button>. Unticking "automation" below deletes it on Save and
-                moves its actions into this card. Cancel keeps things as they
-                are.
+                </button>.
+                ${this._editingLive.owned === false
+                  ? "It stays native and enabled; edit it there. Unticking the box below copies its actions into this card and disables it (hand-back re-enables it)."
+                  : 'Unticking "automation" below deletes it on Save and moves its actions into this card. Cancel keeps things as they are.'}
               </p>`
             : nothing}
           <div class="tabs">
@@ -1519,7 +1576,9 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                 this._draftMaterialized = (e.target as HTMLInputElement).checked;
               }}
             />
-            Create as automation (editable/traceable in HA)
+            ${this._editingLive?.owned === false
+              ? "Keep linked to the automation (untick to absorb into the card)"
+              : "Create as automation (editable/traceable in HA)"}
           </label>
           ${this._draftError
             ? html`<p class="error">${this._draftError}</p>`
@@ -1561,6 +1620,14 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   /** What the name will be if left empty — inferred from the current draft. */
   private _autoNamePlaceholder(): string {
     let sequence: unknown[] = [];
+    if (this._editorTab === "quick" && this._quickMode === "link") {
+      const friendly = this._quickEntity
+        ? this._hass?.states?.[this._quickEntity]?.attributes?.friendly_name
+        : undefined;
+      return typeof friendly === "string" && friendly
+        ? `Auto: ${friendly}`
+        : "Auto (the automation's name)";
+    }
     if (this._editorTab === "quick" && this._quickEntity) {
       sequence = quickSequence(this._quickMode, this._quickEntity, this._quickOption);
     } else if (this._yamlEditorOk) {
@@ -1593,12 +1660,18 @@ export class RemoteMapperCard extends LitElement implements EditHost {
               { value: "toggle", label: "Toggle entity" },
               { value: "script", label: "Run script" },
               { value: "wled_preset", label: "Set WLED preset" },
+              { value: "link", label: "Link existing automation (stays native)" },
             ],
           },
         },
       },
     ];
-    if (this._quickMode === "wled_preset") {
+    if (this._quickMode === "link") {
+      schema.push({
+        name: "entity",
+        selector: { entity: { domain: "automation" } },
+      });
+    } else if (this._quickMode === "wled_preset") {
       // WLED exposes presets as a select.*_preset entity; picking one is a
       // select.select_option call. Populate the preset list from the chosen
       // entity's `options` attribute, falling back to free text.
@@ -1642,7 +1715,9 @@ export class RemoteMapperCard extends LitElement implements EditHost {
             ? "Action"
             : s.name === "option"
               ? "Preset"
-              : "Entity"}
+              : this._quickMode === "link"
+                ? "Automation"
+                : "Entity"}
         @value-changed=${(e: CustomEvent) => {
           const value = e.detail.value as {
             mode: QuickMode;
@@ -1744,8 +1819,9 @@ export class RemoteMapperCard extends LitElement implements EditHost {
             ? html`<p class="hint">No importable automations found.</p>`
             : html`
                 <p class="hint">
-                  Selected slots take over; source automations are
-                  <b>disabled</b>, not deleted.
+                  <b>Link</b> keeps the automation native and enabled — the card
+                  shows it and opens it in HA's editor. <b>Absorb</b> copies its
+                  actions into the card and disables it (never deletes).
                 </p>
                 <ul class="import-list">
                   ${scan.proposals.map(
@@ -1766,6 +1842,25 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                             }}
                           />
                           <b>${p.action_id}</b> ← ${p.alias}
+                          ${p.linkable
+                            ? html`<select
+                                class="mode"
+                                .value=${p.mode ?? "link"}
+                                @click=${(e: Event) => e.stopPropagation()}
+                                @change=${(e: Event) => {
+                                  const mode = (e.target as HTMLSelectElement).value as
+                                    | "link"
+                                    | "absorb";
+                                  const proposals = scan.proposals.map((q, j) =>
+                                    j === i ? { ...q, mode } : q
+                                  );
+                                  this._importScan = { ...scan, proposals };
+                                }}
+                              >
+                                <option value="link">link (keep native)</option>
+                                <option value="absorb">absorb (copy in, disable)</option>
+                              </select>`
+                            : html`<span class="hint-inline">absorb</span>`}
                           ${p.conflict
                             ? html`<span class="warn">(overwrites slot)</span>`
                             : nothing}
@@ -2173,6 +2268,20 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     }
     .import-list li {
       margin: 2px 0;
+    }
+    .import-list select.mode {
+      margin-left: var(--ha-space-1, 4px);
+      font: inherit;
+      font-size: var(--ha-font-size-s, 12px);
+      background: var(--card-background-color, inherit);
+      color: inherit;
+      border: 1px solid var(--divider-color, #444);
+      border-radius: var(--ha-border-radius-sm, 4px);
+    }
+    .hint-inline {
+      margin-left: var(--ha-space-1, 4px);
+      font-size: var(--ha-font-size-s, 12px);
+      color: var(--secondary-text-color);
     }
     .warn {
       color: var(--warning-color, #ffa600);
