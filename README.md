@@ -66,7 +66,7 @@ type: custom:remote-mapper-card
 entry_id: …               # optional with one remote
 layout: grid              # grid (default) | canvas (legacy free-drag tiles)
 display: normal           # grid only: normal | all | assisted
-assisted_trigger: tap     # assisted: tap (toggle) | press (hold, slide, lift)
+assisted_trigger: auto    # assisted: auto (touch→press, mouse→tap) | tap | press
 chips_layout: vertical    # all: vertical | horizontal | grid
 button_color: ""          # any CSS color; empty = theme card background
 accent_color: ""          # borders / assigned marks / flashes; empty = primary

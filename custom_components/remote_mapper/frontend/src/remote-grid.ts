@@ -74,13 +74,15 @@ export class RemoteMapperGrid extends LitElement {
   @property({ type: Boolean }) public editing = false;
   /** Action id currently flashing (after a run). */
   @property() public flash?: string;
-  /** assisted: "tap" toggles the popover; "press" = hold, slide, lift. */
-  @property() public assistedTrigger: AssistedTrigger = "tap";
+  /** assisted: auto (per pointer type), tap (toggle) or press (hold, slide, lift). */
+  @property() public assistedTrigger: AssistedTrigger = "auto";
   /** all: arrangement of a button's event chips. */
   @property() public chipsLayout: ChipsLayout = "vertical";
 
   @state() private _popover?: string;
   @state() private _hoverOpt?: string;
+  /** Trigger resolved at pointerdown (auto → by pointerType), used at pointerup. */
+  private _pressMode: "tap" | "press" = "tap";
   @state() private _drag?: DragState;
   @state() private _dropTarget?: string;
 
@@ -187,8 +189,15 @@ export class RemoteMapperGrid extends LitElement {
       this._recognizer(button).down(e, this._caps(button));
     } else if (this.display === "assisted") {
       el.setPointerCapture(e.pointerId);
-      // press mode opens right away (Pinterest); tap mode toggles on lift
-      if (this.assistedTrigger === "press") this._popover = button.id;
+      // auto: a finger gets Pinterest press-slide-lift, a mouse/pen gets tap
+      this._pressMode =
+        this.assistedTrigger === "auto"
+          ? e.pointerType === "touch"
+            ? "press"
+            : "tap"
+          : this.assistedTrigger;
+      // press mode opens right away; tap mode toggles on lift
+      if (this._pressMode === "press") this._popover = button.id;
     }
     // "all": chips handle their own clicks
   }
@@ -251,7 +260,7 @@ export class RemoteMapperGrid extends LitElement {
         // lifted (or tapped) on an option
         this._popover = undefined;
         this._run(picked);
-      } else if (this.assistedTrigger === "press") {
+      } else if (this._pressMode === "press") {
         // Pinterest: lifting anywhere else dismisses
         this._popover = undefined;
       } else {

@@ -1,7 +1,7 @@
 /** Dashboard-side card config (per card instance, lives in Lovelace). */
 import type { DisplayMode, LayoutKind } from "./model";
 
-export type AssistedTrigger = "tap" | "press";
+export type AssistedTrigger = "auto" | "tap" | "press";
 export type ChipsLayout = "vertical" | "horizontal" | "grid";
 
 export interface RemoteMapperCardConfig {
@@ -11,7 +11,7 @@ export interface RemoteMapperCardConfig {
   layout?: LayoutKind;
   /** Grid only: normal (physical remote), all (every event), assisted (popover). */
   display?: DisplayMode;
-  /** assisted only: tap toggles the popover, or press-drag-release (Pinterest). */
+  /** assisted only: auto (touch → press, mouse → tap), tap, or press (Pinterest). */
   assisted_trigger?: AssistedTrigger;
   /** all only: how a button's event chips are arranged. */
   chips_layout?: ChipsLayout;
@@ -35,6 +35,7 @@ export const LAYOUT_KINDS: Array<{ value: LayoutKind; label: string }> = [
 ];
 
 export const ASSISTED_TRIGGERS: Array<{ value: AssistedTrigger; label: string }> = [
+  { value: "auto", label: "Auto — slide with a finger, tap with a mouse" },
   { value: "tap", label: "Tap opens, tap again closes; tap an option" },
   { value: "press", label: "Press opens; slide to an option and lift" },
 ];
@@ -57,7 +58,8 @@ export function layoutOf(config: RemoteMapperCardConfig | undefined): LayoutKind
 export function assistedTriggerOf(
   config: RemoteMapperCardConfig | undefined
 ): AssistedTrigger {
-  return config?.assisted_trigger === "press" ? "press" : "tap";
+  const value = config?.assisted_trigger;
+  return value === "press" || value === "tap" ? value : "auto";
 }
 
 export function chipsLayoutOf(config: RemoteMapperCardConfig | undefined): ChipsLayout {

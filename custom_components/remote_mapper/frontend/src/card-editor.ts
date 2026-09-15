@@ -155,7 +155,7 @@ export class RemoteMapperCardEditor extends LitElement {
     set("entry_id", value.entry_id, value.entry_id === AUTO);
     set("layout", value.layout, value.layout !== "canvas");
     set("display", value.display, value.display === "normal");
-    set("assisted_trigger", value.assisted_trigger, value.assisted_trigger !== "press");
+    set("assisted_trigger", value.assisted_trigger, value.assisted_trigger === "auto");
     set("chips_layout", value.chips_layout, value.chips_layout === "vertical");
     for (const key of ["button_color", "accent_color", "text_color"]) {
       const v = value[key];
