@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyEditorValue,
+  AUTO_REMOTE,
+  editorValue,
   assistedTriggerOf,
   chipsLayoutOf,
   displayOf,
@@ -35,5 +38,77 @@ describe("config parsing", () => {
     expect(rgbToHex([63, 81, 181])).toBe("#3f51b5");
     expect(rgbToHex([300, -1, 5])).toBe("#ff0005");
     expect(rgbToHex("nope")).toBeUndefined();
+  });
+});
+
+describe("editor round-trip", () => {
+  const base = { type: "custom:remote-mapper-card", grid_options: { columns: 6 } };
+
+  it("form shows defaults for an empty config", () => {
+    const v = editorValue(base);
+    expect(v).toMatchObject({
+      entry_id: AUTO_REMOTE,
+      title: "",
+      show_title: true,
+      layout: "grid",
+      display: "normal",
+      assisted_trigger: "auto",
+      chips_layout: "vertical",
+      button_color_set: false,
+      button_opacity: 1,
+    });
+  });
+
+  it("defaults are dropped, strings trimmed, foreign keys preserved", () => {
+    const next = applyEditorValue(base, {
+      ...editorValue(base),
+      title: "  Desk  ",
+      show_title: true,
+      display: "normal",
+      button_opacity: 1,
+    });
+    expect(next).toEqual({ ...base, title: "Desk" });
+  });
+
+  it("non-defaults are written, and clearing them removes the keys", () => {
+    const on = applyEditorValue(base, {
+      ...editorValue(base),
+      entry_id: "abc",
+      show_title: false,
+      layout: "canvas",
+      display: "assisted",
+      assisted_trigger: "press",
+      chips_layout: "spines",
+      button_opacity: 0.4,
+    });
+    expect(on).toEqual({
+      ...base,
+      entry_id: "abc",
+      show_title: false,
+      layout: "canvas",
+      display: "assisted",
+      assisted_trigger: "press",
+      chips_layout: "spines",
+      button_opacity: 0.4,
+    });
+    const off = applyEditorValue(on, { ...editorValue(on), entry_id: AUTO_REMOTE, show_title: true, layout: "grid", display: "normal", assisted_trigger: "auto", chips_layout: "vertical", button_opacity: 1 });
+    expect(off).toEqual(base);
+  });
+
+  it("color switch on seeds a color, picker value is stored as hex, switch off clears", () => {
+    const seeded = applyEditorValue(base, { ...editorValue(base), accent_color_set: true });
+    expect(seeded.accent_color).toBe("#3f51b5");
+    const picked = applyEditorValue(seeded, {
+      ...editorValue(seeded),
+      accent_color_set: true,
+      accent_color: [1, 2, 3],
+    });
+    expect(picked.accent_color).toBe("#010203");
+    expect(editorValue(picked).accent_color).toEqual([1, 2, 3]);
+    // a YAML-only value (theme var) survives the switch staying on
+    const yaml = { ...base, button_color: "var(--x)" };
+    expect(applyEditorValue(yaml, { ...editorValue(yaml), button_color_set: true }).button_color).toBe("var(--x)");
+    const cleared = applyEditorValue(picked, { ...editorValue(picked), accent_color_set: false });
+    expect(cleared.accent_color).toBeUndefined();
   });
 });

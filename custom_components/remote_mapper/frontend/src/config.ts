@@ -89,6 +89,72 @@ export function rgbToHex(rgb: unknown): string | undefined {
   return `#${hex.join("")}`;
 }
 
+/** Editor sentinel for "no entry_id — use the only remote". */
+export const AUTO_REMOTE = "__auto__";
+export const COLOR_KEYS = ["button_color", "accent_color", "text_color"] as const;
+const DEFAULT_PICKER_COLOR = "#3f51b5";
+
+/** What the editor form shows for a config (defaults filled in). */
+export function editorValue(config: RemoteMapperCardConfig): Record<string, unknown> {
+  return {
+    entry_id: config.entry_id || AUTO_REMOTE,
+    title: config.title ?? "",
+    show_title: config.show_title !== false,
+    layout: layoutOf(config),
+    display: displayOf(config),
+    assisted_trigger: assistedTriggerOf(config),
+    chips_layout: chipsLayoutOf(config),
+    button_color_set: !!config.button_color,
+    accent_color_set: !!config.accent_color,
+    text_color_set: !!config.text_color,
+    button_color: hexToRgb(config.button_color) ?? [63, 81, 181],
+    accent_color: hexToRgb(config.accent_color) ?? [63, 81, 181],
+    text_color: hexToRgb(config.text_color) ?? [255, 255, 255],
+    button_opacity: config.button_opacity ?? 1,
+  };
+}
+
+/**
+ * Fold an ha-form value back into the card config: defaults are dropped
+ * (so YAML stays minimal), strings are trimmed, keys the editor doesn't
+ * own (HA's grid_options, visibility, …) are preserved untouched.
+ */
+export function applyEditorValue(
+  config: RemoteMapperCardConfig,
+  value: Record<string, unknown>
+): RemoteMapperCardConfig {
+  const next: RemoteMapperCardConfig = { ...config, type: config.type };
+  const set = (key: string, v: unknown, isDefault: boolean) => {
+    if (v === undefined || v === "" || isDefault) delete next[key];
+    else next[key] = v;
+  };
+  set("entry_id", value.entry_id, value.entry_id === AUTO_REMOTE);
+  set("title", typeof value.title === "string" ? value.title.trim() : value.title, false);
+  set("show_title", value.show_title, value.show_title !== false);
+  set("layout", value.layout, value.layout !== "canvas");
+  set("display", value.display, value.display === "normal");
+  set("assisted_trigger", value.assisted_trigger, value.assisted_trigger === "auto");
+  set("chips_layout", value.chips_layout, value.chips_layout === "vertical");
+  for (const key of COLOR_KEYS) {
+    if (!value[`${key}_set`]) {
+      delete next[key];
+      continue;
+    }
+    const picked = rgbToHex(value[key]);
+    const existing = typeof next[key] === "string" ? (next[key] as string) : undefined;
+    // A YAML-only value (theme var, rgba()) can't be shown by the picker,
+    // which then holds the seed default — an untouched picker must not
+    // overwrite it. Switch just turned on: seed so the field shows.
+    if (existing && !hexToRgb(existing) && (!picked || picked === DEFAULT_PICKER_COLOR)) {
+      continue;
+    }
+    next[key] = picked ?? existing ?? DEFAULT_PICKER_COLOR;
+  }
+  const opacity = value.button_opacity;
+  set("button_opacity", opacity, typeof opacity !== "number" || opacity >= 1);
+  return next;
+}
+
 /**
  * Inline CSS custom properties for the grid element. Unset values fall
  * through to theme variables (--remote-mapper-*) and then HA defaults.

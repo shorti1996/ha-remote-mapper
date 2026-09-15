@@ -9,20 +9,18 @@ import { customElement, property, state } from "lit/decorators.js";
 
 import { ensureHaForm } from "./canvas/ha-loader";
 import {
+  applyEditorValue,
   ASSISTED_TRIGGERS,
-  assistedTriggerOf,
+  AUTO_REMOTE,
   CHIPS_LAYOUTS,
-  chipsLayoutOf,
+  COLOR_KEYS,
   DISPLAY_MODES,
   displayOf,
-  hexToRgb,
+  editorValue,
   LAYOUT_KINDS,
   layoutOf,
   type RemoteMapperCardConfig,
-  rgbToHex,
 } from "./config";
-
-const AUTO = "__auto__";
 
 const LABELS: Record<string, string> = {
   entry_id: "Remote",
@@ -37,8 +35,6 @@ const LABELS: Record<string, string> = {
   text_color: "Text color",
   button_opacity: "Button opacity",
 };
-
-const COLOR_KEYS = ["button_color", "accent_color", "text_color"] as const;
 
 const HELPERS: Record<string, string> = {
   title: "Empty = the remote's name.",
@@ -104,7 +100,7 @@ export class RemoteMapperCardEditor extends LitElement {
       {
         name: "entry_id",
         selector: dropdown([
-          { value: AUTO, label: "Auto (the only remote)" },
+          { value: AUTO_REMOTE, label: "Auto (the only remote)" },
           ...(this._remotes ?? []).map((r) => ({ value: r.entry_id, label: r.title })),
         ]),
       },
@@ -129,22 +125,7 @@ export class RemoteMapperCardEditor extends LitElement {
       name: "button_opacity",
       selector: { number: { min: 0.1, max: 1, step: 0.05, mode: "slider" } },
     });
-    const data = {
-      entry_id: config.entry_id || AUTO,
-      title: config.title ?? "",
-      show_title: config.show_title !== false,
-      layout: layoutOf(config),
-      display,
-      assisted_trigger: assistedTriggerOf(config),
-      chips_layout: chipsLayoutOf(config),
-      button_color_set: !!config.button_color,
-      accent_color_set: !!config.accent_color,
-      text_color_set: !!config.text_color,
-      button_color: hexToRgb(config.button_color) ?? [63, 81, 181],
-      accent_color: hexToRgb(config.accent_color) ?? [63, 81, 181],
-      text_color: hexToRgb(config.text_color) ?? [255, 255, 255],
-      button_opacity: config.button_opacity ?? 1,
-    };
+    const data = editorValue(config);
     return html`
       <ha-form
         .hass=${this.hass}
@@ -165,30 +146,7 @@ export class RemoteMapperCardEditor extends LitElement {
 
   private _changed = (e: CustomEvent): void => {
     e.stopPropagation();
-    const value = e.detail.value as Record<string, unknown>;
-    const next: RemoteMapperCardConfig = { ...this._config!, type: this._config!.type };
-    const set = (key: string, v: unknown, isDefault: boolean) => {
-      if (v === undefined || v === "" || isDefault) delete next[key];
-      else next[key] = v;
-    };
-    set("entry_id", value.entry_id, value.entry_id === AUTO);
-    set("title", typeof value.title === "string" ? value.title.trim() : value.title, false);
-    set("show_title", value.show_title, value.show_title !== false);
-    set("layout", value.layout, value.layout !== "canvas");
-    set("display", value.display, value.display === "normal");
-    set("assisted_trigger", value.assisted_trigger, value.assisted_trigger === "auto");
-    set("chips_layout", value.chips_layout, value.chips_layout === "vertical");
-    for (const key of COLOR_KEYS) {
-      if (!value[`${key}_set`]) {
-        delete next[key];
-        continue;
-      }
-      const picked = rgbToHex(value[key]);
-      // switch just turned on: seed with the picker's default so the field shows
-      next[key] = picked ?? (typeof next[key] === "string" ? next[key] : "#3f51b5");
-    }
-    const opacity = value.button_opacity;
-    set("button_opacity", opacity, typeof opacity !== "number" || opacity >= 1);
+    const next = applyEditorValue(this._config!, e.detail.value as Record<string, unknown>);
     this._config = next;
     this.dispatchEvent(
       new CustomEvent("config-changed", {
