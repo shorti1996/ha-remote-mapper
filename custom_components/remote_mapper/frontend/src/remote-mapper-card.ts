@@ -1219,11 +1219,14 @@ export class RemoteMapperCard extends LitElement implements EditHost {
               const view = views[a.action_id];
               return html`
                 <li class=${view?.assigned ? "on" : ""}>
-                  <span class="ev-icon" title=${KIND_TITLE[a.kind]}
-                    >${KIND_ICON[a.kind]}</span
-                  >
-                  <span class="ev-name">${a.event}</span>
-                  <span class="ev-summary">${view?.summary ?? "unassigned"}</span>
+                  <span class="ev-main">
+                    <span class="ev-icon" title=${KIND_TITLE[a.kind]}
+                      >${KIND_ICON[a.kind]}</span
+                    >
+                    <span class="ev-name">${a.event}</span>
+                    <span class="ev-summary">${view?.summary ?? "unassigned"}</span>
+                  </span>
+                  <span class="ev-actions">
                   ${this._iconButton("mdi:play", "Run now", () => void this._runSlot(a.action_id), {
                     disabled: !view?.assigned || !!view.archived,
                   })}
@@ -1258,6 +1261,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                     });
                   })()}
                   ${this._iconButton("mdi:pencil", "Edit", () => void this._openEditor(a.action_id))}
+                  </span>
                 </li>
               `;
             })}
@@ -2050,11 +2054,28 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     }
     .event-list li {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
-      gap: var(--ha-space-2, 8px);
+      gap: 0 var(--ha-space-2, 8px);
       padding: var(--ha-space-1, 4px) 0;
       border-bottom: 1px solid var(--divider-color, #444);
       opacity: 0.6;
+    }
+    /* name gets the line; icons drop to a second line when they don't fit */
+    .ev-main {
+      display: flex;
+      align-items: center;
+      gap: var(--ha-space-2, 8px);
+      flex: 1 1 200px;
+      min-width: 0;
+      min-height: var(--ha-space-10, 40px);
+    }
+    .ev-actions {
+      display: flex;
+      align-items: center;
+      margin-left: auto;
+      --mdc-icon-button-size: 40px;
+      --mdc-icon-size: 22px;
     }
     .event-list li.on {
       opacity: 1;
