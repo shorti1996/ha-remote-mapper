@@ -665,9 +665,19 @@ export class RemoteMapperGrid extends LitElement {
       border-color: var(--rm-ac);
       color: var(--rm-ac);
     }
+    /* While the pad flashes accent: siblings become faint rings, the
+       mark that fired inverts (pad-colored disc, accent digit) and pulses */
     .cell.flash .kind.on {
       color: inherit;
       border-color: currentColor;
+      opacity: 0.5;
+    }
+    .cell.flash .kind.flash {
+      background: var(--rm-bg);
+      border-color: var(--rm-bg);
+      color: var(--rm-ac);
+      opacity: 1;
+      animation: rm-pulse 400ms ease-out;
     }
     .kind.flash {
       background: var(--rm-ac);
@@ -807,6 +817,7 @@ export class RemoteMapperGrid extends LitElement {
     .chip.flash {
       background: var(--rm-ac);
       color: var(--rm-on-accent);
+      animation: rm-pulse 400ms ease-out;
     }
     .chip .icon {
       flex: none;
@@ -918,6 +929,17 @@ export class RemoteMapperGrid extends LitElement {
       }
       to {
         transform: translate(-50%, -50%) scale(1);
+      }
+    }
+    @keyframes rm-pulse {
+      0% {
+        transform: scale(1);
+      }
+      40% {
+        transform: scale(1.3);
+      }
+      100% {
+        transform: scale(1);
       }
     }
     @keyframes rm-fade {
