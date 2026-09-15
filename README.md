@@ -63,10 +63,22 @@ config editor). With a single remote no config is needed.
 
 ```yaml
 type: custom:remote-mapper-card
-entry_id: …          # optional with one remote
-layout: grid         # grid (default) | canvas (legacy free-drag tiles)
-display: normal      # grid only: normal | all | assisted
+entry_id: …               # optional with one remote
+layout: grid              # grid (default) | canvas (legacy free-drag tiles)
+display: normal           # grid only: normal | all | assisted
+assisted_trigger: tap     # assisted: tap (toggle) | press (hold, slide, lift)
+chips_layout: vertical    # all: vertical | horizontal | grid
+button_color: ""          # any CSS color; empty = theme card background
+accent_color: ""          # borders / assigned marks / flashes; empty = primary
+text_color: ""
+button_opacity: 1         # 0.1 – 1
 ```
+
+Sizes follow HA's design tokens (`--ha-font-size-*`, `--ha-space-*`,
+`--ha-border-radius-*`), so the card scales with the user's font-size
+setting and themes. Themes can also set `--remote-mapper-button-color`,
+`--remote-mapper-accent-color`, `--remote-mapper-text-color`,
+`--remote-mapper-border-color`, `--remote-mapper-button-opacity`.
 
 ## Layout & display modes
 
@@ -83,7 +95,7 @@ dashboard shows the same arrangement.
 |---|---|---|
 | `normal` | label + kind dots | tap → single, double-tap → double, hold → hold (release on lift) — works like the physical remote |
 | `all` | every event as a chip | tap a chip |
-| `assisted` | label + primary summary | press → the button's events pop up, release/tap one |
+| `assisted` | label + primary summary | tap → the button's events pop up (tap again closes); or `assisted_trigger: press` — hold, slide onto an event, lift |
 
 ## Development
 

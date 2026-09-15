@@ -1,12 +1,18 @@
 /**
  * Lovelace config editor for the card (static getConfigElement). One
- * ha-form: remote picker (from list_remotes), layout kind, display mode.
+ * ha-form: remote picker (from list_remotes), layout kind, display mode,
+ * mode-specific options, and appearance (colors, opacity).
+ * Unknown keys (HA's own grid_options, visibility, …) are preserved.
  */
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import { ensureHaForm } from "./canvas/ha-loader";
 import {
+  ASSISTED_TRIGGERS,
+  assistedTriggerOf,
+  CHIPS_LAYOUTS,
+  chipsLayoutOf,
   DISPLAY_MODES,
   displayOf,
   LAYOUT_KINDS,
@@ -16,6 +22,24 @@ import {
 
 const AUTO = "__auto__";
 
+const LABELS: Record<string, string> = {
+  entry_id: "Remote",
+  layout: "Layout",
+  display: "Display mode",
+  assisted_trigger: "Popover opens on",
+  chips_layout: "Event chips",
+  button_color: "Button color",
+  accent_color: "Accent color",
+  text_color: "Text color",
+  button_opacity: "Button opacity",
+};
+
+const HELPERS: Record<string, string> = {
+  button_color: "Any CSS color, e.g. #3f51b5 or rgba(63,81,181,0.5). Empty = theme.",
+  accent_color: "Borders, assigned marks, flashes. Empty = theme primary color.",
+  text_color: "Empty = theme text color.",
+};
+
 interface HassLike {
   callWS<T>(msg: Record<string, unknown>): Promise<T>;
 }
@@ -24,6 +48,8 @@ interface RemoteListItem {
   entry_id: string;
   title: string;
 }
+
+const dropdown = (options: unknown) => ({ select: { mode: "dropdown", options } });
 
 @customElement("remote-mapper-card-editor")
 export class RemoteMapperCardEditor extends LitElement {
@@ -60,53 +86,59 @@ export class RemoteMapperCardEditor extends LitElement {
   }
 
   protected override render() {
-    if (!this._config) return nothing;
+    const config = this._config;
+    if (!config) return nothing;
     if (!this._formOk) {
       return html`<p class="hint">Loading editor components…</p>`;
     }
-    const remotes = this._remotes ?? [];
-    const schema = [
+    const display = displayOf(config);
+    const schema: Array<Record<string, unknown>> = [
       {
         name: "entry_id",
-        selector: {
-          select: {
-            mode: "dropdown",
-            options: [
-              { value: AUTO, label: "Auto (the only remote)" },
-              ...remotes.map((r) => ({ value: r.entry_id, label: r.title })),
-            ],
-          },
-        },
+        selector: dropdown([
+          { value: AUTO, label: "Auto (the only remote)" },
+          ...(this._remotes ?? []).map((r) => ({ value: r.entry_id, label: r.title })),
+        ]),
       },
-      {
-        name: "layout",
-        selector: { select: { mode: "dropdown", options: LAYOUT_KINDS } },
-      },
-      {
-        name: "display",
-        selector: { select: { mode: "dropdown", options: DISPLAY_MODES } },
-      },
+      { name: "layout", selector: dropdown(LAYOUT_KINDS) },
+      { name: "display", selector: dropdown(DISPLAY_MODES) },
     ];
+    if (display === "assisted") {
+      schema.push({ name: "assisted_trigger", selector: dropdown(ASSISTED_TRIGGERS) });
+    }
+    if (display === "all") {
+      schema.push({ name: "chips_layout", selector: dropdown(CHIPS_LAYOUTS) });
+    }
+    schema.push(
+      { name: "button_color", selector: { text: {} } },
+      { name: "accent_color", selector: { text: {} } },
+      { name: "text_color", selector: { text: {} } },
+      {
+        name: "button_opacity",
+        selector: { number: { min: 0.1, max: 1, step: 0.05, mode: "slider" } },
+      }
+    );
     const data = {
-      entry_id: this._config.entry_id || AUTO,
-      layout: layoutOf(this._config),
-      display: displayOf(this._config),
+      entry_id: config.entry_id || AUTO,
+      layout: layoutOf(config),
+      display,
+      assisted_trigger: assistedTriggerOf(config),
+      chips_layout: chipsLayoutOf(config),
+      button_color: config.button_color ?? "",
+      accent_color: config.accent_color ?? "",
+      text_color: config.text_color ?? "",
+      button_opacity: config.button_opacity ?? 1,
     };
     return html`
       <ha-form
         .hass=${this.hass}
         .data=${data}
         .schema=${schema}
-        .computeLabel=${(s: { name: string }) =>
-          s.name === "entry_id"
-            ? "Remote"
-            : s.name === "layout"
-              ? "Layout"
-              : "Display mode"}
+        .computeLabel=${(s: { name: string }) => LABELS[s.name] ?? s.name}
         .computeHelper=${(s: { name: string }) =>
-          s.name === "display" && layoutOf(this._config) === "canvas"
+          s.name === "display" && layoutOf(config) === "canvas"
             ? "Ignored for the canvas layout (every tile is already visible)."
-            : ""}
+            : (HELPERS[s.name] ?? "")}
         @value-changed=${this._changed}
       ></ha-form>
     `;
@@ -114,21 +146,23 @@ export class RemoteMapperCardEditor extends LitElement {
 
   private _changed = (e: CustomEvent): void => {
     e.stopPropagation();
-    const value = e.detail.value as {
-      entry_id?: string;
-      layout?: string;
-      display?: string;
-    };
+    const value = e.detail.value as Record<string, unknown>;
     const next: RemoteMapperCardConfig = { ...this._config!, type: this._config!.type };
-    if (value.entry_id && value.entry_id !== AUTO) next.entry_id = value.entry_id;
-    else delete next.entry_id;
-    if (value.layout === "canvas") next.layout = "canvas";
-    else delete next.layout;
-    if (value.display && value.display !== "normal") {
-      next.display = value.display as RemoteMapperCardConfig["display"];
-    } else {
-      delete next.display;
+    const set = (key: string, v: unknown, isDefault: boolean) => {
+      if (v === undefined || v === "" || isDefault) delete next[key];
+      else next[key] = v;
+    };
+    set("entry_id", value.entry_id, value.entry_id === AUTO);
+    set("layout", value.layout, value.layout !== "canvas");
+    set("display", value.display, value.display === "normal");
+    set("assisted_trigger", value.assisted_trigger, value.assisted_trigger !== "press");
+    set("chips_layout", value.chips_layout, value.chips_layout === "vertical");
+    for (const key of ["button_color", "accent_color", "text_color"]) {
+      const v = value[key];
+      set(key, typeof v === "string" ? v.trim() : v, false);
     }
+    const opacity = value.button_opacity;
+    set("button_opacity", opacity, typeof opacity !== "number" || opacity >= 1);
     this._config = next;
     this.dispatchEvent(
       new CustomEvent("config-changed", {
@@ -141,7 +175,7 @@ export class RemoteMapperCardEditor extends LitElement {
 
   static override styles = css`
     .hint {
-      font-size: 0.85em;
+      font-size: var(--ha-font-size-m, 14px);
       color: var(--secondary-text-color);
     }
   `;

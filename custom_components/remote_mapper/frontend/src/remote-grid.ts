@@ -12,6 +12,7 @@
 import { css, html, LitElement, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
+import type { AssistedTrigger, ChipsLayout } from "./config";
 import { type Gesture, type GestureCaps, TapRecognizer } from "./gestures";
 import {
   actionOfKind,
@@ -58,8 +59,13 @@ export class RemoteMapperGrid extends LitElement {
   @property({ type: Boolean }) public editing = false;
   /** Action id currently flashing (after a run). */
   @property() public flash?: string;
+  /** assisted: "tap" toggles the popover; "press" = hold, slide, lift. */
+  @property() public assistedTrigger: AssistedTrigger = "tap";
+  /** all: arrangement of a button's event chips. */
+  @property() public chipsLayout: ChipsLayout = "vertical";
 
   @state() private _popover?: string;
+  @state() private _hoverOpt?: string;
   @state() private _drag?: DragState;
   @state() private _dropTarget?: string;
 
@@ -166,9 +172,15 @@ export class RemoteMapperGrid extends LitElement {
       this._recognizer(button).down(e, this._caps(button));
     } else if (this.display === "assisted") {
       el.setPointerCapture(e.pointerId);
-      this._popover = button.id;
+      // press mode opens right away (Pinterest); tap mode toggles on lift
+      if (this.assistedTrigger === "press") this._popover = button.id;
     }
     // "all": chips handle their own clicks
+  }
+
+  private _optAt(x: number, y: number): string | undefined {
+    const opt = this._elementAt(x, y)?.closest(".opt") as HTMLElement | null;
+    return opt?.dataset.action;
   }
 
   private _onCellMove(e: PointerEvent, button: ButtonModel): void {
@@ -183,8 +195,12 @@ export class RemoteMapperGrid extends LitElement {
       this._dropTarget = this._cellKeyAt(e.clientX, e.clientY);
       return;
     }
-    if (!this.editing && this.display === "normal") {
+    if (this.editing) return;
+    if (this.display === "normal") {
       this._recognizers.get(button.id)?.move(e);
+    } else if (this.display === "assisted" && this._popover === button.id) {
+      const over = this._optAt(e.clientX, e.clientY);
+      if (over !== this._hoverOpt) this._hoverOpt = over;
     }
   }
 
@@ -211,15 +227,21 @@ export class RemoteMapperGrid extends LitElement {
       this._recognizers.get(button.id)?.up();
       return;
     }
-    if (this.display === "assisted" && this._popover === button.id) {
-      // Pinterest-style: release over an option picks it; a plain tap
-      // leaves the popover open for a second tap on an option.
-      const opt = this._elementAt(e.clientX, e.clientY)?.closest(".opt") as
-        | HTMLElement
-        | null;
-      if (opt?.dataset.action) {
+    if (this.display === "assisted") {
+      const picked = this._popover === button.id
+        ? this._optAt(e.clientX, e.clientY)
+        : undefined;
+      this._hoverOpt = undefined;
+      if (picked) {
+        // lifted (or tapped) on an option
         this._popover = undefined;
-        this._run(opt.dataset.action);
+        this._run(picked);
+      } else if (this.assistedTrigger === "press") {
+        // Pinterest: lifting anywhere else dismisses
+        this._popover = undefined;
+      } else {
+        // tap mode: a tap toggles this button's popover
+        this._popover = this._popover === button.id ? undefined : button.id;
       }
     }
   }
@@ -227,6 +249,7 @@ export class RemoteMapperGrid extends LitElement {
   private _onCellCancel(button: ButtonModel): void {
     this._drag = undefined;
     this._dropTarget = undefined;
+    this._hoverOpt = undefined;
     this._recognizers.get(button.id)?.cancel();
   }
 
@@ -348,7 +371,7 @@ export class RemoteMapperGrid extends LitElement {
 
   private _renderChips(button: ButtonModel): TemplateResult {
     return html`
-      <div class="chips">
+      <div class="chips ${this.chipsLayout}">
         ${button.actions.map((a) => {
           const slot = this.slots[a.action_id];
           const classes = [
@@ -388,11 +411,16 @@ export class RemoteMapperGrid extends LitElement {
     const edge = cols > 1 && col === 0 ? "edge-left" : cols > 1 && col === cols - 1 ? "edge-right" : "";
     return html`
       <div class="popover ${below ? "below" : "above"} ${edge}">
-        ${button.actions.map((a) => {
+        ${button.actions.map((a, i) => {
           const slot = this.slots[a.action_id];
           const on = slot?.assigned && !slot.archived;
+          const hover = this._hoverOpt === a.action_id ? "hover" : "";
           return html`
-            <div class="opt ${on ? "on" : ""}" data-action=${a.action_id}>
+            <div
+              class="opt ${on ? "on" : ""} ${hover}"
+              style="--i:${i}"
+              data-action=${a.action_id}
+            >
               <span class="circle" title="${a.event} (${KIND_TITLE[a.kind]})"
                 >${KIND_ICON[a.kind]}</span
               >
@@ -408,17 +436,22 @@ export class RemoteMapperGrid extends LitElement {
     :host {
       display: block;
       position: relative;
+      --rm-bg: var(--rm-button-bg, var(--remote-mapper-button-color, var(--card-background-color, inherit)));
+      --rm-fg: var(--rm-text, var(--remote-mapper-text-color, var(--primary-text-color)));
+      --rm-ac: var(--rm-accent, var(--remote-mapper-accent-color, var(--primary-color)));
+      --rm-line: var(--remote-mapper-border-color, var(--divider-color, #444));
+      --rm-on-accent: var(--text-primary-color, #fff);
     }
     .grid {
       display: grid;
-      gap: 8px;
-      padding: 8px 16px 16px;
+      gap: var(--ha-space-2, 8px);
+      padding: 0 var(--ha-space-4, 16px) var(--ha-space-4, 16px);
     }
     .cell {
       position: relative;
       box-sizing: border-box;
       min-width: 0;
-      border-radius: 10px;
+      border-radius: var(--ha-border-radius-lg, 12px);
     }
     .grid.normal .cell,
     .grid.assisted .cell {
@@ -429,19 +462,21 @@ export class RemoteMapperGrid extends LitElement {
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 3px;
-      padding: 6px;
-      border: 1px solid var(--divider-color, #444);
-      background: var(--card-background-color, inherit);
-      color: var(--primary-text-color);
+      gap: var(--ha-space-1, 4px);
+      padding: var(--ha-space-2, 8px);
+      border: 1px solid var(--rm-line);
+      background: var(--rm-bg);
+      color: var(--rm-fg);
+      opacity: var(--rm-opacity, var(--remote-mapper-button-opacity, 1));
       cursor: pointer;
       user-select: none;
       -webkit-user-select: none;
       touch-action: manipulation;
+      transition: background-color 120ms ease, transform 120ms ease;
     }
     .grid.all .cell.btn {
       justify-content: flex-start;
-      min-height: 72px;
+      min-height: var(--ha-space-20, 80px);
     }
     .grid.editing .cell.btn {
       touch-action: none;
@@ -451,32 +486,36 @@ export class RemoteMapperGrid extends LitElement {
       border: 1px dashed transparent;
     }
     .grid.editing .cell.empty {
-      border-color: var(--divider-color, #444);
+      border-color: var(--rm-line);
     }
     .cell.dragging {
       opacity: 0.35;
     }
     .cell.drop {
-      outline: 2px dashed var(--primary-color);
+      outline: 2px dashed var(--rm-ac);
       outline-offset: 2px;
     }
     .cell.flash {
-      background: var(--primary-color);
-      color: var(--text-primary-color, #fff);
+      background: var(--rm-ac);
+      color: var(--rm-on-accent);
     }
     .cell.active {
       z-index: 9;
+      border-color: var(--rm-ac);
     }
     .label {
-      font-weight: 500;
-      font-size: 0.95em;
+      font-size: var(--ha-font-size-l, 16px);
+      font-weight: var(--ha-font-weight-medium, 500);
+      line-height: var(--ha-line-height-condensed, 1.2);
+      letter-spacing: 0.1px;
       max-width: 100%;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
     .summary {
-      font-size: 0.7em;
+      font-size: var(--ha-font-size-m, 14px);
+      line-height: var(--ha-line-height-condensed, 1.2);
       color: var(--secondary-text-color);
       max-width: 100%;
       overflow: hidden;
@@ -490,86 +529,109 @@ export class RemoteMapperGrid extends LitElement {
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
-      gap: 3px;
+      gap: var(--ha-space-1, 4px);
+      margin-top: var(--ha-space-1, 4px);
     }
     .kind {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      border: 1px solid var(--divider-color, #444);
-      font-size: 0.6em;
+      width: var(--ha-space-6, 24px);
+      height: var(--ha-space-6, 24px);
+      border-radius: var(--ha-border-radius-circle, 50%);
+      border: 1px solid var(--rm-line);
+      font-size: var(--ha-font-size-s, 12px);
+      font-weight: var(--ha-font-weight-medium, 500);
       opacity: 0.35;
     }
     .kind.on {
       opacity: 1;
-      border-color: var(--primary-color);
-      color: var(--primary-color);
+      border-color: var(--rm-ac);
+      color: var(--rm-ac);
     }
     .cell.flash .kind.on {
       color: inherit;
       border-color: currentColor;
     }
     .kind.flash {
-      background: var(--primary-color);
-      color: var(--text-primary-color, #fff);
+      background: var(--rm-ac);
+      color: var(--rm-on-accent);
     }
     .badge {
       position: absolute;
-      top: 2px;
-      right: 6px;
-      font-size: 0.65em;
+      top: var(--ha-space-1, 4px);
+      right: var(--ha-space-2, 8px);
+      font-size: var(--ha-font-size-s, 12px);
     }
     .err {
       color: var(--error-color, #db4437);
-      font-weight: 700;
+      font-weight: var(--ha-font-weight-bold, 700);
     }
     .stale {
       color: var(--warning-color, #ffa600);
-      font-size: 0.8em;
+      font-size: var(--ha-font-size-xs, 10px);
     }
     .chips {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: var(--ha-space-1, 4px);
       width: 100%;
+    }
+    .chips.horizontal {
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+    .chips.horizontal .chip {
+      flex: 1 1 40%;
+      width: auto;
+    }
+    .chips.grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .chips.grid .chip {
+      width: auto;
     }
     .chip {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: var(--ha-space-2, 8px);
       width: 100%;
+      min-height: var(--ha-space-8, 32px);
       box-sizing: border-box;
-      padding: 3px 6px;
-      border: 1px solid var(--divider-color, #444);
-      border-radius: 6px;
+      padding: var(--ha-space-1, 4px) var(--ha-space-2, 8px);
+      border: 1px solid var(--rm-line);
+      border-radius: var(--ha-border-radius-md, 8px);
       background: none;
       color: inherit;
       font: inherit;
-      font-size: 0.75em;
+      font-size: var(--ha-font-size-m, 14px);
+      line-height: var(--ha-line-height-condensed, 1.2);
       text-align: left;
       cursor: pointer;
       opacity: 0.5;
     }
     .chip.on {
       opacity: 1;
-      border-color: var(--primary-color);
+      border-color: var(--rm-ac);
     }
     .chip.archived {
       border-style: dashed;
       opacity: 0.35;
     }
     .chip.flash {
-      background: var(--primary-color);
-      color: var(--text-primary-color, #fff);
+      background: var(--rm-ac);
+      color: var(--rm-on-accent);
     }
     .chip .icon {
       flex: none;
-      width: 16px;
+      width: var(--ha-space-5, 20px);
       text-align: center;
-      font-weight: 600;
+      font-weight: var(--ha-font-weight-medium, 500);
+      color: var(--rm-ac);
+    }
+    .chip.flash .icon {
+      color: inherit;
     }
     .chip .text {
       flex: 1;
@@ -591,18 +653,19 @@ export class RemoteMapperGrid extends LitElement {
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
-      gap: 6px;
-      max-width: 244px;
-      padding: 8px;
-      border-radius: 14px;
+      gap: var(--ha-space-2, 8px);
+      max-width: 296px;
+      padding: var(--ha-space-3, 12px);
+      border-radius: var(--ha-border-radius-2xl, 20px);
       background: var(--card-background-color, #222);
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+      box-shadow: var(--ha-card-box-shadow, 0 4px 16px rgba(0, 0, 0, 0.4));
+      animation: rm-fade 120ms ease-out both;
     }
     .popover.above {
-      bottom: calc(100% + 6px);
+      bottom: calc(100% + var(--ha-space-2, 8px));
     }
     .popover.below {
-      top: calc(100% + 6px);
+      top: calc(100% + var(--ha-space-2, 8px));
     }
     .popover.edge-left {
       left: 0;
@@ -617,10 +680,13 @@ export class RemoteMapperGrid extends LitElement {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 2px;
-      width: 56px;
+      gap: var(--ha-space-1, 4px);
+      width: var(--ha-space-16, 64px);
       cursor: pointer;
       opacity: 0.45;
+      /* backwards: hidden during the stagger delay, natural opacity after */
+      animation: rm-pop 240ms cubic-bezier(0.2, 0.8, 0.2, 1.25) backwards;
+      animation-delay: calc(var(--i, 0) * 40ms);
     }
     .opt.on {
       opacity: 1;
@@ -629,15 +695,23 @@ export class RemoteMapperGrid extends LitElement {
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      border: 2px solid var(--primary-color);
-      font-weight: 600;
+      width: var(--ha-space-12, 48px);
+      height: var(--ha-space-12, 48px);
+      border-radius: var(--ha-border-radius-circle, 50%);
+      border: 2px solid var(--rm-ac);
+      font-size: var(--ha-font-size-l, 16px);
+      font-weight: var(--ha-font-weight-medium, 500);
       pointer-events: none;
+      transition: transform 100ms ease, background-color 100ms ease;
+    }
+    .opt.hover .circle {
+      transform: scale(1.15);
+      background: var(--rm-ac);
+      color: var(--rm-on-accent);
     }
     .opt-text {
-      font-size: 0.65em;
+      font-size: var(--ha-font-size-s, 12px);
+      line-height: var(--ha-line-height-condensed, 1.2);
       max-width: 100%;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -649,12 +723,36 @@ export class RemoteMapperGrid extends LitElement {
       z-index: 50;
       pointer-events: none;
       transform: translate(-50%, -50%);
-      padding: 6px 12px;
-      border-radius: 8px;
-      background: var(--primary-color);
-      color: var(--text-primary-color, #fff);
-      font-weight: 500;
+      padding: var(--ha-space-2, 8px) var(--ha-space-3, 12px);
+      border-radius: var(--ha-border-radius-md, 8px);
+      background: var(--rm-ac);
+      color: var(--rm-on-accent);
+      font-size: var(--ha-font-size-m, 14px);
+      font-weight: var(--ha-font-weight-medium, 500);
       opacity: 0.9;
+    }
+    @keyframes rm-pop {
+      from {
+        transform: scale(0.3);
+        opacity: 0;
+      }
+      to {
+        transform: scale(1);
+      }
+    }
+    @keyframes rm-fade {
+      from {
+        opacity: 0;
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .popover,
+      .opt,
+      .circle,
+      .cell.btn {
+        animation: none;
+        transition: none;
+      }
     }
   `;
 }

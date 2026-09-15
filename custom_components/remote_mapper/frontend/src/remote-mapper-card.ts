@@ -22,7 +22,14 @@ import { ensureHaForm, ensureYamlEditor } from "./canvas/ha-loader";
 import { computeTransform, type CanvasTransform } from "./canvas/scaling";
 import type { CanvasLayout, WidgetConfig } from "./canvas/types";
 import { deepClone } from "./canvas/util";
-import { displayOf, layoutOf, type RemoteMapperCardConfig } from "./config";
+import {
+  assistedTriggerOf,
+  chipsLayoutOf,
+  displayOf,
+  layoutOf,
+  styleVarsOf,
+  type RemoteMapperCardConfig,
+} from "./config";
 import {
   buttonLabel,
   KIND_ICON,
@@ -751,18 +758,16 @@ export class RemoteMapperCard extends LitElement implements EditHost {
           <span class="header-buttons">
             ${editing
               ? html`
-                  <button class="pencil" title="Import existing automations"
-                    @click=${this._openImport}>⇪</button>
-                  <button class="pencil" title="Undo"
-                    ?disabled=${!this._edit.canUndo}
-                    @click=${() => this._edit.undo()}>↶</button>
-                  <button class="pencil" title="Cancel (Esc)"
-                    @click=${() => this._edit.cancel()}>✕</button>
-                  <button class="pencil active" title="Done — save layout"
-                    @click=${() => void this._edit.done()}>✓</button>
+                  ${this._iconButton("mdi:import", "Import existing automations", this._openImport)}
+                  ${this._iconButton("mdi:undo", "Undo", () => this._edit.undo(), {
+                    disabled: !this._edit.canUndo,
+                  })}
+                  ${this._iconButton("mdi:close", "Cancel (Esc)", () => this._edit.cancel())}
+                  ${this._iconButton("mdi:check", "Done — save layout", () => void this._edit.done(), {
+                    active: true,
+                  })}
                 `
-              : html`<button class="pencil" title="Edit layout & slots"
-                  @click=${this._enterEdit}>✎</button>`}
+              : this._iconButton("mdi:pencil", "Edit layout & slots", this._enterEdit)}
           </span>
         </div>
         ${this._renderCanvas(editing)}
@@ -784,20 +789,21 @@ export class RemoteMapperCard extends LitElement implements EditHost {
           <span class="header-buttons">
             ${editing
               ? html`
-                  <button class="pencil ${this._pickerOpen ? "active" : ""}"
-                    title="Grid shape (rows × columns)"
-                    @click=${() => {
+                  ${this._iconButton(
+                    "mdi:view-grid-plus-outline",
+                    "Grid shape (rows × columns)",
+                    () => {
                       this._pickerOpen = !this._pickerOpen;
-                    }}>⊞</button>
-                  <button class="pencil" title="Import existing automations"
-                    @click=${this._openImport}>⇪</button>
-                  <button class="pencil" title="Cancel"
-                    @click=${this._cancelGridEdit}>✕</button>
-                  <button class="pencil active" title="Done — save layout"
-                    @click=${() => void this._saveGridEdit()}>✓</button>
+                    },
+                    { active: this._pickerOpen }
+                  )}
+                  ${this._iconButton("mdi:import", "Import existing automations", this._openImport)}
+                  ${this._iconButton("mdi:close", "Cancel", this._cancelGridEdit)}
+                  ${this._iconButton("mdi:check", "Done — save layout", () => void this._saveGridEdit(), {
+                    active: true,
+                  })}
                 `
-              : html`<button class="pencil" title="Edit layout & slots"
-                  @click=${this._enterGridEdit}>✎</button>`}
+              : this._iconButton("mdi:pencil", "Edit layout & slots", this._enterGridEdit)}
           </span>
         </div>
         ${editing && this._pickerOpen
@@ -817,10 +823,13 @@ export class RemoteMapperCard extends LitElement implements EditHost {
             </p>`
           : nothing}
         <remote-mapper-grid
+          style=${styleVarsOf(this._config)}
           .buttons=${buttons}
           .layout=${layout}
           .slots=${this._slotViews()}
           .display=${displayOf(this._config)}
+          .assistedTrigger=${assistedTriggerOf(this._config)}
+          .chipsLayout=${chipsLayoutOf(this._config)}
           .editing=${editing}
           .flash=${this._flash}
           @run-action=${(e: CustomEvent<{ actionId: string }>) =>
@@ -844,6 +853,24 @@ export class RemoteMapperCard extends LitElement implements EditHost {
         ${this._importScan ? this._renderImport() : nothing}
       </ha-card>
     `;
+  }
+
+  /** HA-native 48px icon button (mdi icon name) — same control HA's own cards use. */
+  private _iconButton(
+    icon: string,
+    title: string,
+    onClick: (e: Event) => void,
+    opts: { active?: boolean; disabled?: boolean } = {}
+  ): TemplateResult {
+    return html`<ha-icon-button
+      class=${opts.active ? "active" : ""}
+      .label=${title}
+      title=${title}
+      ?disabled=${opts.disabled}
+      @click=${onClick}
+    >
+      <ha-icon icon=${icon}></ha-icon>
+    </ha-icon-button>`;
   }
 
   /** One button's events: rename (edit mode), run, or open the slot editor. */
@@ -893,16 +920,10 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                   >
                   <span class="ev-name">${a.event}</span>
                   <span class="ev-summary">${view?.summary ?? "unassigned"}</span>
-                  <button
-                    title="Run now"
-                    ?disabled=${!view?.assigned || view.archived}
-                    @click=${() => void this._runSlot(a.action_id)}
-                  >
-                    ▶
-                  </button>
-                  <button title="Edit" @click=${() => void this._openEditor(a.action_id)}>
-                    ✎
-                  </button>
+                  ${this._iconButton("mdi:play", "Run now", () => void this._runSlot(a.action_id), {
+                    disabled: !view?.assigned || !!view.archived,
+                  })}
+                  ${this._iconButton("mdi:pencil", "Edit", () => void this._openEditor(a.action_id))}
                 </li>
               `;
             })}
@@ -1413,35 +1434,37 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   }
 
   static override styles = css`
+    /* Header mirrors ha-card's .card-header: 24px title, 48px icon buttons */
     .header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 12px 16px 0;
+      gap: var(--ha-space-2, 8px);
+      padding: var(--ha-space-1, 4px) var(--ha-space-1, 4px) 0 var(--ha-space-4, 16px);
+      min-height: var(--ha-space-12, 48px);
     }
     .title {
-      font-size: 1.2em;
-      font-weight: 500;
+      color: var(--ha-card-header-color, var(--primary-text-color));
+      font-family: var(--ha-card-header-font-family, inherit);
+      font-size: var(--ha-card-header-font-size, var(--ha-font-size-2xl, 24px));
+      font-weight: var(--ha-card-header-font-weight, var(--ha-font-weight-normal, 400));
+      letter-spacing: -0.012em;
+      line-height: var(--ha-line-height-condensed, 1.2);
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .header-buttons {
       display: flex;
       align-items: center;
-      gap: 2px;
+      flex: none;
     }
-    .pencil {
-      background: none;
-      border: none;
-      cursor: pointer;
-      font-size: 1.1em;
+    ha-icon-button {
       color: var(--secondary-text-color);
-      padding: 4px 8px;
     }
-    .pencil.active {
+    ha-icon-button.active {
       color: var(--primary-color);
-    }
-    .pencil:disabled {
-      opacity: 0.35;
-      cursor: default;
     }
     .content {
       padding: 0 16px 16px;
@@ -1618,22 +1641,22 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       font-weight: 700;
     }
     .picker-dock {
-      padding: 8px 16px 0;
+      padding: 0 var(--ha-space-4, 16px) var(--ha-space-2, 8px);
     }
     .grid-hint {
-      padding: 4px 16px 0;
+      padding: 0 var(--ha-space-4, 16px) var(--ha-space-2, 8px);
       margin: 0;
     }
     .event-list {
       list-style: none;
-      margin: 8px 0;
+      margin: var(--ha-space-2, 8px) 0;
       padding: 0;
     }
     .event-list li {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 6px 0;
+      gap: var(--ha-space-2, 8px);
+      padding: var(--ha-space-1, 4px) 0;
       border-bottom: 1px solid var(--divider-color, #444);
       opacity: 0.6;
     }
@@ -1645,16 +1668,17 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 22px;
-      height: 22px;
+      width: var(--ha-space-7, 28px);
+      height: var(--ha-space-7, 28px);
       border-radius: 50%;
       border: 1px solid var(--primary-color);
-      font-size: 0.75em;
+      font-size: var(--ha-font-size-s, 12px);
+      font-weight: var(--ha-font-weight-medium, 500);
     }
     .ev-name {
       flex: none;
-      font-family: var(--code-font-family, monospace);
-      font-size: 0.85em;
+      font-family: var(--ha-font-family-code, monospace);
+      font-size: var(--ha-font-size-m, 14px);
     }
     .ev-summary {
       flex: 1;
@@ -1662,33 +1686,21 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      font-size: 0.85em;
+      font-size: var(--ha-font-size-m, 14px);
       color: var(--secondary-text-color);
-    }
-    .event-list button {
-      border: 1px solid var(--divider-color, #444);
-      border-radius: 6px;
-      background: none;
-      color: inherit;
-      padding: 2px 8px;
-      cursor: pointer;
-      font: inherit;
-    }
-    .event-list button:disabled {
-      opacity: 0.35;
-      cursor: default;
     }
     .label-input {
       display: block;
       width: 100%;
       box-sizing: border-box;
-      margin-top: 4px;
-      padding: 6px 8px;
+      margin-top: var(--ha-space-1, 4px);
+      padding: var(--ha-space-2, 8px) var(--ha-space-3, 12px);
       border: 1px solid var(--divider-color, #444);
-      border-radius: 6px;
+      border-radius: var(--ha-border-radius-md, 8px);
       background: inherit;
       color: inherit;
       font: inherit;
+      font-size: var(--ha-font-size-l, 16px);
     }
     .tabs {
       display: flex;
@@ -1697,12 +1709,13 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     }
     .tabs button {
       border: 1px solid var(--divider-color, #444);
-      border-radius: 6px 6px 0 0;
+      border-radius: var(--ha-border-radius-md, 8px) var(--ha-border-radius-md, 8px) 0 0;
       background: none;
       color: var(--secondary-text-color);
-      padding: 4px 12px;
+      padding: var(--ha-space-1, 4px) var(--ha-space-3, 12px);
       cursor: pointer;
       font: inherit;
+      font-size: var(--ha-font-size-m, 14px);
     }
     .tabs button.on {
       color: var(--primary-color);
@@ -1738,8 +1751,8 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       color: var(--error-color, #db4437);
     }
     .hint {
-      margin: 0 0 8px;
-      font-size: 0.8em;
+      margin: 0 0 var(--ha-space-2, 8px);
+      font-size: var(--ha-font-size-m, 14px);
       color: var(--secondary-text-color);
     }
     .modal-backdrop {
@@ -1761,7 +1774,9 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       box-shadow: var(--ha-card-box-shadow, 0 8px 24px rgba(0, 0, 0, 0.4));
     }
     .modal h3 {
-      margin: 0 0 8px;
+      margin: 0 0 var(--ha-space-2, 8px);
+      font-size: var(--ha-font-size-xl, 20px);
+      font-weight: var(--ha-font-weight-medium, 500);
     }
     textarea {
       width: 100%;
@@ -1782,13 +1797,16 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       margin-top: 12px;
     }
     .buttons button {
-      padding: 6px 14px;
-      border-radius: 6px;
+      min-height: var(--ha-space-9, 36px);
+      padding: var(--ha-space-1, 4px) var(--ha-space-4, 16px);
+      border-radius: var(--ha-border-radius-md, 8px);
       border: 1px solid var(--divider-color, #444);
       background: none;
       color: var(--primary-text-color);
       cursor: pointer;
       font: inherit;
+      font-size: var(--ha-font-size-m, 14px);
+      font-weight: var(--ha-font-weight-medium, 500);
     }
     .buttons button:first-child {
       background: var(--primary-color);

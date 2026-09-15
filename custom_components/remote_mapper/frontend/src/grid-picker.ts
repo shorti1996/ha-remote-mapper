@@ -45,7 +45,7 @@ export class RemoteMapperGridPicker extends LitElement {
     return html`
       <div
         class="matrix"
-        style="grid-template-columns: repeat(${visCols}, 22px)"
+        style="grid-template-columns: repeat(${visCols}, var(--ha-space-7, 28px))"
         @pointerleave=${() => {
           this._hover = undefined;
         }}
@@ -80,14 +80,14 @@ export class RemoteMapperGridPicker extends LitElement {
     }
     .matrix {
       display: grid;
-      gap: 3px;
+      gap: var(--ha-space-1, 4px);
     }
     .cell {
-      width: 22px;
-      height: 22px;
+      width: var(--ha-space-7, 28px);
+      height: var(--ha-space-7, 28px);
       box-sizing: border-box;
       border: 1px solid var(--divider-color, #666);
-      border-radius: 3px;
+      border-radius: var(--ha-border-radius-sm, 4px);
       background: var(--card-background-color, transparent);
       cursor: pointer;
     }
@@ -97,8 +97,8 @@ export class RemoteMapperGridPicker extends LitElement {
       opacity: 0.85;
     }
     .caption {
-      margin-top: 6px;
-      font-size: 0.8em;
+      margin-top: var(--ha-space-2, 8px);
+      font-size: var(--ha-font-size-m, 14px);
       color: var(--secondary-text-color);
     }
     .warn {
