@@ -206,6 +206,11 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   @state() private _pickerOpen = false;
   @state() private _buttonSheet?: string;
 
+  // long-press tooltip for header icons on touch (PC gets the native title)
+  @state() private _tip?: string;
+  private _tipTimer?: ReturnType<typeof setTimeout>;
+  private _tipShown = false;
+
   // slot editor modal
   @state() private _editingAction?: string;
   @state() private _editorTab: "quick" | "yaml" = "quick";
@@ -804,6 +809,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
               : this._iconButton("mdi:pencil", "Edit layout & slots", this._enterEdit)}
           </span>
         </div>
+        ${this._renderTip()}
         ${this._renderCanvas(editing)}
         ${this._editingAction !== undefined ? this._renderEditor() : nothing}
         ${this._importScan ? this._renderImport() : nothing}
@@ -841,6 +847,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
               : this._iconButton("mdi:pencil", "Edit layout & slots", this._enterGridEdit)}
           </span>
         </div>
+        ${this._renderTip()}
         ${editing && this._pickerOpen
           ? html`<div class="picker-dock">
               <remote-mapper-grid-picker
@@ -890,22 +897,63 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     `;
   }
 
-  /** HA-native 48px icon button (mdi icon name) — same control HA's own cards use. */
+  /**
+   * HA-native 48px icon button (mdi icon name) — same control HA's own
+   * cards use. Hover shows the native title; a long press (touch) shows
+   * the same text in a bubble and swallows the tap.
+   */
   private _iconButton(
     icon: string,
     title: string,
     onClick: (e: Event) => void,
     opts: { active?: boolean; disabled?: boolean } = {}
   ): TemplateResult {
+    const clearTimer = () => {
+      if (this._tipTimer !== undefined) {
+        clearTimeout(this._tipTimer);
+        this._tipTimer = undefined;
+      }
+    };
     return html`<ha-icon-button
       class=${opts.active ? "active" : ""}
       .label=${title}
       title=${title}
       ?disabled=${opts.disabled}
-      @click=${onClick}
+      @pointerdown=${(e: PointerEvent) => {
+        if (e.pointerType === "mouse") return;
+        clearTimer();
+        this._tipShown = false;
+        this._tipTimer = setTimeout(() => {
+          this._tipTimer = undefined;
+          this._tipShown = true;
+          this._tip = title;
+        }, 450);
+      }}
+      @pointerup=${clearTimer}
+      @pointercancel=${clearTimer}
+      @pointerleave=${clearTimer}
+      @contextmenu=${(e: Event) => {
+        if (this._tipShown) e.preventDefault();
+      }}
+      @click=${(e: Event) => {
+        if (this._tipShown) {
+          // the long press was a "what is this?" — not a command
+          e.stopPropagation();
+          this._tipShown = false;
+          setTimeout(() => {
+            this._tip = undefined;
+          }, 1200);
+          return;
+        }
+        onClick(e);
+      }}
     >
       <ha-icon icon=${icon}></ha-icon>
     </ha-icon-button>`;
+  }
+
+  private _renderTip(): TemplateResult | typeof nothing {
+    return this._tip ? html`<div class="tip">${this._tip}</div>` : nothing;
   }
 
   /** One button's events: rename (edit mode), run, or open the slot editor. */
@@ -1530,6 +1578,27 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     }
     ha-icon-button.active {
       color: var(--primary-color);
+    }
+    ha-icon-button {
+      -webkit-touch-callout: none;
+      user-select: none;
+      touch-action: manipulation;
+    }
+    .tip {
+      margin: 0 var(--ha-space-4, 16px) var(--ha-space-2, 8px);
+      padding: var(--ha-space-2, 8px) var(--ha-space-3, 12px);
+      border-radius: var(--ha-border-radius-md, 8px);
+      background: var(--secondary-background-color, rgba(127, 127, 127, 0.2));
+      color: var(--primary-text-color);
+      font-size: var(--ha-font-size-m, 14px);
+      text-align: right;
+      animation: rm-tip 120ms ease-out;
+    }
+    @keyframes rm-tip {
+      from {
+        opacity: 0;
+        transform: translateY(-4px);
+      }
     }
     .content {
       padding: 0 16px 16px;
