@@ -741,7 +741,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
 
   // ── import wizard ──────────────────────────────────────────────────
 
-  private async _openImport(): Promise<void> {
+  private _openImport = async (): Promise<void> => {
     this._importError = undefined;
     this._importOverwrite = false;
     this._importBusy = false;
@@ -757,7 +757,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     } catch (err) {
       this._error = String(err);
     }
-  }
+  };
 
   private _closeImport(): void {
     this._importScan = undefined;
@@ -980,7 +980,8 @@ export class RemoteMapperCard extends LitElement implements EditHost {
           }, 1200);
           return;
         }
-        onClick(e);
+        // handlers may be plain methods — keep `this` bound to the card
+        onClick.call(this, e);
       }}
     >
       <ha-icon icon=${icon}></ha-icon>
