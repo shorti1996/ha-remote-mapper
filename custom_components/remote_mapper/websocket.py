@@ -558,6 +558,32 @@ async def ws_apply_import(
 
 @websocket_api.websocket_command(
     {
+        vol.Required("type"): f"{DOMAIN}/release_remote",
+        vol.Required("entry_id"): str,
+        vol.Optional("convert_remaining", default=True): bool,
+    }
+)
+@websocket_api.async_response
+async def ws_release_remote(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    """Hand the remote back to HA (release.py) and remove its config entry."""
+    from .release import async_release_remote
+
+    store = _store(hass)
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    if entry is None or store.get_remote(msg["entry_id"]) is None:
+        connection.send_error(msg["id"], ERR_NOT_FOUND, "Unknown remote")
+        return
+    summary = await async_release_remote(
+        hass, store, entry, convert_remaining=msg["convert_remaining"]
+    )
+    _fire_updated(hass, msg["entry_id"], "released")
+    connection.send_result(msg["id"], summary)
+
+
+@websocket_api.websocket_command(
+    {
         vol.Required("type"): f"{DOMAIN}/run_slot",
         vol.Required("entry_id"): str,
         vol.Required("action_id"): str,
@@ -597,6 +623,7 @@ def async_register_websocket_commands(hass: HomeAssistant) -> None:
         ws_save_layout,
         ws_probe_device,
         ws_refresh_actions,
+        ws_release_remote,
         ws_scan_import,
         ws_apply_import,
         ws_run_slot,

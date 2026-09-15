@@ -117,6 +117,14 @@ Themes can set `--remote-mapper-button-color`, `--remote-mapper-accent-color`,
 `--remote-mapper-text-color`, `--remote-mapper-border-color`,
 `--remote-mapper-button-opacity`.
 
+## Leaving
+
+Not a lock-in: in edit mode, ⇥ **Hand back to HA** re-enables any
+automations that were imported, keeps automation-backed buttons as plain
+automations, converts the rest into plain automations (optional), keeps
+snapshot scenes, and removes the remote. Deleting the integration from
+*Settings → Devices & services* also re-enables imported originals.
+
 ## Good to know
 
 - **Tapping a pad on the dashboard runs the action** — handy for testing

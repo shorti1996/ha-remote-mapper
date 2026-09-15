@@ -220,9 +220,12 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     always_delete removes artifacts (nothing is deleted silently).
     """
     from .cleanup import async_cleanup_entry
+    from .release import async_reenable_imported
 
     store: RemoteMapperStore | None = hass.data.get(DOMAIN, {}).get("store")
     if store is not None:
+        # Never leave imported originals disabled behind our back
+        await async_reenable_imported(hass, store, entry.entry_id)
         await async_cleanup_entry(hass, store, entry)
         store.async_remove_remote(entry.entry_id)
         await store.async_flush()

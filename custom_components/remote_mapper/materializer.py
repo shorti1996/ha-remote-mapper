@@ -201,6 +201,25 @@ async def async_materialize(
     return config_id
 
 
+async def async_unmanage(hass: HomeAssistant, config_id: str, alias: str) -> bool:
+    """Turn a managed automation into a plain one (release flow).
+
+    Keeps triggers/actions; replaces our prefixed alias and strips the
+    auto-managed description. False if the automation no longer exists.
+    """
+    store = _get_config_store(hass)
+    raw = await store.async_get(config_id)
+    if raw is None:
+        return False
+    payload = {k: v for k, v in raw.items() if k != "id"}
+    payload["alias"] = alias
+    description = str(payload.get("description", ""))
+    if MANAGED_DESCRIPTION_MARKER in description:
+        payload["description"] = ""
+    await store.async_upsert(config_id, payload)
+    return True
+
+
 async def async_get_live_view(
     hass: HomeAssistant, slot: dict[str, Any]
 ) -> dict[str, Any] | None:

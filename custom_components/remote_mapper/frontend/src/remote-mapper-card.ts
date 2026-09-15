@@ -254,6 +254,11 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   @state() private _clearArtifacts?: Record<string, unknown>;
   @state() private _clearRemember = false;
 
+  // hand back to HA (release)
+  @state() private _releaseOpen = false;
+  @state() private _releaseConvert = true;
+  @state() private _releaseBusy = false;
+
   // import wizard
   @state() private _importScan?: ImportScan;
   @state() private _importSelected: Set<number> = new Set();
@@ -811,6 +816,106 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     this._closeEditor();
   }
 
+  // ── hand back to HA ────────────────────────────────────────────────
+
+  /** What the release will do, counted from the current slots. */
+  private _releasePlan(): { imported: number; materialized: number; built: number } {
+    let imported = 0;
+    let materialized = 0;
+    let built = 0;
+    for (const slot of Object.values(this._remote?.slots ?? {})) {
+      if (slot.imported_from) imported++;
+      else if (slot.materialized) materialized++;
+      else if (slot.sequence?.length && !slot.archived) built++;
+    }
+    return { imported, materialized, built };
+  }
+
+  private async _release(): Promise<void> {
+    this._releaseBusy = true;
+    try {
+      const res = await this._hass!.callWS<{
+        reenabled: string[];
+        converted: string[];
+        kept: string[];
+        dropped: string[];
+      }>({
+        type: "remote_mapper/release_remote",
+        entry_id: this._entryId,
+        convert_remaining: this._releaseConvert,
+      });
+      this._releaseOpen = false;
+      this._cancelGridEdit();
+      this._edit.cancel();
+      this.notify(
+        `Handed back: ${res.reenabled.length} original(s) re-enabled, ` +
+          `${res.converted.length} converted, ${res.kept.length} kept, ` +
+          `${res.dropped.length} dropped.`
+      );
+      this._unsubEvents?.();
+      this._unsubEvents = undefined;
+      this._unsubActions?.();
+      this._unsubActions = undefined;
+      this._remote = undefined;
+      this._error =
+        "This remote was handed back to Home Assistant and removed from Remote " +
+        "Mapper. Delete this card, or pick another remote in the card editor.";
+    } catch (err) {
+      this.notify(`Hand back failed: ${(err as { message?: string }).message ?? String(err)}`);
+    } finally {
+      this._releaseBusy = false;
+    }
+  }
+
+  private _renderRelease(): TemplateResult {
+    const plan = this._releasePlan();
+    const close = () => {
+      this._releaseOpen = false;
+    };
+    return html`
+      <div class="modal-backdrop" @click=${this._backdropClick(close)}>
+        <div class="modal" @click=${(e: Event) => e.stopPropagation()}>
+          <h3>Hand "${this._remote?.title}" back to Home Assistant</h3>
+          <p class="hint">
+            Removes this remote from Remote Mapper and leaves Home Assistant the
+            way it would have been without it — nothing is deleted.
+          </p>
+          <ul class="release-list">
+            <li>
+              <b>${plan.imported}</b> imported event(s): the original
+              automation(s) are <b>re-enabled</b>, the mapping goes away.
+            </li>
+            <li>
+              <b>${plan.materialized}</b> automation-backed event(s): the
+              automation is <b>kept</b>, renamed to a plain alias.
+            </li>
+            <li>
+              <label>
+                <input
+                  type="checkbox"
+                  .checked=${this._releaseConvert}
+                  @change=${(e: Event) => {
+                    this._releaseConvert = (e.target as HTMLInputElement).checked;
+                  }}
+                />
+                <b>${plan.built}</b> event(s) built in the card: <b>convert</b> to
+                plain automations so the buttons keep working (unticked: dropped).
+              </label>
+            </li>
+            <li>Snapshot scenes are kept as ordinary scenes.</li>
+            <li>The grid layout and this card's mapping are removed.</li>
+          </ul>
+          <div class="buttons">
+            <button class="danger" ?disabled=${this._releaseBusy} @click=${this._release}>
+              Hand back
+            </button>
+            <button @click=${close}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   // ── import wizard ──────────────────────────────────────────────────
 
   private _openImport = async (): Promise<void> => {
@@ -904,6 +1009,9 @@ export class RemoteMapperCard extends LitElement implements EditHost {
               ? html`
                   ${this._iconButton("mdi:refresh", "Look for new actions (press the buttons first)", () => void this._refreshActions())}
                   ${this._iconButton("mdi:import", "Import existing automations", this._openImport)}
+                  ${this._iconButton("mdi:export", "Hand this remote back to HA…", () => {
+                    this._releaseOpen = true;
+                  })}
                   ${this._iconButton("mdi:undo", "Undo", () => this._edit.undo(), {
                     disabled: !this._edit.canUndo,
                   })}
@@ -919,6 +1027,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
         ${this._renderCanvas(editing)}
         ${this._editingAction !== undefined ? this._renderEditor() : nothing}
         ${this._importScan ? this._renderImport() : nothing}
+        ${this._releaseOpen ? this._renderRelease() : nothing}
       </ha-card>
     `;
   }
@@ -945,6 +1054,9 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                   )}
                   ${this._iconButton("mdi:refresh", "Look for new actions (press the buttons first)", () => void this._refreshActions())}
                   ${this._iconButton("mdi:import", "Import existing automations", this._openImport)}
+                  ${this._iconButton("mdi:export", "Hand this remote back to HA…", () => {
+                    this._releaseOpen = true;
+                  })}
                   ${this._iconButton("mdi:close", "Cancel", this._cancelGridEdit)}
                   ${this._iconButton("mdi:check", "Done — save layout", () => void this._saveGridEdit(), {
                     active: true,
@@ -1000,6 +1112,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
         ${this._buttonSheet !== undefined ? this._renderButtonSheet() : nothing}
         ${this._editingAction !== undefined ? this._renderEditor() : nothing}
         ${this._importScan ? this._renderImport() : nothing}
+        ${this._releaseOpen ? this._renderRelease() : nothing}
       </ha-card>
     `;
   }
@@ -2008,6 +2121,19 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     .row {
       display: block;
       margin-top: 8px;
+    }
+    .release-list {
+      margin: 0 0 var(--ha-space-2, 8px);
+      padding-left: 18px;
+      font-size: var(--ha-font-size-m, 14px);
+    }
+    .release-list li {
+      margin: var(--ha-space-1, 4px) 0;
+    }
+    .buttons .danger:first-child {
+      background: none;
+      color: var(--error-color, #db4437);
+      border-color: var(--error-color, #db4437);
     }
     .import-list {
       margin: 4px 0 8px;
