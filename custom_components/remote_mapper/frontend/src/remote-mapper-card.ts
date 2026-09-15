@@ -212,6 +212,17 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   private _tipTimer?: ReturnType<typeof setTimeout>;
   private _tipShown = false;
 
+  // Modals opened from pointerup get a synthetic click ~immediately after
+  // (touch); the backdrop must not treat that ghost click as "close".
+  private _modalOpenedAt = 0;
+  private _backdropClick(close: () => void): (e: Event) => void {
+    return (e: Event) => {
+      if (e.target !== e.currentTarget) return;
+      if (Date.now() - this._modalOpenedAt < 350) return;
+      close();
+    };
+  }
+
   // slot editor modal
   @state() private _editingAction?: string;
   @state() private _editorTab: "quick" | "yaml" = "quick";
@@ -594,6 +605,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     const sequence = (slot?.sequence ?? []) as unknown[];
     const quick = inferQuick(sequence);
     this._editingAction = actionId;
+    this._modalOpenedAt = Date.now();
     this._quickMode = quick.mode === "custom" ? "scene" : quick.mode;
     this._quickEntity = quick.entity;
     this._quickOption = quick.option;
@@ -897,6 +909,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
             void this._openEditor(e.detail.actionId)}
           @open-button=${(e: CustomEvent<{ buttonId: string }>) => {
             this._buttonSheet = e.detail.buttonId;
+            this._modalOpenedAt = Date.now();
           }}
           @layout-changed=${(e: CustomEvent<{ layout: GridLayout }>) => {
             this._gridDraft = e.detail.layout;
@@ -984,7 +997,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       this._buttonSheet = undefined;
     };
     return html`
-      <div class="modal-backdrop" @click=${close}>
+      <div class="modal-backdrop" @click=${this._backdropClick(close)}>
         <div class="modal" @click=${(e: Event) => e.stopPropagation()}>
           <h3>
             ${buttonLabel(button, layout)}
@@ -1214,7 +1227,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   private _renderEditor(): TemplateResult {
     const slot = this._remote!.slots[this._editingAction!];
     return html`
-      <div class="modal-backdrop" @click=${this._closeEditor}>
+      <div class="modal-backdrop" @click=${this._backdropClick(this._closeEditor)}>
         <div class="modal" @click=${(e: Event) => e.stopPropagation()}>
           <h3>${this._editingAction}</h3>
           ${this._editingLive
