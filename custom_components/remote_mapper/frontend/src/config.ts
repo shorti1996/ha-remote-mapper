@@ -38,7 +38,7 @@ export const LAYOUT_KINDS: Array<{ value: LayoutKind; label: string }> = [
 export const ASSISTED_TRIGGERS: Array<{ value: AssistedTrigger; label: string }> = [
   { value: "auto", label: "Auto — slide with a finger, tap with a mouse" },
   { value: "tap", label: "Tap opens, tap again closes; tap an option" },
-  { value: "press", label: "Press opens; slide to an option and lift" },
+  { value: "press", label: "Long-press opens; slide to an option and lift" },
 ];
 
 export const CHIPS_LAYOUTS: Array<{ value: ChipsLayout; label: string }> = [

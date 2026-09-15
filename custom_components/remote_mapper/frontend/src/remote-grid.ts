@@ -49,6 +49,8 @@ interface DragState {
 }
 
 const DRAG_THRESHOLD = 8;
+/** Press mode: hold this long before the fan opens (a quicker tap toggles). */
+const PRESS_OPEN_MS = 400;
 /** Arc radius for assisted options, in % of the cell's width/height. */
 const ARC_RADIUS = 34;
 
@@ -87,6 +89,18 @@ export class RemoteMapperGrid extends LitElement {
   private _chipTipShown = false;
   /** Trigger resolved at pointerdown (auto → by pointerType), used at pointerup. */
   private _pressMode: "tap" | "press" = "tap";
+  private _pressTimer?: ReturnType<typeof setTimeout>;
+  /** True while a long-press fan is open under a still-down finger. */
+  private _pressActive = false;
+  private _touchMoveBlocker = (e: TouchEvent): void => {
+    // Once the fan is open under the finger, the slide must not scroll the page.
+    if (this._pressActive && e.cancelable) e.preventDefault();
+  };
+
+  public override connectedCallback(): void {
+    super.connectedCallback();
+    this.addEventListener("touchmove", this._touchMoveBlocker, { passive: false });
+  }
   @state() private _drag?: DragState;
   @state() private _dropTarget?: string;
 
@@ -94,7 +108,16 @@ export class RemoteMapperGrid extends LitElement {
 
   public override disconnectedCallback(): void {
     super.disconnectedCallback();
+    this.removeEventListener("touchmove", this._touchMoveBlocker);
+    this._clearPressTimer();
     for (const rec of this._recognizers.values()) rec.cancel();
+  }
+
+  private _clearPressTimer(): void {
+    if (this._pressTimer !== undefined) {
+      clearTimeout(this._pressTimer);
+      this._pressTimer = undefined;
+    }
   }
 
   protected override willUpdate(changed: Map<string, unknown>): void {
@@ -228,8 +251,17 @@ export class RemoteMapperGrid extends LitElement {
             ? "press"
             : "tap"
           : this.assistedTrigger;
-      // press mode opens right away; tap mode toggles on lift
-      if (this._pressMode === "press") this._popover = button.id;
+      // press mode: a long press opens the fan under the finger (slide,
+      // lift); releasing earlier counts as a tap and toggles it instead
+      this._pressActive = false;
+      this._clearPressTimer();
+      if (this._pressMode === "press") {
+        this._pressTimer = setTimeout(() => {
+          this._pressTimer = undefined;
+          this._pressActive = true;
+          this._popover = button.id;
+        }, PRESS_OPEN_MS);
+      }
     }
     // "all": chips handle their own clicks
   }
@@ -288,15 +320,18 @@ export class RemoteMapperGrid extends LitElement {
         ? this._optAt(e.clientX, e.clientY)
         : undefined;
       this._hoverOpt = undefined;
+      const wasPress = this._pressActive;
+      this._pressActive = false;
+      this._clearPressTimer();
       if (picked) {
         // lifted (or tapped) on an option
         this._popover = undefined;
         this._run(picked);
-      } else if (this._pressMode === "press") {
+      } else if (wasPress) {
         // Pinterest: lifting anywhere else dismisses
         this._popover = undefined;
       } else {
-        // tap mode: a tap toggles this button's popover
+        // tap (or a press released early): toggle this button's fan
         this._popover = this._popover === button.id ? undefined : button.id;
       }
     }
@@ -306,6 +341,8 @@ export class RemoteMapperGrid extends LitElement {
     this._drag = undefined;
     this._dropTarget = undefined;
     this._hoverOpt = undefined;
+    this._pressActive = false;
+    this._clearPressTimer();
     this._recognizers.get(button.id)?.cancel();
   }
 
@@ -389,6 +426,9 @@ export class RemoteMapperGrid extends LitElement {
         @pointermove=${(e: PointerEvent) => this._onCellMove(e, button)}
         @pointerup=${(e: PointerEvent) => this._onCellUp(e, button)}
         @pointercancel=${() => this._onCellCancel(button)}
+        @contextmenu=${(e: Event) => {
+          if (this.display === "assisted" || this.editing) e.preventDefault();
+        }}
       >
         <span class="label">${buttonLabel(button, layout)}</span>
         ${this.display === "all"
@@ -473,8 +513,17 @@ export class RemoteMapperGrid extends LitElement {
 
   private _renderPopover(button: ButtonModel): TemplateResult {
     const angles = arcAngles(button.actions.length);
+    const hovered = this._hoverOpt
+      ? button.actions.find((a) => a.action_id === this._hoverOpt)
+      : undefined;
+    const status = hovered
+      ? `${KIND_TITLE[hovered.kind]}: ${this.slots[hovered.action_id]?.summary ?? "unassigned"}`
+      : this._pressActive
+        ? "slide to an event, lift to run"
+        : "tap an event";
     return html`
       <div class="popover">
+        <div class="opt-status">${status}</div>
         ${button.actions.map((a, i) => {
           const slot = this.slots[a.action_id];
           const on = slot?.assigned && !slot.archived;
@@ -491,7 +540,6 @@ export class RemoteMapperGrid extends LitElement {
               <span class="circle" title="${a.event} (${KIND_TITLE[a.kind]})"
                 >${KIND_ICON[a.kind]}</span
               >
-              <span class="opt-text">${slot?.summary ?? "unassigned"}</span>
             </div>
           `;
         })}
@@ -786,7 +834,24 @@ export class RemoteMapperGrid extends LitElement {
     .cell.active .label,
     .cell.active .summary,
     .cell.active .kinds {
-      opacity: 0.15;
+      visibility: hidden;
+    }
+    .cell.active {
+      -webkit-touch-callout: none;
+    }
+    .opt-status {
+      position: absolute;
+      left: var(--ha-space-2, 8px);
+      right: var(--ha-space-2, 8px);
+      bottom: var(--ha-space-2, 8px);
+      font-size: var(--ha-font-size-s, 12px);
+      line-height: var(--ha-line-height-condensed, 1.2);
+      color: var(--secondary-text-color);
+      text-align: center;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      pointer-events: none;
     }
     .popover {
       position: absolute;
@@ -801,7 +866,7 @@ export class RemoteMapperGrid extends LitElement {
       flex-direction: column;
       align-items: center;
       gap: 2px;
-      width: min(var(--ha-space-16, 64px), 34%);
+      width: min(var(--ha-space-12, 48px), 30%);
       transform: translate(-50%, -50%);
       cursor: pointer;
       opacity: 0.45;
@@ -832,15 +897,6 @@ export class RemoteMapperGrid extends LitElement {
       transform: scale(1.2);
       background: var(--rm-ac);
       color: var(--rm-on-accent);
-    }
-    .opt-text {
-      font-size: var(--ha-font-size-xs, 10px);
-      line-height: var(--ha-line-height-condensed, 1.2);
-      max-width: 100%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      pointer-events: none;
     }
     .ghost {
       position: fixed;
