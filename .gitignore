@@ -12,3 +12,8 @@ node_modules/
 
 # Build intermediates (www/ output itself is committed)
 custom_components/remote_mapper/frontend/.ts-out/
+
+# IDE files with machine-specific hosts/credentials
+.idea/sshConfigs.xml
+.idea/deployment.xml
+.idea/webServers.xml

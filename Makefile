@@ -1,4 +1,4 @@
-.PHONY: build dev clean test lint format bump-version ha-up ha-down ha-logs
+.PHONY: build dev clean test test-frontend lint format bump-version ha-up ha-down ha-logs
 
 FRONTEND := custom_components/remote_mapper/frontend
 
@@ -27,8 +27,11 @@ dev:
 clean:
 	rm -rf custom_components/remote_mapper/www/*
 
-test:
+test: test-frontend
 	uv run pytest
+
+test-frontend:
+	cd $(FRONTEND) && npm test
 
 lint:
 	uv run ruff check .

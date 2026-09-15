@@ -9,7 +9,7 @@ automatically), Node 22+, Docker.
 ```sh
 make dev        # card build (unminified, sourcemaps)
 make build      # production card build (output committed in www/)
-make test       # pytest (pytest-homeassistant-custom-component)
+make test       # vitest (frontend pure modules) + pytest (integration)
 make lint       # ruff check + format check
 make ha-up      # dev HA (stable) + mosquitto on :8123 / :1883
 make ha-logs    # follow HA logs
@@ -41,3 +41,12 @@ git commit ... && git tag vx.y.z && git push --tags
 
 The release workflow verifies tag == versions, rebuilds the card,
 fails on www/ drift, and attaches the HACS zip.
+
+## Frontend tests
+
+HA's own frontend convention: keep logic out of Lit elements, in pure
+modules, and unit-test those with Vitest (`frontend/test/`, node
+environment, no DOM). Covered: `model.ts` (grid normalize/resize/swap),
+`naming.ts` (inferred names), `gestures.ts` (tap/double/hold recognizer,
+fake timers), `config.ts`. The elements themselves are exercised in the
+dev HA. `npm test` / `npm run test:watch` in `frontend/`.

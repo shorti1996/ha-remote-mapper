@@ -45,6 +45,7 @@ jobs:
           cache: npm
           cache-dependency-path: custom_components/remote_mapper/frontend/package-lock.json
       - run: npm ci
+      - run: npm test
       - run: npm run build
       # Committed www/ must match a fresh production build
       - run: git diff --exit-code ../www
