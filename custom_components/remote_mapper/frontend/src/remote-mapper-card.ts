@@ -14,11 +14,26 @@
 import { css, html, LitElement, nothing, type TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
+import "./card-editor";
+import "./grid-picker";
+import "./remote-grid";
 import { EditController, type EditHost } from "./canvas/edit-controller";
 import { ensureHaForm, ensureYamlEditor } from "./canvas/ha-loader";
 import { computeTransform, type CanvasTransform } from "./canvas/scaling";
 import type { CanvasLayout, WidgetConfig } from "./canvas/types";
 import { deepClone } from "./canvas/util";
+import { displayOf, layoutOf, type RemoteMapperCardConfig } from "./config";
+import {
+  buttonLabel,
+  KIND_ICON,
+  KIND_TITLE,
+  normalizeGrid,
+  resizeGrid,
+  setButtonLabel,
+  type ButtonModel,
+  type GridLayout,
+} from "./model";
+import type { SlotView } from "./remote-grid";
 
 const CARD_TAG = "remote-mapper-card";
 const UPDATED_EVENT = "remote_mapper_updated";
@@ -39,11 +54,7 @@ interface HassConnection {
 interface HomeAssistant {
   callWS<T>(msg: Record<string, unknown>): Promise<T>;
   connection: HassConnection;
-}
-
-interface RemoteMapperCardConfig {
-  type: string;
-  entry_id?: string;
+  states?: Record<string, { attributes?: Record<string, unknown> }>;
 }
 
 interface SlotRecord {
@@ -60,7 +71,9 @@ interface RemoteData {
   entry_id: string;
   title: string;
   layout: { actions?: string[] };
+  buttons?: ButtonModel[];
   card_layout: CanvasLayout | null;
+  grid_layout?: GridLayout | null;
   slots: Record<string, SlotRecord>;
   stale_actions?: string[];
 }
@@ -94,7 +107,7 @@ interface LiveAutomation {
   edit_url: string;
 }
 
-type QuickMode = "scene" | "toggle" | "script" | "custom";
+type QuickMode = "scene" | "toggle" | "script" | "wled_preset" | "custom";
 
 declare global {
   interface Window {
@@ -126,26 +139,44 @@ function defaultLayout(actions: string[]): CanvasLayout {
 }
 
 /** Recognize the quick-chip shapes inside an existing sequence. */
-function inferQuick(sequence: unknown[]): { mode: QuickMode; entity: string } {
+function inferQuick(sequence: unknown[]): {
+  mode: QuickMode;
+  entity: string;
+  option: string;
+} {
   if (sequence.length === 1 && typeof sequence[0] === "object" && sequence[0]) {
     const step = sequence[0] as Record<string, any>;
     const action = step.action ?? step.service;
     const entity = step.target?.entity_id ?? step.entity_id;
     if (typeof entity === "string") {
-      if (action === "scene.turn_on") return { mode: "scene", entity };
-      if (action === "homeassistant.toggle") return { mode: "toggle", entity };
-      if (action === "script.turn_on") return { mode: "script", entity };
+      if (action === "scene.turn_on") return { mode: "scene", entity, option: "" };
+      if (action === "homeassistant.toggle")
+        return { mode: "toggle", entity, option: "" };
+      if (action === "script.turn_on")
+        return { mode: "script", entity, option: "" };
+      if (action === "select.select_option") {
+        const option = step.data?.option ?? step.option;
+        return { mode: "wled_preset", entity, option: option ?? "" };
+      }
     }
   }
-  return { mode: "custom", entity: "" };
+  return { mode: "custom", entity: "", option: "" };
 }
 
-function quickSequence(mode: QuickMode, entity: string): unknown[] {
+function quickSequence(mode: QuickMode, entity: string, option: string): unknown[] {
   const call = (action: string) => [
     { action, target: { entity_id: entity } },
   ];
   if (mode === "scene") return call("scene.turn_on");
   if (mode === "toggle") return call("homeassistant.toggle");
+  if (mode === "wled_preset")
+    return [
+      {
+        action: "select.select_option",
+        target: { entity_id: entity },
+        data: { option },
+      },
+    ];
   return call("script.turn_on");
 }
 
@@ -157,11 +188,18 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   @state() private _flash?: string;
   @state() private _hostWidth = 0;
 
+  // grid layout (plan 04): draft-then-commit, like the canvas session
+  @state() private _gridEditing = false;
+  @state() private _gridDraft?: GridLayout;
+  @state() private _pickerOpen = false;
+  @state() private _buttonSheet?: string;
+
   // slot editor modal
   @state() private _editingAction?: string;
   @state() private _editorTab: "quick" | "yaml" = "quick";
   @state() private _quickMode: QuickMode = "scene";
   @state() private _quickEntity = "";
+  @state() private _quickOption = "";
   @state() private _draft = "";
   @state() private _yamlValue?: unknown[];
   @state() private _yamlValid = true;
@@ -204,6 +242,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     this._config = config;
     this._entryId = config.entry_id;
     this._fetchStarted = false;
+    this._cancelGridEdit();
     if (this._hass) {
       this._fetchStarted = true;
       void this._initialize();
@@ -211,6 +250,11 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   }
 
   public getCardSize(): number {
+    if (this._isGrid()) {
+      const grid = this._gridLayout();
+      const perRow = displayOf(this._config) === "all" ? 2 : 1;
+      return grid ? 1 + grid.rows * perRow : 3;
+    }
     const layout = this._currentLayout();
     return layout ? 1 + Math.ceil(layout.design_size.height / 100) : 3;
   }
@@ -219,8 +263,12 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     return { columns: 12, min_columns: 6 };
   }
 
+  public static getConfigElement(): HTMLElement {
+    return document.createElement("remote-mapper-card-editor");
+  }
+
   public static getStubConfig(): Record<string, unknown> {
-    return {};
+    return { layout: "grid", display: "normal" };
   }
 
   public override connectedCallback(): void {
@@ -369,6 +417,84 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     return computeTransform(layout.design_size, width, null);
   }
 
+  // ── grid layout (plan 04) ──────────────────────────────────────────
+
+  private _isGrid(): boolean {
+    return layoutOf(this._config) === "grid";
+  }
+
+  /** Draft while editing, else the stored layout normalized to the buttons. */
+  private _gridLayout(): GridLayout | undefined {
+    if (!this._remote) return undefined;
+    if (this._gridEditing && this._gridDraft) return this._gridDraft;
+    return normalizeGrid(this._remote.grid_layout, this._remote.buttons ?? []);
+  }
+
+  private _slotViews(): Record<string, SlotView> {
+    const out: Record<string, SlotView> = {};
+    if (!this._remote) return out;
+    const stale = new Set(this._remote.stale_actions ?? []);
+    for (const button of this._remote.buttons ?? []) {
+      for (const a of button.actions) {
+        const slot = this._remote.slots[a.action_id];
+        out[a.action_id] = {
+          assigned: !!slot,
+          archived: !!slot?.archived,
+          summary: this._slotSummary(slot),
+          error: slot?.last_error ?? null,
+          stale: stale.has(a.action_id),
+        };
+      }
+    }
+    return out;
+  }
+
+  private _enterGridEdit = (): void => {
+    if (!this._remote) return;
+    this._gridDraft = normalizeGrid(
+      this._remote.grid_layout,
+      this._remote.buttons ?? []
+    );
+    this._gridEditing = true;
+  };
+
+  private _cancelGridEdit = (): void => {
+    this._gridEditing = false;
+    this._gridDraft = undefined;
+    this._pickerOpen = false;
+    this._buttonSheet = undefined;
+  };
+
+  private async _saveGridEdit(): Promise<void> {
+    const draft = this._gridDraft;
+    if (!draft) {
+      this._cancelGridEdit();
+      return;
+    }
+    try {
+      await this._hass!.callWS({
+        type: "remote_mapper/save_layout",
+        entry_id: this._entryId,
+        grid_layout: draft,
+      });
+      this._cancelGridEdit();
+    } catch (err) {
+      this.notify(`Layout save failed: ${String(err)}`);
+    }
+  }
+
+  private _onGridPicked = (e: CustomEvent<{ rows: number; cols: number }>): void => {
+    const draft = this._gridDraft;
+    if (!draft || !this._remote) return;
+    this._gridDraft = resizeGrid(
+      draft,
+      e.detail.rows,
+      e.detail.cols,
+      this._remote.buttons ?? []
+    );
+    this._pickerOpen = false;
+  };
+
   // ── slot interactions ──────────────────────────────────────────────
 
   private async _runSlot(actionId: string): Promise<void> {
@@ -393,6 +519,8 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     if (!slot) return "unassigned";
     if (slot.materialized) return "automation";
     const quick = inferQuick(slot.sequence ?? []);
+    if (quick.mode === "wled_preset")
+      return quick.option ? `${quick.entity} → ${quick.option}` : quick.entity;
     if (quick.mode !== "custom") return quick.entity;
     const first = slot.sequence?.[0] as Record<string, unknown> | undefined;
     if (!first) return "empty";
@@ -408,6 +536,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     this._editingAction = actionId;
     this._quickMode = quick.mode === "custom" ? "scene" : quick.mode;
     this._quickEntity = quick.entity;
+    this._quickOption = quick.option;
     this._editorTab = quick.mode === "custom" && sequence.length ? "yaml" : "quick";
     this._draft = JSON.stringify(sequence, null, 2);
     this._yamlValue = sequence;
@@ -460,7 +589,15 @@ export class RemoteMapperCard extends LitElement implements EditHost {
         this._draftError = "Pick an entity first";
         return;
       }
-      msg.sequence = quickSequence(this._quickMode, this._quickEntity);
+      if (this._quickMode === "wled_preset" && !this._quickOption) {
+        this._draftError = "Pick a preset first";
+        return;
+      }
+      msg.sequence = quickSequence(
+        this._quickMode,
+        this._quickEntity,
+        this._quickOption,
+      );
     } else if (this._yamlEditorOk) {
       if (!this._yamlValid) {
         this._draftError = "YAML is not valid";
@@ -604,6 +741,8 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       </ha-card>`;
     }
 
+    if (this._isGrid()) return this._renderGridCard();
+
     const editing = this._edit.active;
     return html`
       <ha-card>
@@ -630,6 +769,149 @@ export class RemoteMapperCard extends LitElement implements EditHost {
         ${this._editingAction !== undefined ? this._renderEditor() : nothing}
         ${this._importScan ? this._renderImport() : nothing}
       </ha-card>
+    `;
+  }
+
+  private _renderGridCard(): TemplateResult {
+    const remote = this._remote!;
+    const editing = this._gridEditing;
+    const layout = this._gridLayout()!;
+    const buttons = remote.buttons ?? [];
+    return html`
+      <ha-card>
+        <div class="header">
+          <span class="title">${remote.title}</span>
+          <span class="header-buttons">
+            ${editing
+              ? html`
+                  <button class="pencil ${this._pickerOpen ? "active" : ""}"
+                    title="Grid shape (rows × columns)"
+                    @click=${() => {
+                      this._pickerOpen = !this._pickerOpen;
+                    }}>⊞</button>
+                  <button class="pencil" title="Import existing automations"
+                    @click=${this._openImport}>⇪</button>
+                  <button class="pencil" title="Cancel"
+                    @click=${this._cancelGridEdit}>✕</button>
+                  <button class="pencil active" title="Done — save layout"
+                    @click=${() => void this._saveGridEdit()}>✓</button>
+                `
+              : html`<button class="pencil" title="Edit layout & slots"
+                  @click=${this._enterGridEdit}>✎</button>`}
+          </span>
+        </div>
+        ${editing && this._pickerOpen
+          ? html`<div class="picker-dock">
+              <remote-mapper-grid-picker
+                .rows=${layout.rows}
+                .cols=${layout.cols}
+                .minCells=${buttons.length}
+                @grid-picked=${this._onGridPicked}
+              ></remote-mapper-grid-picker>
+            </div>`
+          : nothing}
+        ${editing
+          ? html`<p class="hint grid-hint">
+              Drag a button onto another cell to swap · tap a button to
+              rename it or edit its events
+            </p>`
+          : nothing}
+        <remote-mapper-grid
+          .buttons=${buttons}
+          .layout=${layout}
+          .slots=${this._slotViews()}
+          .display=${displayOf(this._config)}
+          .editing=${editing}
+          .flash=${this._flash}
+          @run-action=${(e: CustomEvent<{ actionId: string }>) =>
+            void this._runSlot(e.detail.actionId)}
+          @edit-action=${(e: CustomEvent<{ actionId: string }>) =>
+            void this._openEditor(e.detail.actionId)}
+          @open-button=${(e: CustomEvent<{ buttonId: string }>) => {
+            this._buttonSheet = e.detail.buttonId;
+          }}
+          @layout-changed=${(e: CustomEvent<{ layout: GridLayout }>) => {
+            this._gridDraft = e.detail.layout;
+          }}
+        ></remote-mapper-grid>
+        ${buttons.length === 0
+          ? html`<p class="hint grid-hint">
+              No actions known yet — press each button on the remote once.
+            </p>`
+          : nothing}
+        ${this._buttonSheet !== undefined ? this._renderButtonSheet() : nothing}
+        ${this._editingAction !== undefined ? this._renderEditor() : nothing}
+        ${this._importScan ? this._renderImport() : nothing}
+      </ha-card>
+    `;
+  }
+
+  /** One button's events: rename (edit mode), run, or open the slot editor. */
+  private _renderButtonSheet(): TemplateResult {
+    const remote = this._remote!;
+    const layout = this._gridLayout()!;
+    const button = (remote.buttons ?? []).find((b) => b.id === this._buttonSheet);
+    if (!button) return html``;
+    const views = this._slotViews();
+    const close = () => {
+      this._buttonSheet = undefined;
+    };
+    return html`
+      <div class="modal-backdrop" @click=${close}>
+        <div class="modal" @click=${(e: Event) => e.stopPropagation()}>
+          <h3>
+            ${buttonLabel(button, layout)}
+            <span class="hint">(${button.id})</span>
+          </h3>
+          ${this._gridEditing
+            ? html`<label class="hint row">
+                Label
+                <input
+                  class="label-input"
+                  type="text"
+                  .value=${layout.buttons[button.id]?.label ?? ""}
+                  placeholder=${button.id}
+                  @input=${(e: Event) => {
+                    if (this._gridDraft) {
+                      this._gridDraft = setButtonLabel(
+                        this._gridDraft,
+                        button.id,
+                        (e.target as HTMLInputElement).value
+                      );
+                    }
+                  }}
+                />
+              </label>`
+            : nothing}
+          <ul class="event-list">
+            ${button.actions.map((a) => {
+              const view = views[a.action_id];
+              return html`
+                <li class=${view?.assigned ? "on" : ""}>
+                  <span class="ev-icon" title=${KIND_TITLE[a.kind]}
+                    >${KIND_ICON[a.kind]}</span
+                  >
+                  <span class="ev-name">${a.event}</span>
+                  <span class="ev-summary">${view?.summary ?? "unassigned"}</span>
+                  <button
+                    title="Run now"
+                    ?disabled=${!view?.assigned || view.archived}
+                    @click=${() => void this._runSlot(a.action_id)}
+                  >
+                    ▶
+                  </button>
+                  <button title="Edit" @click=${() => void this._openEditor(a.action_id)}>
+                    ✎
+                  </button>
+                </li>
+              `;
+            })}
+          </ul>
+          <div class="buttons">
+            <button @click=${close}>Close</button>
+          </div>
+        </div>
+      </div>
     `;
   }
 
@@ -896,13 +1178,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
         Loading HA editor components… If this persists, use the YAML tab.
       </p>`;
     }
-    const domain =
-      this._quickMode === "scene"
-        ? "scene"
-        : this._quickMode === "script"
-          ? "script"
-          : undefined;
-    const schema = [
+    const schema: Array<Record<string, unknown>> = [
       {
         name: "mode",
         selector: {
@@ -912,29 +1188,74 @@ export class RemoteMapperCard extends LitElement implements EditHost {
               { value: "scene", label: "Activate scene" },
               { value: "toggle", label: "Toggle entity" },
               { value: "script", label: "Run script" },
+              { value: "wled_preset", label: "Set WLED preset" },
             ],
           },
         },
       },
-      {
+    ];
+    if (this._quickMode === "wled_preset") {
+      // WLED exposes presets as a select.*_preset entity; picking one is a
+      // select.select_option call. Populate the preset list from the chosen
+      // entity's `options` attribute, falling back to free text.
+      schema.push({
+        name: "entity",
+        selector: { entity: { domain: "select", integration: "wled" } },
+      });
+      const stateObj = this._quickEntity
+        ? this._hass?.states?.[this._quickEntity]
+        : undefined;
+      const options = (stateObj?.attributes?.options as string[] | undefined) ?? [];
+      schema.push({
+        name: "option",
+        selector: options.length
+          ? { select: { mode: "dropdown", custom_value: true, options } }
+          : { text: {} },
+      });
+    } else {
+      const domain =
+        this._quickMode === "scene"
+          ? "scene"
+          : this._quickMode === "script"
+            ? "script"
+            : undefined;
+      schema.push({
         name: "entity",
         selector: { entity: domain ? { domain } : {} },
-      },
-    ];
+      });
+    }
     return html`
       <ha-form
         .hass=${this._hass}
-        .data=${{ mode: this._quickMode, entity: this._quickEntity }}
+        .data=${{
+          mode: this._quickMode,
+          entity: this._quickEntity,
+          option: this._quickOption,
+        }}
         .schema=${schema}
         .computeLabel=${(s: { name: string }) =>
-          s.name === "mode" ? "Action" : "Entity"}
+          s.name === "mode"
+            ? "Action"
+            : s.name === "option"
+              ? "Preset"
+              : "Entity"}
         @value-changed=${(e: CustomEvent) => {
-          const value = e.detail.value as { mode: QuickMode; entity: string };
+          const value = e.detail.value as {
+            mode: QuickMode;
+            entity: string;
+            option?: string;
+          };
           if (value.mode !== this._quickMode) {
             this._quickMode = value.mode;
             this._quickEntity = "";
+            this._quickOption = "";
+          } else if (value.entity !== this._quickEntity) {
+            // Entity changed → its preset list differs, drop the old option.
+            this._quickEntity = value.entity ?? "";
+            this._quickOption = "";
           } else {
             this._quickEntity = value.entity ?? "";
+            this._quickOption = value.option ?? "";
           }
         }}
       ></ha-form>
@@ -1296,6 +1617,79 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     .dpad .step {
       font-weight: 700;
     }
+    .picker-dock {
+      padding: 8px 16px 0;
+    }
+    .grid-hint {
+      padding: 4px 16px 0;
+      margin: 0;
+    }
+    .event-list {
+      list-style: none;
+      margin: 8px 0;
+      padding: 0;
+    }
+    .event-list li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--divider-color, #444);
+      opacity: 0.6;
+    }
+    .event-list li.on {
+      opacity: 1;
+    }
+    .ev-icon {
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 1px solid var(--primary-color);
+      font-size: 0.75em;
+    }
+    .ev-name {
+      flex: none;
+      font-family: var(--code-font-family, monospace);
+      font-size: 0.85em;
+    }
+    .ev-summary {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 0.85em;
+      color: var(--secondary-text-color);
+    }
+    .event-list button {
+      border: 1px solid var(--divider-color, #444);
+      border-radius: 6px;
+      background: none;
+      color: inherit;
+      padding: 2px 8px;
+      cursor: pointer;
+      font: inherit;
+    }
+    .event-list button:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+    .label-input {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      margin-top: 4px;
+      padding: 6px 8px;
+      border: 1px solid var(--divider-color, #444);
+      border-radius: 6px;
+      background: inherit;
+      color: inherit;
+      font: inherit;
+    }
     .tabs {
       display: flex;
       gap: 4px;
@@ -1417,7 +1811,7 @@ window.customCards.push({
 });
 
 console.info(
-  `%c REMOTE-MAPPER-CARD %c canvas `,
+  `%c REMOTE-MAPPER-CARD %c grid `,
   "color: white; background: #3f51b5; font-weight: 700;",
   "color: #3f51b5; background: white; font-weight: 700;"
 );

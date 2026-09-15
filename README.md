@@ -58,8 +58,32 @@ lovelace:
       type: module
 ```
 
-Card usage: add `custom:remote-mapper-card`; with a single remote no
-config is needed, otherwise set `entry_id`.
+Card usage: add `custom:remote-mapper-card` (the card has a visual
+config editor). With a single remote no config is needed.
+
+```yaml
+type: custom:remote-mapper-card
+entry_id: …          # optional with one remote
+layout: grid         # grid (default) | canvas (legacy free-drag tiles)
+display: normal      # grid only: normal | all | assisted
+```
+
+## Layout & display modes
+
+Actions are grouped into **buttons** server-side (`1_single`/`1_double` →
+button `1`; Matter `button_1:multi_press_1` → `button_1`; single-entity
+remotes → one button). In edit mode (✎) the ⊞ picker sets the grid shape
+like Word's table picker; drag buttons between cells; tap a button to
+rename it or edit its events. The grid is saved with the remote, so every
+dashboard shows the same arrangement.
+
+`display` is per card instance:
+
+| Mode | Cell shows | Dashboard gesture |
+|---|---|---|
+| `normal` | label + kind dots | tap → single, double-tap → double, hold → hold (release on lift) — works like the physical remote |
+| `all` | every event as a chip | tap a chip |
+| `assisted` | label + primary summary | press → the button's events pop up, release/tap one |
 
 ## Development
 

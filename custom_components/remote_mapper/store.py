@@ -82,7 +82,12 @@ class RemoteMapperStore:
         """Create or refresh the remote record; slots are preserved."""
         remote = self.data["remotes"].setdefault(
             entry_id,
-            {"slots": {}, "snapshot_entities": [], "card_layout": None},
+            {
+                "slots": {},
+                "snapshot_entities": [],
+                "card_layout": None,
+                "grid_layout": None,
+            },
         )
         remote["source"] = source
         remote["source_config"] = source_config

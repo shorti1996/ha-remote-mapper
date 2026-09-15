@@ -15,6 +15,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.script import async_validate_actions_config
 from homeassistant.util.yaml import parse_yaml
 
+from .buttons import group_buttons
 from .const import DOMAIN, EVENT_UPDATED, INTEGRATION_VERSION
 from .store import default_slot
 
@@ -28,6 +29,47 @@ _LOGGER = logging.getLogger(__name__)
 
 ERR_NOT_FOUND = "not_found"
 ERR_INVALID_SEQUENCE = "invalid_sequence"
+ERR_INVALID_FORMAT = "invalid_format"
+
+GRID_MAX: int = 12
+
+
+def _grid_cells_unique_and_in_range(layout: dict[str, Any]) -> dict[str, Any]:
+    """Every placed button inside rows x cols, one button per cell."""
+    taken: dict[tuple[int, int], str] = {}
+    for button_id, pos in layout["buttons"].items():
+        cell = (pos["row"], pos["col"])
+        if pos["row"] >= layout["rows"] or pos["col"] >= layout["cols"]:
+            raise vol.Invalid(
+                f"button {button_id} outside the {layout['rows']}x{layout['cols']} grid"
+            )
+        if (other := taken.get(cell)) is not None:
+            raise vol.Invalid(f"buttons {other} and {button_id} share a cell")
+        taken[cell] = button_id
+    return layout
+
+
+# Per-remote grid layout (plan 04 §1.2): positions + optional label
+# override only; the button ↔ action grouping stays derived.
+GRID_LAYOUT_SCHEMA = vol.All(
+    vol.Schema(
+        {
+            vol.Required("schema_version"): int,
+            vol.Required("rows"): vol.All(int, vol.Range(min=1, max=GRID_MAX)),
+            vol.Required("cols"): vol.All(int, vol.Range(min=1, max=GRID_MAX)),
+            vol.Required("buttons"): {
+                str: vol.Schema(
+                    {
+                        vol.Required("row"): vol.All(int, vol.Range(min=0)),
+                        vol.Required("col"): vol.All(int, vol.Range(min=0)),
+                        vol.Optional("label"): str,
+                    }
+                )
+            },
+        }
+    ),
+    _grid_cells_unique_and_in_range,
+)
 
 
 def _store(hass: HomeAssistant) -> RemoteMapperStore:
@@ -102,19 +144,22 @@ async def ws_list_remotes(
 async def ws_get_remote(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
 ) -> None:
-    """Full remote view: layout, card layout, all slots."""
+    """Full remote view: layout, derived buttons, both card layouts, slots."""
     entry = hass.config_entries.async_get_entry(msg["entry_id"])
     remote = _store(hass).get_remote(msg["entry_id"])
     if entry is None or remote is None:
         connection.send_error(msg["id"], ERR_NOT_FOUND, "Unknown remote")
         return
+    layout = remote.get("layout", {})
     connection.send_result(
         msg["id"],
         {
             "entry_id": entry.entry_id,
             "title": entry.title,
-            "layout": remote.get("layout", {}),
+            "layout": layout,
+            "buttons": group_buttons(remote.get("source"), layout.get("actions", [])),
             "card_layout": remote.get("card_layout"),
+            "grid_layout": remote.get("grid_layout"),
             "slots": remote.get("slots", {}),
             "stale_actions": remote.get("stale_actions", []),
         },
@@ -352,20 +397,33 @@ async def ws_archive_slot(
     {
         vol.Required("type"): f"{DOMAIN}/save_layout",
         vol.Required("entry_id"): str,
-        vol.Required("card_layout"): dict,
+        vol.Optional("card_layout"): dict,
+        vol.Optional("grid_layout"): GRID_LAYOUT_SCHEMA,
     }
 )
 @websocket_api.async_response
 async def ws_save_layout(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
 ) -> None:
-    """Persist the card's canvas layout (belongs to the remote, not the card)."""
+    """Persist a card layout (belongs to the remote, not the card).
+
+    ``card_layout`` is the free-drag canvas, ``grid_layout`` the button
+    grid; either or both — the other is left untouched.
+    """
     store = _store(hass)
     remote = store.get_remote(msg["entry_id"])
     if remote is None:
         connection.send_error(msg["id"], ERR_NOT_FOUND, "Unknown remote")
         return
-    remote["card_layout"] = msg["card_layout"]
+    if "card_layout" not in msg and "grid_layout" not in msg:
+        connection.send_error(
+            msg["id"], ERR_INVALID_FORMAT, "card_layout or grid_layout required"
+        )
+        return
+    if "card_layout" in msg:
+        remote["card_layout"] = msg["card_layout"]
+    if "grid_layout" in msg:
+        remote["grid_layout"] = msg["grid_layout"]
     store.async_schedule_save()
     _fire_updated(hass, msg["entry_id"], "layout_saved")
     connection.send_result(msg["id"], {})

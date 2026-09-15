@@ -300,3 +300,86 @@ async def test_run_slot(hass, hass_ws_client, remote_device) -> None:
     fire_remote_action(hass, "1_single")
     await hass.async_block_till_done()
     assert len(calls) == 2
+
+
+async def test_get_remote_buttons(hass, hass_ws_client, remote_device) -> None:
+    """get_remote groups actions into buttons and exposes the grid layout."""
+    entry = await _setup_remote(hass, remote_device)
+    client = await hass_ws_client(hass)
+
+    res = await _ws(
+        client, {"type": f"{DOMAIN}/get_remote", "entry_id": entry.entry_id}
+    )
+    assert res["success"]
+    assert res["result"]["buttons"] == [
+        {
+            "id": "1",
+            "label": "1",
+            "actions": [
+                {"action_id": "1_single", "event": "single", "kind": "single"},
+                {"action_id": "1_double", "event": "double", "kind": "double"},
+            ],
+        }
+    ]
+    assert res["result"]["grid_layout"] is None
+
+
+async def test_save_grid_layout(hass, hass_ws_client, remote_device) -> None:
+    """Grid layout round-trips, is validated, and leaves the canvas alone."""
+    entry = await _setup_remote(hass, remote_device)
+    client = await hass_ws_client(hass)
+    events = async_capture_events(hass, EVENT_UPDATED)
+
+    grid = {
+        "schema_version": 1,
+        "rows": 2,
+        "cols": 1,
+        "buttons": {"1": {"row": 1, "col": 0, "label": "Top"}},
+    }
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/save_layout",
+            "entry_id": entry.entry_id,
+            "grid_layout": grid,
+        },
+    )
+    assert res["success"]
+    assert events[-1].data["kind"] == "layout_saved"
+
+    res = await _ws(
+        client, {"type": f"{DOMAIN}/get_remote", "entry_id": entry.entry_id}
+    )
+    assert res["result"]["grid_layout"] == grid
+    assert res["result"]["card_layout"] is None
+
+    # Out of range / shared cell / missing both → rejected, stored value kept
+    for bad in (
+        {**grid, "buttons": {"1": {"row": 2, "col": 0}}},
+        {
+            **grid,
+            "buttons": {"1": {"row": 0, "col": 0}, "2": {"row": 0, "col": 0}},
+        },
+        {**grid, "rows": 0},
+    ):
+        res = await _ws(
+            client,
+            {
+                "type": f"{DOMAIN}/save_layout",
+                "entry_id": entry.entry_id,
+                "grid_layout": bad,
+            },
+        )
+        assert not res["success"], bad
+        assert res["error"]["code"] == "invalid_format"
+
+    res = await _ws(
+        client, {"type": f"{DOMAIN}/save_layout", "entry_id": entry.entry_id}
+    )
+    assert not res["success"]
+    assert res["error"]["code"] == "invalid_format"
+
+    res = await _ws(
+        client, {"type": f"{DOMAIN}/get_remote", "entry_id": entry.entry_id}
+    )
+    assert res["result"]["grid_layout"] == grid
