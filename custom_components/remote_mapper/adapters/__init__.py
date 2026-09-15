@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 from .device_trigger import DeviceTriggerAdapter
 from .event_entity import EventEntityAdapter
+from .matter import MatterRemoteAdapter
 from .mqtt_generic import MqttGenericAdapter
 from .z2m_mqtt import Z2mMqttAdapter
 
@@ -20,6 +21,7 @@ ADAPTERS: dict[str, RemoteSourceAdapter] = {
     DeviceTriggerAdapter.id: DeviceTriggerAdapter(),
     Z2mMqttAdapter.id: Z2mMqttAdapter(),
     EventEntityAdapter.id: EventEntityAdapter(),
+    MatterRemoteAdapter.id: MatterRemoteAdapter(),
     MqttGenericAdapter.id: MqttGenericAdapter(),
 }
 

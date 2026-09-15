@@ -13,18 +13,22 @@ from homeassistant.config_entries import (
 )
 from homeassistant.core import callback
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.selector import selector
 
 from .adapters import get_adapter
+from .adapters.matter import button_tokens
 from .const import (
     ADAPTER_DEVICE_TRIGGER,
     ADAPTER_EVENT_ENTITY,
+    ADAPTER_MATTER,
     ADAPTER_MQTT_GENERIC,
     ADAPTER_Z2M_MQTT,
     CLEANUP_ALWAYS_DELETE,
     CLEANUP_ASK,
     CLEANUP_NEVER_DELETE,
     CONF_ACTIONS,
+    CONF_BUTTONS,
     CONF_DEVICE_ID,
     CONF_ENTITY_ID,
     CONF_LAYOUT,
@@ -115,6 +119,7 @@ class RemoteMapperConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="user",
             menu_options=[
                 "device",
+                "matter",
                 "z2m_topic",
                 "event_entity",
                 "mqtt_generic",
@@ -137,6 +142,68 @@ class RemoteMapperConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema(
                 {vol.Required(CONF_DEVICE_ID): selector({"device": {}})}
             ),
+        )
+
+    async def async_step_matter(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Pick a device; group every one of its event.* entities into one card.
+
+        Matter remotes expose one event entity per physical button — this
+        collects them all so a single card carries every button and event.
+        """
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            device_id = user_input[CONF_DEVICE_ID]
+            entity_ids = sorted(
+                entry.entity_id
+                for entry in er.async_entries_for_device(
+                    er.async_get(self.hass), device_id, include_disabled_entities=False
+                )
+                if entry.domain == "event"
+            )
+            if not entity_ids:
+                errors["base"] = "no_event_entities"
+            else:
+                await self.async_set_unique_id(f"matter:{device_id}")
+                self._abort_if_unique_id_configured()
+                buttons = {
+                    token: entity_id
+                    for entity_id, token in button_tokens(entity_ids).items()
+                }
+                source_config = {
+                    CONF_DEVICE_ID: device_id,
+                    CONF_BUTTONS: buttons,
+                }
+                actions = await get_adapter(ADAPTER_MATTER).async_default_actions(
+                    self.hass, source_config
+                )
+                if not actions:
+                    errors["base"] = "no_actions"
+                else:
+                    device = dr.async_get(self.hass).async_get(device_id)
+                    title = (
+                        (device.name_by_user or device.name) if device else None
+                    ) or "Remote"
+                    return self.async_create_entry(
+                        title=title,
+                        data={
+                            CONF_SOURCE: ADAPTER_MATTER,
+                            CONF_SOURCE_CONFIG: source_config,
+                            CONF_LAYOUT: {CONF_ACTIONS: actions},
+                        },
+                    )
+
+        return self.async_show_form(
+            step_id="matter",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_DEVICE_ID): selector(
+                        {"device": {"entity": {"domain": "event"}}}
+                    )
+                }
+            ),
+            errors=errors,
         )
 
     async def _create_manual(

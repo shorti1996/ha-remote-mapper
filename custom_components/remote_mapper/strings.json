@@ -5,6 +5,7 @@
         "title": "Add remote",
         "menu_options": {
           "device": "Device with triggers (Zigbee2MQTT, ZHA, …) — recommended",
+          "matter": "Matter / multi-button remote (one event entity per button)",
           "z2m_topic": "Zigbee2MQTT raw topic",
           "event_entity": "Event entity (event.*_action)",
           "mqtt_generic": "Generic MQTT topic + template"
@@ -13,6 +14,13 @@
       "device": {
         "title": "Pick device",
         "description": "Pick the device whose buttons you want to map.",
+        "data": {
+          "device_id": "Device"
+        }
+      },
+      "matter": {
+        "title": "Pick Matter remote",
+        "description": "Pick a remote that exposes one event.* entity per button (typical for Matter). Every button × event becomes a slot, named button:event (e.g. button_1:long_press).",
         "data": {
           "device_id": "Device"
         }
@@ -52,7 +60,8 @@
       }
     },
     "error": {
-      "no_actions": "No actions given. Press each button and probe again, or enter action ids manually."
+      "no_actions": "No actions given. Press each button and probe again, or enter action ids manually.",
+      "no_event_entities": "That device has no event.* entities. Pick a device whose buttons appear as event entities, or use another source type."
     },
     "abort": {
       "already_configured": "This remote is already configured."

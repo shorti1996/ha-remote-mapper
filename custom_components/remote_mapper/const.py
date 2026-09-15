@@ -39,12 +39,16 @@ CONF_DEVICE_ID: Final = "device_id"
 CONF_TOPIC: Final = "topic"
 CONF_ENTITY_ID: Final = "entity_id"
 CONF_VALUE_TEMPLATE: Final = "value_template"
+# Matter/multi-button: frozen {button_token: event_entity_id} map. Tokens are
+# computed once at config time so stored action ids stay stable.
+CONF_BUTTONS: Final = "buttons"
 
 # Adapter ids
 ADAPTER_DEVICE_TRIGGER: Final = "device_trigger"
 ADAPTER_Z2M_MQTT: Final = "z2m_mqtt"
 ADAPTER_EVENT_ENTITY: Final = "event_entity"
 ADAPTER_MQTT_GENERIC: Final = "mqtt_generic"
+ADAPTER_MATTER: Final = "matter"
 
 # Options keys
 CONF_SNAPSHOT_ENTITIES: Final = "snapshot_entities"
