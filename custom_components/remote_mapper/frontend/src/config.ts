@@ -2,7 +2,7 @@
 import type { DisplayMode, LayoutKind } from "./model";
 
 export type AssistedTrigger = "auto" | "tap" | "press";
-export type ChipsLayout = "vertical" | "horizontal" | "grid";
+export type ChipsLayout = "vertical" | "horizontal" | "compact" | "spines" | "grid";
 
 export interface RemoteMapperCardConfig {
   type: string;
@@ -43,7 +43,9 @@ export const ASSISTED_TRIGGERS: Array<{ value: AssistedTrigger; label: string }>
 
 export const CHIPS_LAYOUTS: Array<{ value: ChipsLayout; label: string }> = [
   { value: "vertical", label: "Vertical list" },
-  { value: "horizontal", label: "Horizontal row" },
+  { value: "horizontal", label: "Wrapped row — chips flow like tags" },
+  { value: "compact", label: "Compact icons — one row, name on hover / long-press" },
+  { value: "spines", label: "Spines — one row, names rotated 90°" },
   { value: "grid", label: "Two-column grid" },
 ];
 

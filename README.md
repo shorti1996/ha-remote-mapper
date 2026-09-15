@@ -105,7 +105,7 @@ entry_id: …               # optional with a single remote
 layout: grid              # grid (default) | canvas (free-drag tiles)
 display: normal           # normal | all | assisted
 assisted_trigger: auto    # assisted: auto (touch→press, mouse→tap) | tap | press
-chips_layout: vertical    # all: vertical | horizontal | grid
+chips_layout: vertical    # all: vertical | horizontal (wrapped) | compact | spines | grid
 button_color: "#3f51b5"   # any CSS color; unset = theme
 accent_color: ""          # borders, assigned marks, flashes; unset = primary
 text_color: ""

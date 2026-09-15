@@ -81,6 +81,10 @@ export class RemoteMapperGrid extends LitElement {
 
   @state() private _popover?: string;
   @state() private _hoverOpt?: string;
+  /** Compact chips: long-press tooltip (touch); PC gets the native title. */
+  @state() private _chipTip?: { action: string; text: string };
+  private _chipTipTimer?: ReturnType<typeof setTimeout>;
+  private _chipTipShown = false;
   /** Trigger resolved at pointerdown (auto → by pointerType), used at pointerup. */
   private _pressMode: "tap" | "press" = "tap";
   @state() private _drag?: DragState;
@@ -114,6 +118,34 @@ export class RemoteMapperGrid extends LitElement {
     const slot = this.slots[actionId];
     if (slot?.assigned && !slot.archived) this._emit("run-action", { actionId });
   }
+
+  // ── compact chips: long-press tooltip ─────────────────────────────
+
+  private _chipPressStart(e: PointerEvent, actionId: string): void {
+    if (this.chipsLayout !== "compact" || e.pointerType === "mouse") return;
+    this._chipPressEnd();
+    this._chipTipShown = false;
+    this._chipTipTimer = setTimeout(() => {
+      this._chipTipTimer = undefined;
+      this._chipTipShown = true;
+      const slot = this.slots[actionId];
+      const kind = this.buttons
+        .flatMap((b) => b.actions)
+        .find((a) => a.action_id === actionId);
+      const text = `${kind ? KIND_TITLE[kind.kind] : actionId}: ${slot?.summary ?? "unassigned"}`;
+      this._chipTip = { action: actionId, text };
+      setTimeout(() => {
+        if (this._chipTip?.action === actionId) this._chipTip = undefined;
+      }, 1800);
+    }, 450);
+  }
+
+  private _chipPressEnd = (): void => {
+    if (this._chipTipTimer !== undefined) {
+      clearTimeout(this._chipTipTimer);
+      this._chipTipTimer = undefined;
+    }
+  };
 
   // ── normal mode gestures ──────────────────────────────────────────
 
@@ -362,6 +394,9 @@ export class RemoteMapperGrid extends LitElement {
         ${this.display === "all"
           ? this._renderChips(button)
           : this._renderCompact(button)}
+        ${this._chipTip && button.actions.some((a) => a.action_id === this._chipTip!.action)
+          ? html`<div class="chip-tip">${this._chipTip.text}</div>`
+          : nothing}
         ${error
           ? html`<span class="badge err" title=${error}>!</span>`
           : nothing}
@@ -406,8 +441,20 @@ export class RemoteMapperGrid extends LitElement {
             <button
               class=${classes}
               data-action=${a.action_id}
-              title="${a.event} (${KIND_TITLE[a.kind]})"
+              title="${a.event} (${KIND_TITLE[a.kind]}): ${slot?.summary ?? "unassigned"}"
+              @pointerdown=${(e: PointerEvent) => this._chipPressStart(e, a.action_id)}
+              @pointerup=${this._chipPressEnd}
+              @pointercancel=${this._chipPressEnd}
+              @contextmenu=${(e: Event) => {
+                if (this._chipTip) e.preventDefault();
+              }}
               @click=${(e: Event) => {
+                if (this._chipTipShown) {
+                  // long press was "what is this?", not a command
+                  e.stopPropagation();
+                  this._chipTipShown = false;
+                  return;
+                }
                 if (this.editing) return;
                 e.stopPropagation();
                 this._run(a.action_id);
@@ -598,12 +645,60 @@ export class RemoteMapperGrid extends LitElement {
       gap: var(--ha-space-1, 4px);
       width: 100%;
     }
+    /* Wrapped row: natural width, flow like tags, never wider than the pad */
     .chips.horizontal {
       flex-direction: row;
       flex-wrap: wrap;
     }
     .chips.horizontal .chip {
-      flex: 1 1 40%;
+      flex: 0 1 auto;
+      width: auto;
+      max-width: 100%;
+    }
+    /* Compact: icons only, one row */
+    .chips.compact {
+      flex-direction: row;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .chips.compact .chip {
+      width: var(--ha-space-10, 40px);
+      justify-content: center;
+      padding: var(--ha-space-1, 4px);
+    }
+    .chips.compact .chip .text,
+    .chips.compact .chip .stale {
+      display: none;
+    }
+    .chips.compact .chip .icon {
+      width: auto;
+      font-size: var(--ha-font-size-l, 16px);
+    }
+    /* Spines: one row, names read bottom-to-top */
+    .chips.spines {
+      flex-direction: row;
+      justify-content: center;
+      align-items: stretch;
+      height: 150px;
+    }
+    .chips.spines .chip {
+      flex: 1 1 0;
+      width: auto;
+      min-width: var(--ha-space-8, 32px);
+      max-width: var(--ha-space-11, 44px);
+      height: 100%;
+      flex-direction: column-reverse;
+      justify-content: flex-start;
+      padding: var(--ha-space-2, 8px) 0;
+    }
+    .chips.spines .chip .text {
+      flex: 1;
+      min-height: 0;
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      text-align: left;
+    }
+    .chips.spines .chip .icon {
       width: auto;
     }
     .chips.grid {
@@ -613,11 +708,32 @@ export class RemoteMapperGrid extends LitElement {
     .chips.grid .chip {
       width: auto;
     }
+    .chip-tip {
+      position: absolute;
+      left: var(--ha-space-2, 8px);
+      right: var(--ha-space-2, 8px);
+      bottom: var(--ha-space-2, 8px);
+      z-index: 5;
+      padding: var(--ha-space-1, 4px) var(--ha-space-2, 8px);
+      border-radius: var(--ha-border-radius-md, 8px);
+      background: var(--secondary-background-color, rgba(127, 127, 127, 0.25));
+      color: var(--primary-text-color);
+      font-size: var(--ha-font-size-s, 12px);
+      text-align: center;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      pointer-events: none;
+    }
     .chip {
       display: flex;
       align-items: center;
       gap: var(--ha-space-2, 8px);
       width: 100%;
+      min-width: 0;
+      overflow: hidden;
+      -webkit-touch-callout: none;
+      user-select: none;
       min-height: var(--ha-space-8, 32px);
       box-sizing: border-box;
       padding: var(--ha-space-1, 4px) var(--ha-space-2, 8px);
