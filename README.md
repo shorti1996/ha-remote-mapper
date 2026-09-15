@@ -1,139 +1,129 @@
-# Remote Mapper
+# Remote Mapper for Home Assistant
 
-Home Assistant custom integration (with bundled Lovelace card) that turns
-physical remotes (Zigbee/MQTT/…) into first-class dashboard objects: each
-remote gets a card mirroring its buttons; each button × event ("slot") can
-be assigned an action, executed by the integration or materialized as a
-native HA automation. Includes one-tap snapshot-to-scene.
+**Turn any Zigbee / Matter / MQTT remote into a card that looks like the
+remote — and assign what each button does right there, on the dashboard.**
 
-## Features
+No blueprints, no one-automation-per-button, no YAML hunting. Pick the
+button, pick the action, done. Everything else (automations, scenes, the
+device's quirks) is handled for you.
 
-- **Canvas card** — drag slot tiles once into an arrangement mirroring the
-  physical device (long-press or pencil to edit; undo, D-pad nudge,
-  resize). Layout persists server-side with the remote, not the dashboard.
-- **Slot editor tiers** — quick chips (activate scene / toggle entity /
-  run script via native HA pickers), YAML editor for arbitrary sequences
-  (full automation-action syntax: `choose`, `if/then`, templates, …).
-- **Tap to test** — tapping an assigned tile fires its sequence
-  (a dashboard gesture, distinct from the physical button event).
-- **Materialize toggle** — per slot: "create as automation". On = the slot
-  lives in HA's automation system (native editor, traces, `related`
-  search); off = folds the automation (with any external edits) back into
-  the card. Mode switch, not export.
-- **Snapshot-to-scene** — set the room how you like it, press 📸: current
-  states of the remote's entity set become a persistent scene bound to the
-  button. Re-snapshot updates the same scene in place.
-- **Scene ownership** — only scenes the integration created are ever
-  prompted about; one remembered choice (ask/always/never) covers scene
-  and automation cleanup.
-- **Import assistant** — absorbs existing button automations (one big
-  `choose` keyed on trigger ids, or one automation per button) into slots
-  losslessly; sources are disabled, never deleted; anything unclassifiable
-  is flagged, never dropped.
-- **Drift handling** — newly discovered actions are added automatically;
-  actions the source stops reporting get a "stale" badge.
+<!-- screenshot: the card in "normal" mode next to the physical remote -->
+![Remote Mapper card mirroring a 6-button Zigbee remote](docs/img/hero.png)
 
-## Sources (adapters)
+## Why
 
-| Adapter | Use for | Enumerates actions? |
-|---|---|---|
-| **Device triggers** (default) | Z2M, ZHA — any device publishing device triggers | yes (press each button once — Z2M discovery is lazy) |
-| Zigbee2MQTT raw topic | Z2M without HA discovery | no (type ids manually) |
-| Event entity | `event.*_action` entities (experimental in Z2M) | yes (`event_types`) |
-| Generic MQTT | deCONZ, ESPHome, custom firmware | no |
+Remotes are the best input device in a smart home and the worst to set up.
+Every button × press type is a separate trigger, so a 6-button remote with
+single/double/hold is 18 automations — or one giant `choose`. Six months
+later nobody remembers what button 4 does.
 
-## Installation
+Remote Mapper gives each remote **one card**, arranged like the real
+device, where every button shows what it does and lets you change it.
 
-HACS → custom repository (category: Integration) → install → restart →
-*Settings → Devices & services → Add integration → Remote Mapper*.
+## What you get
 
-With Lovelace in **storage mode** (default) the card resource registers
-automatically. In **YAML mode** add it manually:
+- **A card shaped like the remote.** A Word-style picker sets the grid
+  (2×3, 1×4, …); drag buttons into place; rename them. Saved with the
+  remote, so every dashboard shows the same layout.
 
-```yaml
-lovelace:
-  mode: yaml
-  resources:
-    - url: /hacsfiles/remote_mapper/remote-mapper-card.js?v=0.1.0
-      type: module
-```
+  <!-- screenshot: edit mode with the ⊞ grid picker open -->
+  ![Grid picker](docs/img/grid-picker.png)
 
-Card usage: add `custom:remote-mapper-card` (the card has a visual
-config editor). With a single remote no config is needed.
+- **Three ways to use it** (per card, in the card editor):
+
+  | Mode | What you see | What a tap does |
+  |---|---|---|
+  | **Normal** | one pad per button, marks for single / double / hold | tap = single, double-tap = double, hold = hold — the card *is* the remote |
+  | **All visible** | every event of every button as a chip | tap a chip |
+  | **Assisted** | one pad per button | press → the button's events fan out inside it, slide onto one and lift (mouse: click, click) |
+
+  <!-- screenshots: the three modes side by side -->
+  ![Normal / all visible / assisted](docs/img/modes.png)
+
+- **Assign in seconds.** Tap an event → *Activate scene*, *Toggle entity*,
+  *Run script*, *Set WLED preset*… with HA's own pickers. Need more? A
+  YAML tab takes the full automation action syntax (`if`, `choose`,
+  templates).
+
+  <!-- screenshot: the slot editor, Quick tab -->
+  ![Assign an action](docs/img/assign.png)
+
+- **📸 Snapshot to scene.** Set the room the way you like it, press
+  *Snapshot* on a button: the current state of the room becomes a scene
+  bound to that button. Press again later to update it in place.
+
+- **Real automations when you want them.** Tick *Create as automation* on
+  any button: it becomes a native HA automation (traces, the HA editor,
+  "related" search). Untick to fold it back into the card. Your choice,
+  per button, reversible.
+
+- **Import what you already have.** Existing automations for the remote
+  are absorbed into the card; the originals are disabled, never deleted.
+
+- **Appearance.** Colors and pad opacity in the card editor; follows your
+  theme and HA's font-size setting out of the box.
+
+## Supported remotes
+
+Anything that reaches Home Assistant as one of:
+
+| Source | Examples |
+|---|---|
+| **Device triggers** (default) | Zigbee2MQTT and ZHA remotes — Tuya, Aqara, IKEA, Hue, MOES, … |
+| **Matter** multi-button | IKEA BILRESA and other Matter remotes exposing one `event.*` per button |
+| **Event entity** | any `event.*` entity with `event_types` |
+| **Zigbee2MQTT raw topic / generic MQTT** | deCONZ, ESPHome, custom firmware |
+
+Zigbee2MQTT discovers actions lazily: press each button once during setup
+and Remote Mapper picks them up (new ones are added automatically later).
+
+## Install
+
+1. HACS → *Custom repositories* → add this repo as **Integration** → install.
+2. Restart Home Assistant.
+3. *Settings → Devices & services → Add integration → Remote Mapper*, pick
+   the device, press its buttons once.
+4. Edit a dashboard → *Add card* → **Remote Mapper Card**. With one remote
+   nothing needs configuring.
+
+The card ships with the integration; no separate frontend install. (YAML
+dashboards: add the resource
+`/hacsfiles/remote_mapper/remote-mapper-card.js` as a module.)
+
+## Card options
+
+Everything below is available in the visual card editor; YAML for
+reference:
 
 ```yaml
 type: custom:remote-mapper-card
-entry_id: …               # optional with one remote
-layout: grid              # grid (default) | canvas (legacy free-drag tiles)
-display: normal           # grid only: normal | all | assisted
+entry_id: …               # optional with a single remote
+layout: grid              # grid (default) | canvas (free-drag tiles)
+display: normal           # normal | all | assisted
 assisted_trigger: auto    # assisted: auto (touch→press, mouse→tap) | tap | press
 chips_layout: vertical    # all: vertical | horizontal | grid
-button_color: "#3f51b5"   # picker in the editor; YAML takes any CSS color / var()
-accent_color: ""          # borders / assigned marks / flashes; empty = primary
+button_color: "#3f51b5"   # any CSS color; unset = theme
+accent_color: ""          # borders, assigned marks, flashes; unset = primary
 text_color: ""
-button_opacity: 1         # 0.1 – 1, pad background only (text stays solid)
+button_opacity: 1         # 0.1 – 1, pad background only
 ```
 
-Sizes follow HA's design tokens (`--ha-font-size-*`, `--ha-space-*`,
-`--ha-border-radius-*`), so the card scales with the user's font-size
-setting and themes. Themes can also set `--remote-mapper-button-color`,
-`--remote-mapper-accent-color`, `--remote-mapper-text-color`,
-`--remote-mapper-border-color`, `--remote-mapper-button-opacity`.
+Themes can set `--remote-mapper-button-color`, `--remote-mapper-accent-color`,
+`--remote-mapper-text-color`, `--remote-mapper-border-color`,
+`--remote-mapper-button-opacity`.
 
-## Layout & display modes
+## Good to know
 
-Actions are grouped into **buttons** server-side (`1_single`/`1_double` →
-button `1`; Matter `button_1:multi_press_1` → `button_1`; single-entity
-remotes → one button). In edit mode (✎) the ⊞ picker sets the grid shape
-like Word's table picker; drag buttons between cells; tap a button to
-rename it or edit its events. The grid is saved with the remote, so every
-dashboard shows the same arrangement.
+- **Tapping a pad on the dashboard runs the action** — handy for testing
+  from the couch. It is not the physical button event; automations you
+  materialized don't fire from it.
+- Scenes and automations the integration created are the only ones it will
+  ever offer to delete, and it asks first (remembered choice: ask / always /
+  never).
+- If Zigbee2MQTT renames an action, the button gets a *stale* badge instead
+  of silently breaking.
 
-`display` is per card instance:
+## Contributing
 
-| Mode | Cell shows | Dashboard gesture |
-|---|---|---|
-| `normal` | label + kind dots | tap → single, double-tap → double, hold → hold (release on lift) — works like the physical remote |
-| `all` | every event as a chip | tap a chip |
-| `assisted` | label + primary summary | tap → the button's events pop up (tap again closes); or `assisted_trigger: press` — hold, slide onto an event, lift |
-
-## Development
-
-Requirements: [uv](https://docs.astral.sh/uv/) (Python ≥ 3.14.2 fetched
-automatically), Node 22+, Docker.
-
-```sh
-make dev        # card build (unminified, sourcemaps)
-make build      # production card build (output committed in www/)
-make test       # pytest (pytest-homeassistant-custom-component)
-make lint       # ruff check + format check
-make ha-up      # dev HA (stable) + mosquitto on :8123 / :1883
-make ha-logs    # follow HA logs
-```
-
-`docker/compose.yaml` mounts `custom_components/remote_mapper` read-only
-into the dev HA. Simulate a remote against the bundled broker:
-
-```sh
-mosquitto_pub -t "homeassistant/device_automation/x/action_1_single/config" -r \
-  -m '{"automation_type":"trigger","topic":"zigbee2mqtt/x/action","payload":"1_single","type":"action","subtype":"1_single","device":{"identifiers":["zigbee2mqtt_x"],"name":"X"}}'
-mosquitto_pub -t "zigbee2mqtt/x/action" -m "1_single"
-```
-
-Live smoke test against a running HA (see `ai/local-ha-testing.md`):
-`HA_TOKEN=... MQTT_HOST=... uv run python scripts/e2e_live.py`.
-
-The card's canvas engine is vendored from the in-house widget-canvas
-repo (`frontend/src/canvas/`, provenance headers in each file); once that
-repo tags a release exporting `src/lib.ts`, the copies collapse into a
-pinned npm git dependency.
-
-## Release
-
-```sh
-make bump-version VERSION=x.y.z   # syncs manifest, package.json, pyproject, VERSION
-git commit ... && git tag vx.y.z && git push --tags
-```
-
-The release workflow verifies tag == versions, rebuilds the card,
-fails on www/ drift, and attaches the HACS zip.
+See [DEVELOPMENT.md](DEVELOPMENT.md) for the dev loop, the dockerized test
+HA, and releases.
