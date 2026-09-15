@@ -424,6 +424,18 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     void this._openEditor(id);
   }
 
+  /** In-app navigation (what HA's own navigate() does — no page reload). */
+  private _navigate(path: string): void {
+    window.history.pushState(null, "", path);
+    window.dispatchEvent(new CustomEvent("location-changed", { detail: { replace: false } }));
+  }
+
+  private _automationEditPath(slot: SlotRecord | undefined): string | undefined {
+    return slot?.materialized && slot.automation_id
+      ? `/config/automation/edit/${slot.automation_id}`
+      : undefined;
+  }
+
   public notify(message: string): void {
     // native HA toast (DDC layout-persistence pattern)
     window.dispatchEvent(
@@ -1046,6 +1058,14 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                   ${this._iconButton("mdi:play", "Run now", () => void this._runSlot(a.action_id), {
                     disabled: !view?.assigned || !!view.archived,
                   })}
+                  ${(() => {
+                    const path = this._automationEditPath(remote.slots[a.action_id]);
+                    return path
+                      ? this._iconButton("mdi:robot", "Open in HA's automation editor", () =>
+                          this._navigate(path)
+                        )
+                      : nothing;
+                  })()}
                   ${this._iconButton("mdi:pencil", "Edit", () => void this._openEditor(a.action_id))}
                 </li>
               `;
@@ -1243,9 +1263,14 @@ export class RemoteMapperCard extends LitElement implements EditHost {
           ${this._editingLive
             ? html`<p class="hint">
                 Linked to <b>${this._editingLive.alias}</b> —
-                <a href=${this._editingLive.edit_url}>Edit in HA</a>. Unticking
-                "automation" below deletes it on Save and moves its actions into
-                this card. Cancel keeps things as they are.
+                <button
+                  class="link"
+                  @click=${() => this._navigate(this._editingLive!.edit_url)}
+                >
+                  open in HA's automation editor
+                </button>. Unticking "automation" below deletes it on Save and
+                moves its actions into this card. Cancel keeps things as they
+                are.
               </p>`
             : nothing}
           <div class="tabs">
@@ -1952,6 +1977,15 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       max-height: 86vh;
       overflow: auto;
       box-shadow: var(--ha-card-box-shadow, 0 8px 24px rgba(0, 0, 0, 0.4));
+    }
+    button.link {
+      background: none;
+      border: none;
+      padding: 0;
+      font: inherit;
+      color: var(--primary-color);
+      text-decoration: underline;
+      cursor: pointer;
     }
     .modal h3 {
       margin: 0 0 var(--ha-space-2, 8px);
