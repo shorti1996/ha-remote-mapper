@@ -29,6 +29,9 @@ MANAGED_DESCRIPTION_MARKER: Final = f"Auto-managed by {DOMAIN}."
 
 # Bus event fired after every mutating WS handler; the card refetches on it.
 EVENT_UPDATED: Final = f"{DOMAIN}_updated"
+# Bus event for every physical remote action (assigned or not); the card
+# flashes the matching button — live feedback that the press arrived.
+EVENT_ACTION: Final = f"{DOMAIN}_action"
 
 # Config entry data keys
 CONF_SOURCE: Final = "source"

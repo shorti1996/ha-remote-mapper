@@ -14,7 +14,7 @@ from homeassistant.core import Context, callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.script import Script, async_validate_actions_config
 
-from .const import DOMAIN
+from .const import DOMAIN, EVENT_ACTION
 
 if TYPE_CHECKING:
     from homeassistant.core import CALLBACK_TYPE, HomeAssistant
@@ -73,7 +73,10 @@ class SlotDispatcher:
 
     @callback
     def _handle_action(self, action_id: str, raw: dict[str, Any]) -> None:
-        """Adapter callback — schedule the dispatch."""
+        """Adapter callback — announce to cards, then schedule the dispatch."""
+        self.hass.bus.async_fire(
+            EVENT_ACTION, {"entry_id": self.entry_id, "action_id": action_id}
+        )
         self.hass.async_create_task(
             self.async_dispatch(action_id),
             f"{DOMAIN} dispatch {self.name} {action_id}",

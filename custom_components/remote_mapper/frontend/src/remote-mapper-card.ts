@@ -45,6 +45,7 @@ import type { SlotView } from "./remote-grid";
 
 const CARD_TAG = "remote-mapper-card";
 const UPDATED_EVENT = "remote_mapper_updated";
+const ACTION_EVENT = "remote_mapper_action";
 
 const LAYOUT_SCHEMA_VERSION = 1;
 const TILE_W = 100;
@@ -242,6 +243,8 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   private _config?: RemoteMapperCardConfig;
   private _entryId?: string;
   private _unsubEvents?: () => void;
+  private _unsubActions?: () => void;
+  private _flashTimer?: ReturnType<typeof setTimeout>;
   private _fetchStarted = false;
   private _edit = new EditController(this);
   private _resizeObserver?: ResizeObserver;
@@ -307,6 +310,8 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     this._resizeObserver?.disconnect();
     this._unsubEvents?.();
     this._unsubEvents = undefined;
+    this._unsubActions?.();
+    this._unsubActions = undefined;
     this._edit.detach();
   }
 
@@ -337,6 +342,21 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     }>((event) => {
       if (event.data.entry_id === this._entryId) void this._fetchRemote();
     }, UPDATED_EVENT);
+    // physical presses light up the same way dashboard taps do
+    this._unsubActions = await this._hass!.connection.subscribeEvents<{
+      data: { entry_id: string; action_id: string };
+    }>((event) => {
+      if (event.data.entry_id === this._entryId) this._flashAction(event.data.action_id);
+    }, ACTION_EVENT);
+  }
+
+  private _flashAction(actionId: string): void {
+    this._flash = actionId;
+    if (this._flashTimer !== undefined) clearTimeout(this._flashTimer);
+    this._flashTimer = setTimeout(() => {
+      this._flashTimer = undefined;
+      this._flash = undefined;
+    }, 400);
   }
 
   private async _fetchRemote(): Promise<void> {
@@ -547,10 +567,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   private async _runSlot(actionId: string): Promise<void> {
     const slot = this._remote?.slots[actionId];
     if (!slot || slot.archived) return;
-    this._flash = actionId;
-    setTimeout(() => {
-      this._flash = undefined;
-    }, 400);
+    this._flashAction(actionId);
     try {
       await this._hass!.callWS({
         type: "remote_mapper/run_slot",

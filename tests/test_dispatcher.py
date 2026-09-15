@@ -123,3 +123,36 @@ async def test_device_entry_attached(hass, remote_device, device_registry) -> No
     entry = await _setup_remote_entry(hass, remote_device)
     device = device_registry.async_get(remote_device)
     assert entry.entry_id in device.config_entries
+
+
+async def test_physical_action_fires_bus_event(hass, remote_device) -> None:
+    """Every physical press is announced, assigned or not (card flash)."""
+    from pytest_homeassistant_custom_component.common import (
+        MockConfigEntry,
+        async_capture_events,
+    )
+
+    from custom_components.remote_mapper.const import DOMAIN, EVENT_ACTION
+
+    from .conftest import fire_remote_action
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Test Remote",
+        unique_id=remote_device,
+        data={
+            "source": "device_trigger",
+            "source_config": {"device_id": remote_device},
+            "layout": {"actions": ["1_single", "1_double"]},
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    events = async_capture_events(hass, EVENT_ACTION)
+    fire_remote_action(hass, "1_double")
+    await hass.async_block_till_done()
+    assert [e.data for e in events] == [
+        {"entry_id": entry.entry_id, "action_id": "1_double"}
+    ]
