@@ -374,3 +374,16 @@ async def test_plain_save_on_materialized_slot_rejected(
     assert res["success"]
     items = _automations_yaml(hass)
     assert items[0]["actions"] == new_seq
+
+
+def test_build_payload_alias_includes_name() -> None:
+    """The slot name lands in the automation alias; absent name = old alias."""
+    from custom_components.remote_mapper.materializer import build_payload
+
+    trigger = {"platform": "device", "domain": "mqtt"}
+    assert build_payload("Desk", "1_single", trigger, [])["alias"] == (
+        "[remote_mapper] Desk · 1_single"
+    )
+    assert build_payload("Desk", "1_single", trigger, [], "Lamp")["alias"] == (
+        "[remote_mapper] Desk · 1_single — Lamp"
+    )

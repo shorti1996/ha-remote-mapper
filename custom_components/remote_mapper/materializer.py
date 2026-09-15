@@ -46,11 +46,22 @@ def automation_config_id(entry_id: str, action_id: str) -> str:
 
 
 def build_payload(
-    remote_title: str, action_id: str, trigger: dict[str, Any], sequence: list[Any]
+    remote_title: str,
+    action_id: str,
+    trigger: dict[str, Any],
+    sequence: list[Any],
+    name: str | None = None,
 ) -> dict[str, Any]:
-    """Automation payload — plural keys (2024.10+ editor convention)."""
+    """Automation payload — plural keys (2024.10+ editor convention).
+
+    The user's slot name (if any) goes into the alias so the automation
+    reads well in HA's own list.
+    """
+    alias = f"{AUTOMATION_ALIAS_PREFIX} {remote_title} · {action_id}"
+    if name:
+        alias = f"{alias} — {name}"
     return {
-        "alias": f"{AUTOMATION_ALIAS_PREFIX} {remote_title} · {action_id}",
+        "alias": alias,
         "description": (
             f"{MANAGED_DESCRIPTION_MARKER} Edits here are canonical. "
             "Disable the toggle in the remote card to remove."
@@ -178,7 +189,9 @@ async def async_materialize(
     adapter = get_adapter(remote["source"])
     trigger = adapter.build_trigger(action_id, remote["source_config"])
     config_id = automation_config_id(entry_id, action_id)
-    payload = build_payload(title, action_id, trigger, slot["sequence"])
+    payload = build_payload(
+        title, action_id, trigger, slot["sequence"], slot.get("name")
+    )
 
     await _get_config_store(hass).async_upsert(config_id, payload)
 

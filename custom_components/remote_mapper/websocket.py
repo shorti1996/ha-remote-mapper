@@ -202,6 +202,8 @@ async def ws_get_slot(
         vol.Optional("sequence"): vol.Any(list, None),
         vol.Optional("sequence_yaml"): str,
         vol.Optional("materialized"): bool,
+        # User-facing name; None/"" = auto (the card infers one from the sequence)
+        vol.Optional("name"): vol.Any(str, None),
     }
 )
 @websocket_api.async_response
@@ -240,6 +242,12 @@ async def ws_save_slot(
     elif not was_materialized:
         connection.send_error(msg["id"], ERR_INVALID_SEQUENCE, "No sequence given")
         return
+
+    if "name" in msg and (slot is not None or sequence is not None):
+        # Name rides along with whatever else is saved (materialized too)
+        slot = slot or default_slot()
+        slot["name"] = (msg["name"] or "").strip() or None
+        store.async_set_slot(msg["entry_id"], msg["action_id"], slot)
 
     if was_materialized and not target_materialized:
         # Dematerialize: sequence=None pulls the automation's current

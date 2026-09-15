@@ -40,6 +40,7 @@ import {
   type ButtonModel,
   type GridLayout,
 } from "./model";
+import { inferName } from "./naming";
 import type { SlotView } from "./remote-grid";
 
 const CARD_TAG = "remote-mapper-card";
@@ -62,10 +63,14 @@ interface HomeAssistant {
   callWS<T>(msg: Record<string, unknown>): Promise<T>;
   connection: HassConnection;
   states?: Record<string, { attributes?: Record<string, unknown> }>;
+  areas?: Record<string, { name?: string }>;
+  devices?: Record<string, { name?: string | null; name_by_user?: string | null }>;
+  floors?: Record<string, { name?: string }>;
 }
 
 interface SlotRecord {
   sequence: unknown[];
+  name?: string | null;
   scene_id: string | null;
   materialized: boolean;
   automation_id: string | null;
@@ -208,6 +213,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   @state() private _quickEntity = "";
   @state() private _quickOption = "";
   @state() private _draft = "";
+  @state() private _draftName = "";
   @state() private _yamlValue?: unknown[];
   @state() private _yamlValid = true;
   @state() private _draftError?: string;
@@ -551,16 +557,12 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     }
   }
 
+  /** User name if set, else a name inferred from the sequence (naming.ts). */
   private _slotSummary(slot: SlotRecord | undefined): string {
     if (!slot) return "unassigned";
+    if (slot.name) return slot.name;
     if (slot.materialized) return "automation";
-    const quick = inferQuick(slot.sequence ?? []);
-    if (quick.mode === "wled_preset")
-      return quick.option ? `${quick.entity} → ${quick.option}` : quick.entity;
-    if (quick.mode !== "custom") return quick.entity;
-    const first = slot.sequence?.[0] as Record<string, unknown> | undefined;
-    if (!first) return "empty";
-    return (first.action ?? first.service ?? Object.keys(first)[0]) as string;
+    return inferName(slot.sequence ?? [], this._hass) || "empty";
   }
 
   // ── slot editor modal ──────────────────────────────────────────────
@@ -575,6 +577,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     this._quickOption = quick.option;
     this._editorTab = quick.mode === "custom" && sequence.length ? "yaml" : "quick";
     this._draft = JSON.stringify(sequence, null, 2);
+    this._draftName = slot?.name ?? "";
     this._yamlValue = sequence;
     this._yamlValid = true;
     this._draftError = undefined;
@@ -619,6 +622,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       entry_id: this._entryId,
       action_id: this._editingAction,
       materialized: this._draftMaterialized,
+      name: this._draftName.trim() || null,
     };
     if (this._editorTab === "quick") {
       if (!this._quickEntity) {
@@ -1178,6 +1182,18 @@ export class RemoteMapperCard extends LitElement implements EditHost {
             ? this._renderQuickTab()
             : this._renderYamlTab()}
           <label class="hint row">
+            Name
+            <input
+              class="label-input"
+              type="text"
+              .value=${this._draftName}
+              placeholder=${this._autoNamePlaceholder()}
+              @input=${(e: Event) => {
+                this._draftName = (e.target as HTMLInputElement).value;
+              }}
+            />
+          </label>
+          <label class="hint row">
             <input
               type="checkbox"
               .checked=${this._draftMaterialized}
@@ -1222,6 +1238,24 @@ export class RemoteMapperCard extends LitElement implements EditHost {
         </div>
       </div>
     `;
+  }
+
+  /** What the name will be if left empty — inferred from the current draft. */
+  private _autoNamePlaceholder(): string {
+    let sequence: unknown[] = [];
+    if (this._editorTab === "quick" && this._quickEntity) {
+      sequence = quickSequence(this._quickMode, this._quickEntity, this._quickOption);
+    } else if (this._yamlEditorOk) {
+      sequence = this._yamlValue ?? [];
+    } else {
+      try {
+        sequence = JSON.parse(this._draft || "[]") as unknown[];
+      } catch {
+        sequence = [];
+      }
+    }
+    const auto = inferName(sequence, this._hass);
+    return auto ? `Auto: ${auto}` : "Auto (from the action)";
   }
 
   private _renderQuickTab(): TemplateResult {

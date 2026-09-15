@@ -451,3 +451,34 @@ async def test_refresh_actions(hass, hass_ws_client, remote_device) -> None:
     fire_remote_action(hass, "1_hold")
     await hass.async_block_till_done()
     assert len(calls) == 1
+
+
+async def test_slot_name_round_trip(hass, hass_ws_client, remote_device) -> None:
+    """A user name persists with the slot; empty clears it back to auto."""
+    entry = await _setup_remote(hass, remote_device)
+    client = await hass_ws_client(hass)
+
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/save_slot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_single",
+            "sequence": [{"action": "test.automation"}],
+            "name": "  Desk light  ",
+        },
+    )
+    assert res["success"]
+    assert res["result"]["slot"]["name"] == "Desk light"
+
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/save_slot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_single",
+            "sequence": [{"action": "test.automation"}],
+            "name": "",
+        },
+    )
+    assert res["result"]["slot"]["name"] is None

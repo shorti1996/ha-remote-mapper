@@ -29,6 +29,7 @@ def default_slot() -> dict[str, Any]:
     """Return a fresh Assigned-state slot record."""
     return {
         "sequence": [],
+        "name": None,
         "scene_id": None,
         "materialized": False,
         "automation_id": None,
