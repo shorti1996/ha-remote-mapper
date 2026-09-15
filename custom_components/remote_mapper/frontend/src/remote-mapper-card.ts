@@ -106,6 +106,9 @@ interface ImportProposal {
   disable_source: boolean;
   mixed: boolean;
   conflict: boolean;
+  /** Several automations shared this trigger — sequences concatenated. */
+  merged?: boolean;
+  sources?: Array<{ entity_id: string; alias: string }>;
 }
 
 interface ImportScan {
@@ -1539,6 +1542,12 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                           ${p.mixed
                             ? html`<span class="warn"
                                 >(mixed remotes — source stays enabled)</span
+                              >`
+                            : nothing}
+                          ${p.merged
+                            ? html`<span class="warn"
+                                title="Home Assistant ran all of them on this press; the slot runs them one after another"
+                                >(merges ${p.sources?.length ?? 2} automations)</span
                               >`
                             : nothing}
                         </label>

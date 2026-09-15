@@ -10,6 +10,10 @@ Two observed shapes (plan §5):
 
 Anything else is flagged for manual YAML-tier import — never silently
 dropped. Originals are disabled (automation.turn_off), not deleted.
+
+Several automations on the same trigger (HA runs them all) merge into
+ONE proposal: sequences concatenated in scan order, every source
+disabled — so the slot does what the physical button did.
 """
 
 from __future__ import annotations
@@ -113,7 +117,40 @@ class ImportScanner:
                 continue  # our own materialized automation — not an import
             self._classify(entity_id, alias, raw, store)
 
-        return {"proposals": self.proposals, "skipped": self.skipped}
+        return {"proposals": self._merged(), "skipped": self.skipped}
+
+    def _merged(self) -> list[dict[str, Any]]:
+        """Fold proposals sharing an action_id into one (all sources kept)."""
+        by_action: dict[str, dict[str, Any]] = {}
+        for proposal in self.proposals:
+            action_id = proposal["action_id"]
+            if (merged := by_action.get(action_id)) is None:
+                by_action[action_id] = {
+                    **proposal,
+                    "sources": [
+                        {
+                            "entity_id": proposal["source_entity_id"],
+                            "config_id": proposal["source_config_id"],
+                            "alias": proposal["alias"],
+                            "disable_source": proposal["disable_source"],
+                        }
+                    ],
+                }
+                continue
+            merged["sequence"] = [*merged["sequence"], *proposal["sequence"]]
+            merged["alias"] = f"{merged['alias']} + {proposal['alias']}"
+            merged["mixed"] = merged["mixed"] or proposal["mixed"]
+            merged["sources"].append(
+                {
+                    "entity_id": proposal["source_entity_id"],
+                    "config_id": proposal["source_config_id"],
+                    "alias": proposal["alias"],
+                    "disable_source": proposal["disable_source"],
+                }
+            )
+        for merged in by_action.values():
+            merged["merged"] = len(merged["sources"]) > 1
+        return list(by_action.values())
 
     # ── internals ────────────────────────────────────────────────────
 
@@ -242,16 +279,29 @@ async def async_apply(
         if store.get_slot(entry_id, action_id) is not None and not overwrite:
             conflicts.append(action_id)
             continue
+        # merged proposals carry every source; single ones just the one
+        sources = proposal.get("sources") or [
+            {
+                "entity_id": proposal.get("source_entity_id"),
+                "config_id": proposal.get("source_config_id"),
+                "disable_source": proposal.get("disable_source"),
+            }
+        ]
         slot = default_slot()
         slot["sequence"] = proposal["sequence"]
         slot["imported_from"] = {
-            "entity_id": proposal.get("source_entity_id"),
-            "config_id": proposal.get("source_config_id"),
+            "entity_id": sources[0].get("entity_id"),
+            "config_id": sources[0].get("config_id"),
+            "sources": [
+                {"entity_id": s.get("entity_id"), "config_id": s.get("config_id")}
+                for s in sources
+            ],
         }
         store.async_set_slot(entry_id, action_id, slot)
         applied.append(action_id)
-        if proposal.get("disable_source") and proposal.get("source_entity_id"):
-            to_disable.add(proposal["source_entity_id"])
+        for source in sources:
+            if source.get("disable_source") and source.get("entity_id"):
+                to_disable.add(source["entity_id"])
 
     for entity_id in sorted(to_disable):
         await hass.services.async_call(

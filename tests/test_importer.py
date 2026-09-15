@@ -275,6 +275,7 @@ async def test_apply_import(hass, hass_ws_client, remote_device) -> None:
     assert slot["imported_from"] == {
         "entity_id": "automation.pilot",
         "config_id": "auto_b",
+        "sources": [{"entity_id": "automation.pilot", "config_id": "auto_b"}],
     }
 
     # Template stays a raw string in the store…
@@ -347,3 +348,65 @@ async def test_apply_conflict_skipped_without_overwrite(
     res = await client.receive_json()
     assert res["result"]["applied"] == ["1_single"]
     assert store.get_slot(entry.entry_id, "1_single")["sequence"] == SEQ_B1
+
+
+async def test_duplicate_trigger_automations_merge(
+    hass, hass_ws_client, remote_device
+) -> None:
+    """Two automations on one trigger → one slot running both, both disabled.
+
+    Reproduces the production case: HA fires every automation for a
+    press; importing only the first would change what the button does.
+    """
+    entry = await _setup_remote(hass, remote_device)
+    await _setup_automations(
+        hass,
+        [
+            {
+                "id": "dup_1",
+                "alias": "hold warm",
+                "triggers": [_device_trigger(remote_device, "1_double")],
+                "actions": [{"action": "test.automation", "data": {"which": "warm"}}],
+            },
+            {
+                "id": "dup_2",
+                "alias": "hold bright",
+                "triggers": [_device_trigger(remote_device, "1_double")],
+                "actions": [{"action": "test.automation", "data": {"which": "bright"}}],
+            },
+        ],
+    )
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {"type": f"{DOMAIN}/scan_import", "entry_id": entry.entry_id}
+    )
+    scan = (await client.receive_json())["result"]
+    assert scan["skipped"] == []
+    assert len(scan["proposals"]) == 1
+    proposal = scan["proposals"][0]
+    assert proposal["action_id"] == "1_double"
+    assert proposal["merged"] is True
+    assert proposal["alias"] == "hold warm + hold bright"
+    assert [a["data"]["which"] for a in proposal["sequence"]] == ["warm", "bright"]
+    assert [s["entity_id"] for s in proposal["sources"]] == [
+        "automation.hold_warm",
+        "automation.hold_bright",
+    ]
+
+    calls = async_mock_service(hass, "test", "automation")
+    await client.send_json_auto_id(
+        {
+            "type": f"{DOMAIN}/apply_import",
+            "entry_id": entry.entry_id,
+            "proposals": scan["proposals"],
+        }
+    )
+    res = (await client.receive_json())["result"]
+    assert res["applied"] == ["1_double"]
+    assert res["disabled"] == ["automation.hold_bright", "automation.hold_warm"]
+    for entity_id in res["disabled"]:
+        assert hass.states.get(entity_id).state == "off"
+
+    fire_remote_action(hass, "1_double")
+    await hass.async_block_till_done()
+    assert [c.data["which"] for c in calls] == ["warm", "bright"]
