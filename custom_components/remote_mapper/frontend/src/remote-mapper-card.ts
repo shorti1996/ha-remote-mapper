@@ -226,6 +226,16 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   // Modals opened from pointerup get a synthetic click ~immediately after
   // (touch); the backdrop must not treat that ghost click as "close".
   private _modalOpenedAt = 0;
+  /** Capture-phase: swallow the ghost click anywhere inside a just-opened modal. */
+  private _ghostGuard = {
+    handleEvent: (e: Event) => {
+      if (Date.now() - this._modalOpenedAt < 350) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    },
+    capture: true,
+  };
   private _backdropClick(close: () => void): (e: Event) => void {
     return (e: Event) => {
       if (e.target !== e.currentTarget) return;
@@ -1189,7 +1199,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     };
     return html`
       <div class="modal-backdrop" @click=${this._backdropClick(close)}>
-        <div class="modal" @click=${(e: Event) => e.stopPropagation()}>
+        <div class="modal" @click=${this._ghostGuard}>
           <h3>
             ${buttonLabel(button, layout)}
             <span class="hint">(${button.id})</span>
@@ -1453,7 +1463,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     const slot = this._remote!.slots[this._editingAction!];
     return html`
       <div class="modal-backdrop" @click=${this._backdropClick(this._closeEditor)}>
-        <div class="modal" @click=${(e: Event) => e.stopPropagation()}>
+        <div class="modal" @click=${this._ghostGuard}>
           <h3>${this._editingAction}</h3>
           ${this._editingLive
             ? html`<p class="hint">
