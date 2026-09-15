@@ -49,6 +49,21 @@ interface DragState {
 }
 
 const DRAG_THRESHOLD = 8;
+/** Arc radius for assisted options, in % of the cell's width/height. */
+const ARC_RADIUS = 34;
+
+/**
+ * Pinterest-style fan: angles (degrees clockwise from "up") for n options.
+ * Up to four fan across the top half; more go all the way around.
+ */
+function arcAngles(n: number): number[] {
+  if (n <= 1) return [0];
+  if (n <= 4) {
+    const span = n === 2 ? 70 : n === 3 ? 120 : 165;
+    return Array.from({ length: n }, (_, i) => -span / 2 + (i * span) / (n - 1));
+  }
+  return Array.from({ length: n }, (_, i) => (i * 360) / n);
+}
 
 @customElement("remote-mapper-grid")
 export class RemoteMapperGrid extends LitElement {
@@ -341,9 +356,7 @@ export class RemoteMapperGrid extends LitElement {
         ${error
           ? html`<span class="badge err" title=${error}>!</span>`
           : nothing}
-        ${this._popover === button.id
-          ? this._renderPopover(button, row === 0, col, layout.cols)
-          : nothing}
+        ${this._popover === button.id ? this._renderPopover(button) : nothing}
       </div>
     `;
   }
@@ -402,23 +415,21 @@ export class RemoteMapperGrid extends LitElement {
     `;
   }
 
-  private _renderPopover(
-    button: ButtonModel,
-    below: boolean,
-    col: number,
-    cols: number
-  ): TemplateResult {
-    const edge = cols > 1 && col === 0 ? "edge-left" : cols > 1 && col === cols - 1 ? "edge-right" : "";
+  private _renderPopover(button: ButtonModel): TemplateResult {
+    const angles = arcAngles(button.actions.length);
     return html`
-      <div class="popover ${below ? "below" : "above"} ${edge}">
+      <div class="popover">
         ${button.actions.map((a, i) => {
           const slot = this.slots[a.action_id];
           const on = slot?.assigned && !slot.archived;
           const hover = this._hoverOpt === a.action_id ? "hover" : "";
+          const rad = (angles[i] * Math.PI) / 180;
+          const x = 50 + Math.sin(rad) * ARC_RADIUS;
+          const y = 50 - Math.cos(rad) * ARC_RADIUS;
           return html`
             <div
               class="opt ${on ? "on" : ""} ${hover}"
-              style="--i:${i}"
+              style="--i:${i};left:${x.toFixed(1)}%;top:${y.toFixed(1)}%"
               data-action=${a.action_id}
             >
               <span class="circle" title="${a.event} (${KIND_TITLE[a.kind]})"
@@ -645,43 +656,27 @@ export class RemoteMapperGrid extends LitElement {
       inset: 0;
       z-index: 8;
     }
+    /* Assisted: options fan out INSIDE the pressed cell (Pinterest) */
+    .cell.active .label,
+    .cell.active .summary,
+    .cell.active .kinds {
+      opacity: 0.15;
+    }
     .popover {
       position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
+      inset: 0;
       z-index: 10;
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: var(--ha-space-2, 8px);
-      max-width: 296px;
-      padding: var(--ha-space-3, 12px);
-      border-radius: var(--ha-border-radius-2xl, 20px);
-      background: var(--card-background-color, #222);
-      box-shadow: var(--ha-card-box-shadow, 0 4px 16px rgba(0, 0, 0, 0.4));
-      animation: rm-fade 120ms ease-out both;
-    }
-    .popover.above {
-      bottom: calc(100% + var(--ha-space-2, 8px));
-    }
-    .popover.below {
-      top: calc(100% + var(--ha-space-2, 8px));
-    }
-    .popover.edge-left {
-      left: 0;
-      transform: none;
-    }
-    .popover.edge-right {
-      left: auto;
-      right: 0;
-      transform: none;
+      border-radius: inherit;
+      animation: rm-fade 120ms ease-out;
     }
     .opt {
+      position: absolute;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: var(--ha-space-1, 4px);
-      width: var(--ha-space-16, 64px);
+      gap: 2px;
+      width: min(var(--ha-space-16, 64px), 34%);
+      transform: translate(-50%, -50%);
       cursor: pointer;
       opacity: 0.45;
       /* backwards: hidden during the stagger delay, natural opacity after */
@@ -695,22 +690,25 @@ export class RemoteMapperGrid extends LitElement {
       display: flex;
       align-items: center;
       justify-content: center;
-      width: var(--ha-space-12, 48px);
-      height: var(--ha-space-12, 48px);
+      width: 100%;
+      max-width: var(--ha-space-12, 48px);
+      aspect-ratio: 1;
       border-radius: var(--ha-border-radius-circle, 50%);
       border: 2px solid var(--rm-ac);
+      background: var(--card-background-color, #222);
+      box-shadow: var(--ha-card-box-shadow, 0 2px 8px rgba(0, 0, 0, 0.4));
       font-size: var(--ha-font-size-l, 16px);
       font-weight: var(--ha-font-weight-medium, 500);
       pointer-events: none;
       transition: transform 100ms ease, background-color 100ms ease;
     }
     .opt.hover .circle {
-      transform: scale(1.15);
+      transform: scale(1.2);
       background: var(--rm-ac);
       color: var(--rm-on-accent);
     }
     .opt-text {
-      font-size: var(--ha-font-size-s, 12px);
+      font-size: var(--ha-font-size-xs, 10px);
       line-height: var(--ha-line-height-condensed, 1.2);
       max-width: 100%;
       overflow: hidden;
@@ -733,11 +731,11 @@ export class RemoteMapperGrid extends LitElement {
     }
     @keyframes rm-pop {
       from {
-        transform: scale(0.3);
+        transform: translate(-50%, -50%) scale(0.3);
         opacity: 0;
       }
       to {
-        transform: scale(1);
+        transform: translate(-50%, -50%) scale(1);
       }
     }
     @keyframes rm-fade {
