@@ -15,10 +15,11 @@ export interface RemoteMapperCardConfig {
   assisted_trigger?: AssistedTrigger;
   /** all only: how a button's event chips are arranged. */
   chips_layout?: ChipsLayout;
-  /** Appearance — any CSS color; opacity 0.1–1. Theme vars work too. */
+  /** Appearance — "#rrggbb" from the picker, or any CSS color / theme var in YAML. */
   button_color?: string;
   accent_color?: string;
   text_color?: string;
+  /** Pad background opacity 0.1–1 (text and accent stay solid). */
   button_opacity?: number;
   [key: string]: unknown;
 }
@@ -65,6 +66,21 @@ export function assistedTriggerOf(
 export function chipsLayoutOf(config: RemoteMapperCardConfig | undefined): ChipsLayout {
   const value = config?.chips_layout;
   return CHIPS_LAYOUTS.some((c) => c.value === value) ? (value as ChipsLayout) : "vertical";
+}
+
+/** "#rrggbb" → [r, g, b] for HA's color_rgb selector; anything else → undefined. */
+export function hexToRgb(value: unknown): [number, number, number] | undefined {
+  if (typeof value !== "string") return undefined;
+  const m = /^#([0-9a-f]{6})$/i.exec(value.trim());
+  if (!m) return undefined;
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+export function rgbToHex(rgb: unknown): string | undefined {
+  if (!Array.isArray(rgb) || rgb.length !== 3) return undefined;
+  const hex = rgb.map((c) => Math.max(0, Math.min(255, Number(c) | 0)).toString(16).padStart(2, "0"));
+  return `#${hex.join("")}`;
 }
 
 /**

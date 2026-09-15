@@ -68,10 +68,10 @@ layout: grid              # grid (default) | canvas (legacy free-drag tiles)
 display: normal           # grid only: normal | all | assisted
 assisted_trigger: auto    # assisted: auto (touch→press, mouse→tap) | tap | press
 chips_layout: vertical    # all: vertical | horizontal | grid
-button_color: ""          # any CSS color; empty = theme card background
+button_color: "#3f51b5"   # picker in the editor; YAML takes any CSS color / var()
 accent_color: ""          # borders / assigned marks / flashes; empty = primary
 text_color: ""
-button_opacity: 1         # 0.1 – 1
+button_opacity: 1         # 0.1 – 1, pad background only (text stays solid)
 ```
 
 Sizes follow HA's design tokens (`--ha-font-size-*`, `--ha-space-*`,

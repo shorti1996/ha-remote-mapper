@@ -456,7 +456,8 @@ export class RemoteMapperGrid extends LitElement {
     :host {
       display: block;
       position: relative;
-      --rm-bg: var(--rm-button-bg, var(--remote-mapper-button-color, var(--card-background-color, inherit)));
+      --rm-bg: var(--rm-button-bg, var(--remote-mapper-button-color, var(--ha-card-background, var(--card-background-color, #1c1c1c))));
+      --rm-alpha: calc(var(--rm-opacity, var(--remote-mapper-button-opacity, 1)) * 100%);
       --rm-fg: var(--rm-text, var(--remote-mapper-text-color, var(--primary-text-color)));
       --rm-ac: var(--rm-accent, var(--remote-mapper-accent-color, var(--primary-color)));
       --rm-line: var(--remote-mapper-border-color, var(--divider-color, #444));
@@ -484,10 +485,10 @@ export class RemoteMapperGrid extends LitElement {
       justify-content: center;
       gap: var(--ha-space-1, 4px);
       padding: var(--ha-space-2, 8px);
-      border: 1px solid var(--rm-line);
-      background: var(--rm-bg);
+      /* opacity applies to the pad only — text and accent marks stay solid */
+      border: 1px solid color-mix(in srgb, var(--rm-line) var(--rm-alpha), transparent);
+      background: color-mix(in srgb, var(--rm-bg) var(--rm-alpha), transparent);
       color: var(--rm-fg);
-      opacity: var(--rm-opacity, var(--remote-mapper-button-opacity, 1));
       cursor: pointer;
       user-select: none;
       -webkit-user-select: none;

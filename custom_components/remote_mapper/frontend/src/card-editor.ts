@@ -15,9 +15,11 @@ import {
   chipsLayoutOf,
   DISPLAY_MODES,
   displayOf,
+  hexToRgb,
   LAYOUT_KINDS,
   layoutOf,
   type RemoteMapperCardConfig,
+  rgbToHex,
 } from "./config";
 
 const AUTO = "__auto__";
@@ -34,10 +36,13 @@ const LABELS: Record<string, string> = {
   button_opacity: "Button opacity",
 };
 
+const COLOR_KEYS = ["button_color", "accent_color", "text_color"] as const;
+
 const HELPERS: Record<string, string> = {
-  button_color: "Any CSS color, e.g. #3f51b5 or rgba(63,81,181,0.5). Empty = theme.",
-  accent_color: "Borders, assigned marks, flashes. Empty = theme primary color.",
-  text_color: "Empty = theme text color.",
+  button_color: "Pad background. Turn the switch off to use the theme.",
+  accent_color: "Borders, assigned marks, flashes. Off = theme primary color.",
+  text_color: "Off = theme text color.",
+  button_opacity: "Pad background only; text stays readable.",
 };
 
 interface HassLike {
@@ -109,24 +114,28 @@ export class RemoteMapperCardEditor extends LitElement {
     if (display === "all") {
       schema.push({ name: "chips_layout", selector: dropdown(CHIPS_LAYOUTS) });
     }
-    schema.push(
-      { name: "button_color", selector: { text: {} } },
-      { name: "accent_color", selector: { text: {} } },
-      { name: "text_color", selector: { text: {} } },
-      {
-        name: "button_opacity",
-        selector: { number: { min: 0.1, max: 1, step: 0.05, mode: "slider" } },
-      }
-    );
+    // Native color picker (HA color_rgb selector) behind an on/off switch so
+    // "use the theme" stays expressible; YAML may still hold any CSS color.
+    for (const key of COLOR_KEYS) {
+      schema.push({ name: `${key}_set`, selector: { boolean: {} } });
+      if (config[key]) schema.push({ name: key, selector: { color_rgb: {} } });
+    }
+    schema.push({
+      name: "button_opacity",
+      selector: { number: { min: 0.1, max: 1, step: 0.05, mode: "slider" } },
+    });
     const data = {
       entry_id: config.entry_id || AUTO,
       layout: layoutOf(config),
       display,
       assisted_trigger: assistedTriggerOf(config),
       chips_layout: chipsLayoutOf(config),
-      button_color: config.button_color ?? "",
-      accent_color: config.accent_color ?? "",
-      text_color: config.text_color ?? "",
+      button_color_set: !!config.button_color,
+      accent_color_set: !!config.accent_color,
+      text_color_set: !!config.text_color,
+      button_color: hexToRgb(config.button_color) ?? [63, 81, 181],
+      accent_color: hexToRgb(config.accent_color) ?? [63, 81, 181],
+      text_color: hexToRgb(config.text_color) ?? [255, 255, 255],
       button_opacity: config.button_opacity ?? 1,
     };
     return html`
@@ -134,7 +143,10 @@ export class RemoteMapperCardEditor extends LitElement {
         .hass=${this.hass}
         .data=${data}
         .schema=${schema}
-        .computeLabel=${(s: { name: string }) => LABELS[s.name] ?? s.name}
+        .computeLabel=${(s: { name: string }) =>
+          s.name.endsWith("_set")
+            ? `Custom ${LABELS[s.name.slice(0, -4)].toLowerCase()}`
+            : (LABELS[s.name] ?? s.name)}
         .computeHelper=${(s: { name: string }) =>
           s.name === "display" && layoutOf(config) === "canvas"
             ? "Ignored for the canvas layout (every tile is already visible)."
@@ -157,9 +169,14 @@ export class RemoteMapperCardEditor extends LitElement {
     set("display", value.display, value.display === "normal");
     set("assisted_trigger", value.assisted_trigger, value.assisted_trigger === "auto");
     set("chips_layout", value.chips_layout, value.chips_layout === "vertical");
-    for (const key of ["button_color", "accent_color", "text_color"]) {
-      const v = value[key];
-      set(key, typeof v === "string" ? v.trim() : v, false);
+    for (const key of COLOR_KEYS) {
+      if (!value[`${key}_set`]) {
+        delete next[key];
+        continue;
+      }
+      const picked = rgbToHex(value[key]);
+      // switch just turned on: seed with the picker's default so the field shows
+      next[key] = picked ?? (typeof next[key] === "string" ? next[key] : "#3f51b5");
     }
     const opacity = value.button_opacity;
     set("button_opacity", opacity, typeof opacity !== "number" || opacity >= 1);
