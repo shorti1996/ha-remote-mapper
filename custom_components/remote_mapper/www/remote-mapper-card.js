@@ -680,7 +680,7 @@ function t(t,e,i,s){var o,r=arguments.length,n=r<3?e:null===s?s=Object.getOwnPro
                   <span class="ev-summary">${i?.summary??"unassigned"}</span>
                   ${this._iconButton("mdi:play","Run now",()=>{this._runSlot(e.action_id)},{disabled:!i?.assigned||!!i.archived})}
                   ${(()=>{const i=this._targetEditor(t.slots[e.action_id]);return i?this._iconButton(i.icon,i.title,()=>this._navigate(i.path)):V})()}
-                  ${(()=>{const i=t.slots[e.action_id],s=this._automationEditPath(i);return s?this._iconButton("mdi:robot","Open in HA's automation editor",()=>this._navigate(s)):this._importedSources(i).map(t=>this._iconButton("mdi:history",`Open the imported original (disabled): ${t.entity_id??t.config_id}`,()=>this._navigate(`/config/automation/edit/${t.config_id}`)))})()}
+                  ${(()=>{const i=t.slots[e.action_id],s=this._automationEditPath(i);return s?this._iconButton("mdi:robot","Open in HA's automation editor",()=>this._navigate(s)):this._importedSources(i).map(t=>this._iconButton("mdi:robot-off",`Open the imported original (disabled): ${t.entity_id??t.config_id}`,()=>this._navigate(`/config/automation/edit/${t.config_id}`)))})()}
                   ${this._iconButton("mdi:pencil","Edit",()=>{this._openEditor(e.action_id)})}
                 </li>
               `})}

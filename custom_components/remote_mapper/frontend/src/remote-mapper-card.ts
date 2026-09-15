@@ -1128,7 +1128,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                     }
                     return this._importedSources(slot).map((src) =>
                       this._iconButton(
-                        "mdi:history",
+                        "mdi:robot-off",
                         `Open the imported original (disabled): ${src.entity_id ?? src.config_id}`,
                         () => this._navigate(`/config/automation/edit/${src.config_id}`)
                       )
