@@ -466,6 +466,11 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     return computeTransform(layout.design_size, width, null);
   }
 
+  private _renderTitle(): TemplateResult {
+    if (this._config?.show_title === false) return html`<span class="title"></span>`;
+    return html`<span class="title">${this._config?.title || this._remote?.title}</span>`;
+  }
+
   // ── grid layout (plan 04) ──────────────────────────────────────────
 
   private _isGrid(): boolean {
@@ -821,7 +826,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     return html`
       <ha-card>
         <div class="header">
-          <span class="title">${this._remote.title}</span>
+          ${this._renderTitle()}
           <span class="header-buttons">
             ${editing
               ? html`
@@ -854,7 +859,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     return html`
       <ha-card>
         <div class="header">
-          <span class="title">${remote.title}</span>
+          ${this._renderTitle()}
           <span class="header-buttons">
             ${editing
               ? html`

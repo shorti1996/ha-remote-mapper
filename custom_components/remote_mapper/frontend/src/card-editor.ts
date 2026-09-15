@@ -26,6 +26,8 @@ const AUTO = "__auto__";
 
 const LABELS: Record<string, string> = {
   entry_id: "Remote",
+  title: "Title",
+  show_title: "Show title",
   layout: "Layout",
   display: "Display mode",
   assisted_trigger: "Popover opens on",
@@ -39,6 +41,7 @@ const LABELS: Record<string, string> = {
 const COLOR_KEYS = ["button_color", "accent_color", "text_color"] as const;
 
 const HELPERS: Record<string, string> = {
+  title: "Empty = the remote's name.",
   button_color: "Pad background. Turn the switch off to use the theme.",
   accent_color: "Borders, assigned marks, flashes. Off = theme primary color.",
   text_color: "Off = theme text color.",
@@ -105,6 +108,8 @@ export class RemoteMapperCardEditor extends LitElement {
           ...(this._remotes ?? []).map((r) => ({ value: r.entry_id, label: r.title })),
         ]),
       },
+      { name: "title", selector: { text: {} } },
+      { name: "show_title", selector: { boolean: {} } },
       { name: "layout", selector: dropdown(LAYOUT_KINDS) },
       { name: "display", selector: dropdown(DISPLAY_MODES) },
     ];
@@ -126,6 +131,8 @@ export class RemoteMapperCardEditor extends LitElement {
     });
     const data = {
       entry_id: config.entry_id || AUTO,
+      title: config.title ?? "",
+      show_title: config.show_title !== false,
       layout: layoutOf(config),
       display,
       assisted_trigger: assistedTriggerOf(config),
@@ -165,6 +172,8 @@ export class RemoteMapperCardEditor extends LitElement {
       else next[key] = v;
     };
     set("entry_id", value.entry_id, value.entry_id === AUTO);
+    set("title", typeof value.title === "string" ? value.title.trim() : value.title, false);
+    set("show_title", value.show_title, value.show_title !== false);
     set("layout", value.layout, value.layout !== "canvas");
     set("display", value.display, value.display === "normal");
     set("assisted_trigger", value.assisted_trigger, value.assisted_trigger === "auto");

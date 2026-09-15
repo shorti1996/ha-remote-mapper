@@ -7,6 +7,10 @@ export type ChipsLayout = "vertical" | "horizontal" | "compact" | "spines" | "gr
 export interface RemoteMapperCardConfig {
   type: string;
   entry_id?: string;
+  /** Header text; empty = the remote's name. */
+  title?: string;
+  /** false hides the title text (header keeps its buttons). */
+  show_title?: boolean;
   /** grid (default) — button grid; canvas — legacy free-drag tiles. */
   layout?: LayoutKind;
   /** Grid only: normal (physical remote), all (every event), assisted (popover). */

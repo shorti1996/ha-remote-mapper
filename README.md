@@ -102,6 +102,7 @@ reference:
 ```yaml
 type: custom:remote-mapper-card
 entry_id: …               # optional with a single remote
+title: ""                 # empty = the remote's name; show_title: false hides it
 layout: grid              # grid (default) | canvas (free-drag tiles)
 display: normal           # normal | all | assisted
 assisted_trigger: auto    # assisted: auto (touch→press, mouse→tap) | tap | press
