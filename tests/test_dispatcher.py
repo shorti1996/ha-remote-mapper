@@ -118,11 +118,24 @@ async def test_unload_detaches(hass, remote_device) -> None:
     assert not calls
 
 
-async def test_device_entry_attached(hass, remote_device, device_registry) -> None:
-    """Config entry is attached to the remote's registry device."""
+async def test_own_device_linked_via_source(
+    hass, remote_device, device_registry
+) -> None:
+    """Our entry owns its own device, linked to the source device (via_device).
+
+    Sharing the source device (add_config_entry_id) is deprecated — devices
+    belong to a single config entry since 2026.7, enforced in 2027.8.
+    """
+    from custom_components.remote_mapper.const import DOMAIN
+
     entry = await _setup_remote_entry(hass, remote_device)
-    device = device_registry.async_get(remote_device)
-    assert entry.entry_id in device.config_entries
+    source = device_registry.async_get(remote_device)
+    assert entry.entry_id not in source.config_entries
+    ours = device_registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    assert ours is not None
+    assert ours.config_entries == {entry.entry_id}
+    assert ours.via_device_id == source.id
+    assert ours.name == entry.title
 
 
 async def test_physical_action_fires_bus_event(hass, remote_device) -> None:

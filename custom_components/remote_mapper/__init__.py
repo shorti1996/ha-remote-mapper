@@ -72,18 +72,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     store.async_ensure_remote(entry.entry_id, source, source_config, layout)
 
-    # Attach the entry to the remote's existing registry device — gives a
-    # device page grouping our slots/automations.
+    # Our own registry device per remote (devices belong to exactly one
+    # config entry since HA 2026.7; sharing the source device is deprecated
+    # and stops working in 2027.8). It links to the physical device via
+    # via_device, so the two show up together in the UI.
+    device_registry = dr.async_get(hass)
+    via_device = None
     if device_id := source_config.get(CONF_DEVICE_ID):
-        device_registry = dr.async_get(hass)
-        if device_registry.async_get(device_id):
-            device_registry.async_update_device(
-                device_id, add_config_entry_id=entry.entry_id
-            )
+        if source_device := device_registry.async_get(device_id):
+            via_device = next(iter(source_device.identifiers), None)
         else:
             _LOGGER.warning(
                 "Device %s for remote %s no longer exists", device_id, entry.title
             )
+    device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, entry.entry_id)},
+        name=entry.title,
+        manufacturer="Remote Mapper",
+        model="Mapped remote",
+        via_device=via_device,
+    )
 
     dispatcher = SlotDispatcher(
         hass,
