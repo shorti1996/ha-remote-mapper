@@ -91,7 +91,9 @@ async def async_release_remote(
             continue  # originals are back — the slot just goes away
         plain_alias = f"{entry.title} · {slot.get('name') or action_id}"
         if slot.get("materialized") and slot.get("automation_id"):
-            if await async_unmanage(hass, slot["automation_id"], plain_alias):
+            if not slot.get("owned", True):
+                summary["kept"].append(action_id)  # linked: not ours, untouched
+            elif await async_unmanage(hass, slot["automation_id"], plain_alias):
                 summary["kept"].append(action_id)
             else:
                 summary["dropped"].append(action_id)

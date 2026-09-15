@@ -65,7 +65,12 @@ def collect_artifacts(
             "scene_id": scene_id,
             "entity_id": scene_entity_id(hass, scene_id),
         }
-    if slot.get("materialized") and slot.get("automation_id"):
+    # linked (owned=False) automations are not ours to delete
+    if (
+        slot.get("materialized")
+        and slot.get("automation_id")
+        and slot.get("owned", True)
+    ):
         artifacts["automation"] = {"automation_id": slot["automation_id"]}
     return artifacts
 

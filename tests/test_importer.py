@@ -254,7 +254,7 @@ async def test_apply_import(hass, hass_ws_client, remote_device) -> None:
         {
             "type": f"{DOMAIN}/apply_import",
             "entry_id": entry.entry_id,
-            "proposals": scan["proposals"],
+            "proposals": [{**p, "mode": "absorb"} for p in scan["proposals"]],
         }
     )
     res = await client.receive_json()
@@ -313,6 +313,7 @@ async def test_apply_conflict_skipped_without_overwrite(
 
     proposal = {
         "action_id": "1_single",
+        "mode": "absorb",
         "sequence": SEQ_B1,
         "source_entity_id": "automation.x",
         "source_config_id": "x",
@@ -398,7 +399,7 @@ async def test_duplicate_trigger_automations_merge(
         {
             "type": f"{DOMAIN}/apply_import",
             "entry_id": entry.entry_id,
-            "proposals": scan["proposals"],
+            "proposals": [{**p, "mode": "absorb"} for p in scan["proposals"]],
         }
     )
     res = (await client.receive_json())["result"]

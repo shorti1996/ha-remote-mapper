@@ -100,7 +100,7 @@ async def _import_original(client, entry_id: str) -> None:
         {
             "type": f"{DOMAIN}/apply_import",
             "entry_id": entry_id,
-            "proposals": scan["proposals"],
+            "proposals": [{**p, "mode": "absorb"} for p in scan["proposals"]],
         },
     )
     assert res["success"], res

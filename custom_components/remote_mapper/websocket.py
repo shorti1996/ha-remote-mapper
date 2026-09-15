@@ -150,7 +150,24 @@ async def ws_get_remote(
     if entry is None or remote is None:
         connection.send_error(msg["id"], ERR_NOT_FOUND, "Unknown remote")
         return
+    from .materializer import automation_entity_id
+
     layout = remote.get("layout", {})
+    # Materialized/linked slots: the card resolves name + on/off from the
+    # automation entity in hass.states, so hand it the entity id.
+    slots = {
+        action_id: (
+            {
+                **slot,
+                "automation_entity_id": automation_entity_id(
+                    hass, slot["automation_id"]
+                ),
+            }
+            if slot.get("materialized") and slot.get("automation_id")
+            else slot
+        )
+        for action_id, slot in remote.get("slots", {}).items()
+    }
     connection.send_result(
         msg["id"],
         {
@@ -160,7 +177,7 @@ async def ws_get_remote(
             "buttons": group_buttons(remote.get("source"), layout.get("actions", [])),
             "card_layout": remote.get("card_layout"),
             "grid_layout": remote.get("grid_layout"),
-            "slots": remote.get("slots", {}),
+            "slots": slots,
             "stale_actions": remote.get("stale_actions", []),
         },
     )
@@ -204,6 +221,8 @@ async def ws_get_slot(
         vol.Optional("materialized"): bool,
         # User-facing name; None/"" = auto (the card infers one from the sequence)
         vol.Optional("name"): vol.Any(str, None),
+        # Link mode: point the slot at an existing native automation entity
+        vol.Optional("link_entity_id"): str,
     }
 )
 @websocket_api.async_response
@@ -217,9 +236,14 @@ async def ws_save_slot(
     provided (or live-fetched) actions land back in the store and the
     automation is deleted.
     """
+    from homeassistant.helpers import entity_registry as er
+
     from .materializer import (
+        async_absorb_link,
         async_dematerialize,
+        async_link,
         async_materialize,
+        is_linked,
     )
 
     store = _store(hass)
@@ -229,8 +253,50 @@ async def ws_save_slot(
 
     entry = hass.config_entries.async_get_entry(msg["entry_id"])
     slot = store.get_slot(msg["entry_id"], msg["action_id"])
+
+    if link_entity_id := msg.get("link_entity_id"):
+        registry_entry = er.async_get(hass).async_get(link_entity_id)
+        if registry_entry is None or registry_entry.domain != "automation":
+            connection.send_error(
+                msg["id"], ERR_NOT_FOUND, f"{link_entity_id} is not an automation"
+            )
+            return
+        try:
+            await async_link(
+                hass, store, msg["entry_id"], msg["action_id"], registry_entry.unique_id
+            )
+        except Exception as err:
+            connection.send_error(msg["id"], ERR_INVALID_SEQUENCE, str(err))
+            return
+        if "name" in msg:
+            slot = store.get_slot(msg["entry_id"], msg["action_id"])
+            slot["name"] = (msg["name"] or "").strip() or None
+            store.async_set_slot(msg["entry_id"], msg["action_id"], slot)
+        _fire_updated(hass, msg["entry_id"], "slot_linked")
+        connection.send_result(
+            msg["id"], {"slot": store.get_slot(msg["entry_id"], msg["action_id"])}
+        )
+        return
+
     was_materialized = bool(slot and slot.get("materialized"))
     target_materialized = msg.get("materialized", was_materialized)
+
+    if is_linked(slot) and not target_materialized:
+        # Unlink = absorb: actions into the card, original disabled
+        try:
+            await async_absorb_link(hass, store, msg["entry_id"], msg["action_id"])
+        except Exception as err:
+            connection.send_error(msg["id"], ERR_INVALID_SEQUENCE, str(err))
+            return
+        if "name" in msg:
+            slot = store.get_slot(msg["entry_id"], msg["action_id"])
+            slot["name"] = (msg["name"] or "").strip() or None
+            store.async_set_slot(msg["entry_id"], msg["action_id"], slot)
+        _fire_updated(hass, msg["entry_id"], "slot_absorbed")
+        connection.send_result(
+            msg["id"], {"slot": store.get_slot(msg["entry_id"], msg["action_id"])}
+        )
+        return
 
     sequence: list | None = None
     if "sequence" in msg or "sequence_yaml" in msg:

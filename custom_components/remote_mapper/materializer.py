@@ -197,8 +197,77 @@ async def async_materialize(
 
     slot["materialized"] = True
     slot["automation_id"] = config_id
+    slot["owned"] = True
     store.async_set_slot(entry_id, action_id, slot)
     return config_id
+
+
+def is_linked(slot: dict[str, Any] | None) -> bool:
+    """Materialized onto a native automation we did not create."""
+    return bool(
+        slot and slot.get("materialized") and slot.get("automation_id")
+    ) and not slot.get("owned", True)
+
+
+async def async_link(
+    hass: HomeAssistant,
+    store: RemoteMapperStore,
+    entry_id: str,
+    action_id: str,
+    config_id: str,
+) -> None:
+    """Point the slot at an existing native automation (link mode).
+
+    Nothing is copied or disabled: the automation stays canonical and
+    keeps firing on its own trigger; the dispatcher skips the slot.
+    """
+    from .store import default_slot
+
+    if await _get_config_store(hass).async_get(config_id) is None:
+        raise HomeAssistantError(f"Automation {config_id} not found")
+    slot = store.get_slot(entry_id, action_id) or default_slot()
+    slot["materialized"] = True
+    slot["automation_id"] = config_id
+    slot["owned"] = False
+    slot["sequence"] = []
+    slot["scene_id"] = None
+    slot.pop("imported_from", None)
+    store.async_set_slot(entry_id, action_id, slot)
+
+
+async def async_absorb_link(
+    hass: HomeAssistant,
+    store: RemoteMapperStore,
+    entry_id: str,
+    action_id: str,
+) -> None:
+    """Unlink: copy the automation's actions into the slot, disable it.
+
+    Same footprint as an absorbing import — the original is disabled
+    (never deleted) and remembered in imported_from for hand-back.
+    """
+    slot = store.get_slot(entry_id, action_id)
+    if not is_linked(slot):
+        raise HomeAssistantError(f"Slot {entry_id}/{action_id} is not linked")
+    config_id = slot["automation_id"]
+    raw = await _get_config_store(hass).async_get(config_id)
+    if raw is None:
+        raise HomeAssistantError(f"Automation {config_id} no longer exists")
+    entity_id = automation_entity_id(hass, config_id)
+    slot["sequence"] = list(raw.get("actions", raw.get("action", [])) or [])
+    slot["materialized"] = False
+    slot["automation_id"] = None
+    slot["owned"] = True
+    slot["imported_from"] = {
+        "entity_id": entity_id,
+        "config_id": config_id,
+        "sources": [{"entity_id": entity_id, "config_id": config_id}],
+    }
+    store.async_set_slot(entry_id, action_id, slot)
+    if entity_id:
+        await hass.services.async_call(
+            AUTOMATION_DOMAIN, "turn_off", {"entity_id": entity_id}, blocking=True
+        )
 
 
 async def async_unmanage(hass: HomeAssistant, config_id: str, alias: str) -> bool:
@@ -230,12 +299,16 @@ async def async_get_live_view(
     raw = await _get_config_store(hass).async_get(config_id)
     if raw is None:
         return None
+    entity_id = automation_entity_id(hass, config_id)
+    state = hass.states.get(entity_id) if entity_id else None
     return {
         "config_id": config_id,
-        "entity_id": automation_entity_id(hass, config_id),
+        "entity_id": entity_id,
         "alias": raw.get("alias"),
         "actions": raw.get("actions", raw.get("action", [])),
         "edit_url": EDIT_URL.format(config_id),
+        "owned": slot.get("owned", True),
+        "state": state.state if state else None,
     }
 
 

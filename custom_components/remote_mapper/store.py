@@ -33,6 +33,9 @@ def default_slot() -> dict[str, Any]:
         "scene_id": None,
         "materialized": False,
         "automation_id": None,
+        # materialized + owned=False → LINKED to a native automation we never
+        # created: dispatcher skips (it fires itself), we never rename/delete
+        "owned": True,
         "archived": False,
         "schema_version": SLOT_SCHEMA_VERSION,
         "updated_at": dt_util.utcnow().isoformat(),

@@ -150,6 +150,11 @@ class ImportScanner:
             )
         for merged in by_action.values():
             merged["merged"] = len(merged["sources"]) > 1
+            # Link (keep native) needs one automation with a config id
+            merged["linkable"] = not merged["merged"] and bool(
+                merged.get("source_config_id")
+            )
+            merged["mode"] = "link" if merged["linkable"] else "absorb"
         return list(by_action.values())
 
     # ── internals ────────────────────────────────────────────────────
@@ -268,9 +273,11 @@ async def async_apply(
     Sequences are validated by the caller (websocket layer) before this
     runs. Returns applied/skipped action ids and disabled entity ids.
     """
+    from .materializer import async_link
     from .store import default_slot
 
     applied: list[str] = []
+    linked: list[str] = []
     conflicts: list[str] = []
     to_disable: set[str] = set()
 
@@ -278,6 +285,13 @@ async def async_apply(
         action_id = proposal["action_id"]
         if store.get_slot(entry_id, action_id) is not None and not overwrite:
             conflicts.append(action_id)
+            continue
+        if proposal.get("mode", "link") == "link" and proposal.get("source_config_id"):
+            # Link mode: the automation stays native and enabled
+            await async_link(
+                hass, store, entry_id, action_id, proposal["source_config_id"]
+            )
+            linked.append(action_id)
             continue
         # merged proposals carry every source; single ones just the one
         sources = proposal.get("sources") or [
@@ -312,4 +326,9 @@ async def async_apply(
         )
         _LOGGER.info("%s: disabled imported source %s", DOMAIN, entity_id)
 
-    return {"applied": applied, "conflicts": conflicts, "disabled": sorted(to_disable)}
+    return {
+        "applied": applied,
+        "linked": linked,
+        "conflicts": conflicts,
+        "disabled": sorted(to_disable),
+    }
