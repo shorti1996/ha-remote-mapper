@@ -166,3 +166,41 @@ async def test_subscribe_unknown_device_raises(
         await adapter.async_subscribe(
             hass, {"device_id": "nope"}, ["1_single"], lambda a, r: None, "X"
         )
+
+
+async def test_default_actions_merge_z2m_exposes(hass, remote_device, adapter) -> None:
+    """Z2M's exposed action enum fills in never-pressed actions, device order first."""
+    import asyncio
+    import json
+
+    from pytest_homeassistant_custom_component.common import async_fire_mqtt_message
+
+    task = hass.async_create_task(
+        adapter.async_default_actions(hass, {"device_id": remote_device})
+    )
+    # let the probe subscribe to +/bridge/devices before the retained message
+    for _ in range(10):
+        await asyncio.sleep(0)
+    async_fire_mqtt_message(
+        hass,
+        "zigbee2mqtt/bridge/devices",
+        json.dumps(
+            [
+                {"ieee_address": "other", "definition": {"exposes": []}},
+                {
+                    "ieee_address": "test_remote",
+                    "definition": {
+                        "exposes": [
+                            {"property": "battery", "type": "numeric"},
+                            {
+                                "property": "action",
+                                "type": "enum",
+                                "values": ["1_single", "1_double", "1_hold"],
+                            },
+                        ]
+                    },
+                },
+            ]
+        ),
+    )
+    assert await task == ["1_single", "1_double", "1_hold"]

@@ -6,13 +6,17 @@ precedent: HomeKit type_triggers). action_id := trigger subtype; the
 trigger's `id` field carries it back to the callback.
 
 Z2M discovery is lazy — a device trigger for an action is only published
-after that action fires once. Probes may therefore return a partial
-subtype set; attaching not-yet-discovered subtypes is safe (the MQTT
-placeholder trigger arms on discovery).
+after that action fires once. To avoid "press every combination first",
+the probe also reads Zigbee2MQTT's retained ``<base>/bridge/devices`` and
+merges the device's full ``action`` enum (Z2M 2.x exposes it). Attaching
+not-yet-discovered subtypes is safe (the MQTT placeholder trigger arms on
+discovery).
 """
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -22,7 +26,9 @@ from homeassistant.components.device_automation import (
     async_get_device_automations,
 )
 from homeassistant.components.device_automation.exceptions import DeviceNotFound
+from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.trigger import (
     async_initialize_triggers,
     async_validate_trigger_config,
@@ -36,6 +42,69 @@ if TYPE_CHECKING:
     from .base import ActionCallback
 
 _LOGGER = logging.getLogger(__name__)
+
+# Z2M stamps device identifiers as ("mqtt", "zigbee2mqtt_<ieee>") whatever
+# the base topic is; the devices list itself lives under <base>/bridge/.
+Z2M_IDENTIFIER_PREFIX = "zigbee2mqtt_"
+Z2M_DEVICES_TOPIC = "+/bridge/devices"
+# Retained message arrives right after subscribing; tests shrink this.
+Z2M_EXPOSES_TIMEOUT = 2.0
+
+
+def _z2m_ieee(hass: HomeAssistant, device_id: str) -> str | None:
+    """IEEE address if the registry device was created by Zigbee2MQTT."""
+    device = dr.async_get(hass).async_get(device_id)
+    if device is None:
+        return None
+    for domain, ident in device.identifiers:
+        if domain == "mqtt" and ident.startswith(Z2M_IDENTIFIER_PREFIX):
+            return ident[len(Z2M_IDENTIFIER_PREFIX) :]
+    return None
+
+
+def _action_values(definition: dict[str, Any]) -> list[str]:
+    """The ``action`` enum values from a Z2M device definition, if any."""
+    for expose in definition.get("exposes", []):
+        if expose.get("property") == "action" and isinstance(
+            expose.get("values"), list
+        ):
+            return [str(v) for v in expose["values"]]
+    return []
+
+
+async def async_z2m_exposed_actions(hass: HomeAssistant, device_id: str) -> list[str]:
+    """Full action list from Z2M's retained bridge/devices; [] if unavailable."""
+    ieee = _z2m_ieee(hass, device_id)
+    if ieee is None or "mqtt" not in hass.config.components:
+        return []
+    from homeassistant.components import mqtt
+
+    result: asyncio.Future[list[str]] = hass.loop.create_future()
+
+    @callback
+    def _received(msg: Any) -> None:
+        if result.done():
+            return
+        try:
+            devices = json.loads(msg.payload)
+        except ValueError:
+            return
+        for device in devices if isinstance(devices, list) else []:
+            if device.get("ieee_address") == ieee:
+                result.set_result(_action_values(device.get("definition") or {}))
+                return
+
+    try:
+        unsub = await mqtt.async_subscribe(hass, Z2M_DEVICES_TOPIC, _received)
+    except HomeAssistantError as err:
+        _LOGGER.debug("Z2M devices list unavailable: %s", err)
+        return []
+    try:
+        return await asyncio.wait_for(result, Z2M_EXPOSES_TIMEOUT)
+    except TimeoutError:
+        return []
+    finally:
+        unsub()
 
 
 class DeviceTriggerAdapter:
@@ -67,9 +136,12 @@ class DeviceTriggerAdapter:
     async def async_default_actions(
         self, hass: HomeAssistant, config: dict[str, Any]
     ) -> list[str]:
-        """Return unique subtypes, probe order preserved."""
-        triggers = await self._async_probe(hass, config[CONF_DEVICE_ID])
+        """Z2M's full action list (device order) + any probed subtypes."""
+        device_id = config[CONF_DEVICE_ID]
+        triggers = await self._async_probe(hass, device_id)
         seen: dict[str, None] = {}
+        for action in await async_z2m_exposed_actions(hass, device_id):
+            seen.setdefault(action, None)
         for trigger in triggers:
             if (subtype := trigger.get("subtype")) is not None:
                 seen.setdefault(str(subtype), None)

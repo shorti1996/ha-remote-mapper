@@ -17,6 +17,14 @@ def auto_enable_custom_integrations(enable_custom_integrations: None) -> None:
     """Enable loading custom integrations in all tests."""
 
 
+@pytest.fixture(autouse=True)
+def fast_z2m_exposes(monkeypatch) -> None:
+    """No retained bridge/devices in tests — don't wait for it."""
+    from custom_components.remote_mapper.adapters import device_trigger
+
+    monkeypatch.setattr(device_trigger, "Z2M_EXPOSES_TIMEOUT", 0.05)
+
+
 @pytest.fixture
 async def mqtt_stopped_cleanly(hass, mqtt_client_mock, mqtt_mock):
     """Simulate socket close at teardown.
