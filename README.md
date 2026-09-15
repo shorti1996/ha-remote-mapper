@@ -74,8 +74,10 @@ Anything that reaches Home Assistant as one of:
 | **Event entity** | any `event.*` entity with `event_types` |
 | **Zigbee2MQTT raw topic / generic MQTT** | deCONZ, ESPHome, custom firmware |
 
-Zigbee2MQTT discovers actions lazily: press each button once during setup
-and Remote Mapper picks them up (new ones are added automatically later).
+Zigbee2MQTT discovers actions lazily: press each button once (every press
+type) and Remote Mapper picks them up — at setup, on HA start, when you
+open the card's edit mode, or with the ↻ button in the header. No restart
+needed; new actions are live immediately.
 
 ## Install
 

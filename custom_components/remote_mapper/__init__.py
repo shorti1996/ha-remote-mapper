@@ -117,7 +117,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     "action_ids": orphaned,
                 },
             )
-        await _async_drift_check(hass, store, entry, action_ids)
+        await async_refresh_actions(hass, store, entry)
 
     # Deferred: the automation component (and lazy MQTT discovery) may
     # not be ready at our setup; the yaml fallback keeps it safe anyway.
@@ -128,30 +128,32 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def _async_drift_check(
+async def async_refresh_actions(
     hass: HomeAssistant,
     store: RemoteMapperStore,
     entry: ConfigEntry,
-    configured_actions: list[str],
-) -> None:
-    """Additive drift diff (design §9, plan M7).
+) -> dict[str, Any]:
+    """Additive drift diff (design §9, plan M7) — at setup and on demand.
 
-    Re-probe the source: newly discovered actions are ADDED to the
-    layout; configured actions the source no longer reports are flagged
-    stale (card badge) — never removed, mappings are user state.
-    An empty probe is skipped: fallback adapters can't enumerate, and a
-    broker hiccup must not flag everything stale.
+    Re-probe the source: newly discovered actions are ADDED to the layout
+    and the live subscription; configured actions the source no longer
+    reports are flagged stale (card badge) — never removed, mappings are
+    user state. An empty probe is skipped: fallback adapters can't
+    enumerate, and a broker hiccup must not flag everything stale.
+
+    Returns {"added": [...], "stale": [...], "probed": bool}.
     """
     from .adapters import get_adapter
     from .const import EVENT_UPDATED
 
     remote = store.get_remote(entry.entry_id)
     if remote is None:
-        return
+        return {"added": [], "stale": [], "probed": False}
+    configured_actions: list[str] = list(remote["layout"].get(CONF_ACTIONS, []))
     adapter = get_adapter(remote["source"])
     probed = await adapter.async_default_actions(hass, remote["source_config"])
     if not probed:
-        return
+        return {"added": [], "stale": remote.get("stale_actions", []), "probed": False}
 
     added = [a for a in probed if a not in configured_actions]
     stale = sorted(a for a in configured_actions if a not in probed)
@@ -164,6 +166,12 @@ async def _async_drift_check(
             entry.title,
             added,
         )
+        runtime = hass.data[DOMAIN].get(entry.entry_id) or {}
+        if dispatcher := runtime.get("dispatcher"):
+            try:
+                await dispatcher.async_update_actions(remote["layout"][CONF_ACTIONS])
+            except HomeAssistantError as err:
+                _LOGGER.warning("Remote %s: re-subscribe failed: %s", entry.title, err)
     if remote.get("stale_actions") != stale:
         remote["stale_actions"] = stale
         changed = True
@@ -185,6 +193,7 @@ async def _async_drift_check(
                 "stale": stale,
             },
         )
+    return {"added": added, "stale": stale, "probed": True}
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

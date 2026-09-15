@@ -453,6 +453,33 @@ async def ws_probe_device(
 
 @websocket_api.websocket_command(
     {
+        vol.Required("type"): f"{DOMAIN}/refresh_actions",
+        vol.Required("entry_id"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_refresh_actions(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    """Re-probe the source now: add newly discovered actions, flag stale ones.
+
+    Same routine as the startup drift check — Z2M discovers actions lazily
+    (press each button once), so this is the "I pressed them, pick them
+    up" button.
+    """
+    from . import async_refresh_actions
+
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    store = _store(hass)
+    if entry is None or store.get_remote(msg["entry_id"]) is None:
+        connection.send_error(msg["id"], ERR_NOT_FOUND, "Unknown remote")
+        return
+    result = await async_refresh_actions(hass, store, entry)
+    connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command(
+    {
         vol.Required("type"): f"{DOMAIN}/scan_import",
         vol.Required("entry_id"): str,
     }
@@ -561,6 +588,7 @@ def async_register_websocket_commands(hass: HomeAssistant) -> None:
         ws_archive_slot,
         ws_save_layout,
         ws_probe_device,
+        ws_refresh_actions,
         ws_scan_import,
         ws_apply_import,
         ws_run_slot,

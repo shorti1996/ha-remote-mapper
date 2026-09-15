@@ -463,7 +463,36 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       this._remote.buttons ?? []
     );
     this._gridEditing = true;
+    // Z2M discovers actions lazily — pick up anything pressed since setup
+    void this._refreshActions(true);
   };
+
+  /** Re-probe the source; quiet=true only toasts when something changed. */
+  private async _refreshActions(quiet = false): Promise<void> {
+    try {
+      const res = await this._hass!.callWS<{
+        added: string[];
+        stale: string[];
+        probed: boolean;
+      }>({ type: "remote_mapper/refresh_actions", entry_id: this._entryId });
+      if (res.added.length) {
+        this.notify(`Found new actions: ${res.added.join(", ")}`);
+        if (this._gridEditing && this._remote) {
+          // fold them into the draft so they show up in this edit session
+          await this._fetchRemote();
+          this._gridDraft = normalizeGrid(this._gridDraft, this._remote.buttons ?? []);
+        }
+      } else if (!quiet) {
+        this.notify(
+          res.probed
+            ? "No new actions — press each button once (all press types), then refresh again"
+            : "This source can't enumerate actions"
+        );
+      }
+    } catch (err) {
+      this.notify(`Refresh failed: ${String(err)}`);
+    }
+  }
 
   private _cancelGridEdit = (): void => {
     this._gridEditing = false;
@@ -758,6 +787,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
           <span class="header-buttons">
             ${editing
               ? html`
+                  ${this._iconButton("mdi:refresh", "Look for new actions (press the buttons first)", () => void this._refreshActions())}
                   ${this._iconButton("mdi:import", "Import existing automations", this._openImport)}
                   ${this._iconButton("mdi:undo", "Undo", () => this._edit.undo(), {
                     disabled: !this._edit.canUndo,
@@ -797,6 +827,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                     },
                     { active: this._pickerOpen }
                   )}
+                  ${this._iconButton("mdi:refresh", "Look for new actions (press the buttons first)", () => void this._refreshActions())}
                   ${this._iconButton("mdi:import", "Import existing automations", this._openImport)}
                   ${this._iconButton("mdi:close", "Cancel", this._cancelGridEdit)}
                   ${this._iconButton("mdi:check", "Done — save layout", () => void this._saveGridEdit(), {

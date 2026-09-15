@@ -383,3 +383,71 @@ async def test_save_grid_layout(hass, hass_ws_client, remote_device) -> None:
         client, {"type": f"{DOMAIN}/get_remote", "entry_id": entry.entry_id}
     )
     assert res["result"]["grid_layout"] == grid
+
+
+async def test_refresh_actions(hass, hass_ws_client, remote_device) -> None:
+    """A later-discovered action is added to the layout AND dispatched live."""
+    import json
+
+    from pytest_homeassistant_custom_component.common import async_fire_mqtt_message
+
+    from .conftest import REMOTE_IDENTIFIER, REMOTE_TOPIC
+
+    entry = await _setup_remote(hass, remote_device)
+    client = await hass_ws_client(hass)
+
+    # Nothing new yet
+    res = await _ws(
+        client, {"type": f"{DOMAIN}/refresh_actions", "entry_id": entry.entry_id}
+    )
+    assert res["success"]
+    assert res["result"] == {"added": [], "stale": [], "probed": True}
+
+    # Z2M lazily publishes discovery for 1_hold after the user presses it
+    async_fire_mqtt_message(
+        hass,
+        "homeassistant/device_automation/test_remote/action_1_hold/config",
+        json.dumps(
+            {
+                "automation_type": "trigger",
+                "topic": REMOTE_TOPIC,
+                "payload": "1_hold",
+                "type": "action",
+                "subtype": "1_hold",
+                "device": {"identifiers": [REMOTE_IDENTIFIER[1]]},
+            }
+        ),
+    )
+    await hass.async_block_till_done()
+
+    res = await _ws(
+        client, {"type": f"{DOMAIN}/refresh_actions", "entry_id": entry.entry_id}
+    )
+    assert res["result"]["added"] == ["1_hold"]
+
+    res = await _ws(
+        client, {"type": f"{DOMAIN}/get_remote", "entry_id": entry.entry_id}
+    )
+    assert "1_hold" in res["result"]["layout"]["actions"]
+    assert [b["id"] for b in res["result"]["buttons"]] == ["1"]
+    assert [a["event"] for a in res["result"]["buttons"][0]["actions"]] == [
+        "single",
+        "double",
+        "hold",
+    ]
+
+    # The live subscription now covers the new action — no restart needed
+    calls = async_mock_service(hass, "test", "automation")
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/save_slot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_hold",
+            "sequence": [{"action": "test.automation"}],
+        },
+    )
+    assert res["success"]
+    fire_remote_action(hass, "1_hold")
+    await hass.async_block_till_done()
+    assert len(calls) == 1

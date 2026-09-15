@@ -58,6 +58,12 @@ class SlotDispatcher:
             self.name,
         )
 
+    async def async_update_actions(self, action_ids: list[str]) -> None:
+        """Re-subscribe with a new action set (actions discovered at runtime)."""
+        self.action_ids = action_ids
+        self.async_detach()
+        await self.async_attach()
+
     @callback
     def async_detach(self) -> None:
         """Unsubscribe (entry unload)."""
