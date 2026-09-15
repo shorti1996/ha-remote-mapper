@@ -64,7 +64,7 @@ interface HassConnection {
 interface HomeAssistant {
   callWS<T>(msg: Record<string, unknown>): Promise<T>;
   connection: HassConnection;
-  states?: Record<string, { attributes?: Record<string, unknown> }>;
+  states?: Record<string, { state?: string; attributes?: Record<string, unknown> }>;
   areas?: Record<string, { name?: string }>;
   devices?: Record<string, { name?: string | null; name_by_user?: string | null }>;
   floors?: Record<string, { name?: string }>;
@@ -275,6 +275,8 @@ export class RemoteMapperCard extends LitElement implements EditHost {
 
   public set hass(hass: HomeAssistant) {
     this._hass = hass;
+    // the button sheet shows live automation state — keep it current
+    if (this._buttonSheet !== undefined) this.requestUpdate();
     if (!this._fetchStarted && this._config) {
       this._fetchStarted = true;
       void this._initialize();
@@ -1126,13 +1128,21 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                         this._navigate(path)
                       );
                     }
-                    return this._importedSources(slot).map((src) =>
-                      this._iconButton(
-                        "mdi:robot-off",
-                        `Open the imported original (disabled): ${src.entity_id ?? src.config_id}`,
-                        () => this._navigate(`/config/automation/edit/${src.config_id}`)
-                      )
-                    );
+                    return this._importedSources(slot).map((src) => {
+                      // live state: an original that got re-enabled fires in
+                      // parallel with this slot on every press — say so
+                      const enabled =
+                        !!src.entity_id && this._hass?.states?.[src.entity_id]?.state === "on";
+                      const label = src.entity_id ?? src.config_id;
+                      return this._iconButton(
+                        enabled ? "mdi:robot" : "mdi:robot-off",
+                        enabled
+                          ? `Imported original is ENABLED — it also runs on this press: ${label}`
+                          : `Open the imported original (disabled): ${label}`,
+                        () => this._navigate(`/config/automation/edit/${src.config_id}`),
+                        { active: enabled }
+                      );
+                    });
                   })()}
                   ${this._iconButton("mdi:pencil", "Edit", () => void this._openEditor(a.action_id))}
                 </li>
