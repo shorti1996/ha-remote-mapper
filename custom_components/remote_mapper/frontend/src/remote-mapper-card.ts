@@ -37,6 +37,7 @@ import {
   normalizeGrid,
   resizeGrid,
   setButtonLabel,
+  trimLabels,
   type ButtonModel,
   type GridLayout,
 } from "./model";
@@ -558,7 +559,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       await this._hass!.callWS({
         type: "remote_mapper/save_layout",
         entry_id: this._entryId,
-        grid_layout: draft,
+        grid_layout: trimLabels(draft),
       });
       this._cancelGridEdit();
     } catch (err) {

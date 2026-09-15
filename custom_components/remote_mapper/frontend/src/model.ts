@@ -176,15 +176,27 @@ export function setButtonLabel(
 ): GridLayout {
   const pos = layout.buttons[id];
   if (!pos) return layout;
-  const trimmed = label.trim();
   const { label: _old, ...rest } = pos;
+  // kept as typed while editing (trailing space must survive the cursor);
+  // trimLabels() runs before save
   return {
     ...layout,
     buttons: {
       ...layout.buttons,
-      [id]: trimmed ? { ...rest, label: trimmed } : rest,
+      [id]: label.trim() ? { ...rest, label } : rest,
     },
   };
+}
+
+/** Trim label overrides (before persisting). */
+export function trimLabels(layout: GridLayout): GridLayout {
+  const buttons: Record<string, GridPos> = {};
+  for (const [id, pos] of Object.entries(layout.buttons)) {
+    const { label, ...rest } = pos;
+    const trimmed = label?.trim();
+    buttons[id] = trimmed ? { ...rest, label: trimmed } : rest;
+  }
+  return { ...layout, buttons };
 }
 
 export function buttonLabel(button: ButtonModel, layout: GridLayout): string {

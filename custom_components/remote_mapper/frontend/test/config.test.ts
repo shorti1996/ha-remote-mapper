@@ -4,6 +4,7 @@ import {
   applyEditorValue,
   AUTO_REMOTE,
   editorValue,
+  trimConfigStrings,
   assistedTriggerOf,
   chipsLayoutOf,
   displayOf,
@@ -41,6 +42,15 @@ describe("config parsing", () => {
   });
 });
 
+describe("trimConfigStrings (on blur)", () => {
+  it("trims title and colors, drops blank ones, returns same object when clean", () => {
+    const cfg = { type: "x", title: "Desk ", accent_color: " #010203", text_color: "  " };
+    expect(trimConfigStrings(cfg)).toEqual({ type: "x", title: "Desk", accent_color: "#010203" });
+    const clean = { type: "x", title: "Desk" };
+    expect(trimConfigStrings(clean)).toBe(clean);
+  });
+});
+
 describe("editor round-trip", () => {
   const base = { type: "custom:remote-mapper-card", grid_options: { columns: 6 } };
 
@@ -59,15 +69,16 @@ describe("editor round-trip", () => {
     });
   });
 
-  it("defaults are dropped, strings trimmed, foreign keys preserved", () => {
+  it("defaults are dropped, title kept as typed, foreign keys preserved", () => {
     const next = applyEditorValue(base, {
       ...editorValue(base),
-      title: "  Desk  ",
+      title: "Desk ",
       show_title: true,
       display: "normal",
       button_opacity: 1,
     });
-    expect(next).toEqual({ ...base, title: "Desk" });
+    expect(next).toEqual({ ...base, title: "Desk " });
+    expect(applyEditorValue(next, { ...editorValue(next), title: "   " })).toEqual(base);
   });
 
   it("non-defaults are written, and clearing them removes the keys", () => {

@@ -129,7 +129,9 @@ export function applyEditorValue(
     else next[key] = v;
   };
   set("entry_id", value.entry_id, value.entry_id === AUTO_REMOTE);
-  set("title", typeof value.title === "string" ? value.title.trim() : value.title, false);
+  // Not trimmed while typing (a trailing space would vanish under the
+  // cursor); whitespace-only counts as empty.
+  set("title", value.title, typeof value.title === "string" && !value.title.trim());
   set("show_title", value.show_title, value.show_title !== false);
   set("layout", value.layout, value.layout !== "canvas");
   set("display", value.display, value.display === "normal");
@@ -153,6 +155,26 @@ export function applyEditorValue(
   const opacity = value.button_opacity;
   set("button_opacity", opacity, typeof opacity !== "number" || opacity >= 1);
   return next;
+}
+
+/**
+ * Trim free-text fields; empty ones are dropped. Run when a field loses
+ * focus (typing keeps spaces, see applyEditorValue). Returns the same
+ * object when nothing changes so callers can skip re-emitting.
+ */
+export function trimConfigStrings(config: RemoteMapperCardConfig): RemoteMapperCardConfig {
+  let changed = false;
+  const next: RemoteMapperCardConfig = { ...config };
+  for (const key of ["title", ...COLOR_KEYS] as const) {
+    const v = next[key];
+    if (typeof v !== "string") continue;
+    const trimmed = v.trim();
+    if (trimmed === v) continue;
+    changed = true;
+    if (trimmed) next[key] = trimmed;
+    else delete next[key];
+  }
+  return changed ? next : config;
 }
 
 /**

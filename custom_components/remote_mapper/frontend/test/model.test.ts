@@ -8,6 +8,7 @@ import {
   resizeGrid,
   setButtonLabel,
   swapCells,
+  trimLabels,
   type ButtonModel,
   type GridLayout,
 } from "../src/model";
@@ -106,10 +107,12 @@ describe("resizeGrid / swapCells / labels", () => {
     expect(swapCells(g, { row: 0, col: 0 }, { row: 0, col: 0 })).toBe(g);
   });
 
-  it("label override trims and clears back to the button's own label", () => {
+  it("label override is kept as typed, trimmed on save, cleared when blank", () => {
     const g = normalizeGrid(null, six);
-    const named = setButtonLabel(g, "1", "  Lamp ");
-    expect(buttonLabel(six[0], named)).toBe("Lamp");
+    const named = setButtonLabel(g, "1", "Lamp ");
+    expect(buttonLabel(six[0], named)).toBe("Lamp ");
+    expect(trimLabels(named).buttons["1"].label).toBe("Lamp");
     expect(buttonLabel(six[0], setButtonLabel(named, "1", "   "))).toBe("1");
+    expect(trimLabels(setButtonLabel(named, "1", "  ")).buttons["1"].label).toBeUndefined();
   });
 });

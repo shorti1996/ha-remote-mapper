@@ -20,6 +20,7 @@ import {
   LAYOUT_KINDS,
   layoutOf,
   type RemoteMapperCardConfig,
+  trimConfigStrings,
 } from "./config";
 
 const LABELS: Record<string, string> = {
@@ -140,13 +141,23 @@ export class RemoteMapperCardEditor extends LitElement {
             ? "Ignored for the canvas layout (every tile is already visible)."
             : (HELPERS[s.name] ?? "")}
         @value-changed=${this._changed}
+        @focusout=${this._trimOnBlur}
       ></ha-form>
     `;
   }
 
   private _changed = (e: CustomEvent): void => {
     e.stopPropagation();
-    const next = applyEditorValue(this._config!, e.detail.value as Record<string, unknown>);
+    this._emit(applyEditorValue(this._config!, e.detail.value as Record<string, unknown>));
+  };
+
+  /** Leaving a text field (or clicking Save, which blurs it) trims it. */
+  private _trimOnBlur = (): void => {
+    const next = trimConfigStrings(this._config!);
+    if (next !== this._config) this._emit(next);
+  };
+
+  private _emit(next: RemoteMapperCardConfig): void {
     this._config = next;
     this.dispatchEvent(
       new CustomEvent("config-changed", {
@@ -155,7 +166,7 @@ export class RemoteMapperCardEditor extends LitElement {
         composed: true,
       })
     );
-  };
+  }
 
   static override styles = css`
     .hint {
