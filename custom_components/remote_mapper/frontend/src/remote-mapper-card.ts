@@ -443,6 +443,45 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       : undefined;
   }
 
+  /**
+   * Editor for the sequence's target when it's a scene or script — HA
+   * keeps both editable at /config/{scene,script}/edit/{id}. Scenes are
+   * addressed by their config id (state attribute), scripts by object id.
+   */
+  private _targetEditor(
+    slot: SlotRecord | undefined
+  ): { icon: string; title: string; path: string } | undefined {
+    const first = slot?.sequence?.[0] as Record<string, any> | undefined;
+    if (!first) return undefined;
+    const action = first.action ?? first.service;
+    let entity = first.target?.entity_id ?? first.entity_id ?? first.scene;
+    if (Array.isArray(entity)) entity = entity[0];
+    if (typeof entity !== "string") return undefined;
+    const name = this._hass?.states?.[entity]?.attributes?.friendly_name ?? entity;
+    if (entity.startsWith("scene.") && (action === "scene.turn_on" || first.scene)) {
+      const id = this._hass?.states?.[entity]?.attributes?.id;
+      if (typeof id !== "string") return undefined; // yaml scene without id
+      return { icon: "mdi:palette", title: `Edit scene: ${name}`, path: `/config/scene/edit/${id}` };
+    }
+    if (entity.startsWith("script.") && (action === "script.turn_on" || action === entity)) {
+      return {
+        icon: "mdi:script-text",
+        title: `Edit script: ${name}`,
+        path: `/config/script/edit/${entity.slice("script.".length)}`,
+      };
+    }
+    if (typeof action === "string" && action.startsWith("script.") && action !== "script.turn_on") {
+      const objectId = action.slice("script.".length);
+      const scriptName = this._hass?.states?.[action]?.attributes?.friendly_name ?? objectId;
+      return {
+        icon: "mdi:script-text",
+        title: `Edit script: ${scriptName}`,
+        path: `/config/script/edit/${objectId}`,
+      };
+    }
+    return undefined;
+  }
+
   /** Originals an imported slot came from (still in HA, disabled). */
   private _importedSources(slot: SlotRecord | undefined): ImportedSource[] {
     const from = slot?.imported_from;
@@ -1073,6 +1112,12 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                   ${this._iconButton("mdi:play", "Run now", () => void this._runSlot(a.action_id), {
                     disabled: !view?.assigned || !!view.archived,
                   })}
+                  ${(() => {
+                    const target = this._targetEditor(remote.slots[a.action_id]);
+                    return target
+                      ? this._iconButton(target.icon, target.title, () => this._navigate(target.path))
+                      : nothing;
+                  })()}
                   ${(() => {
                     const slot = remote.slots[a.action_id];
                     const path = this._automationEditPath(slot);
