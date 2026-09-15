@@ -70,9 +70,16 @@ interface HomeAssistant {
   floors?: Record<string, { name?: string }>;
 }
 
+interface ImportedSource {
+  entity_id: string | null;
+  config_id: string | null;
+}
+
 interface SlotRecord {
   sequence: unknown[];
   name?: string | null;
+  /** Set by the import assistant; originals are disabled, not deleted. */
+  imported_from?: ImportedSource & { sources?: ImportedSource[] };
   scene_id: string | null;
   materialized: boolean;
   automation_id: string | null;
@@ -434,6 +441,14 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     return slot?.materialized && slot.automation_id
       ? `/config/automation/edit/${slot.automation_id}`
       : undefined;
+  }
+
+  /** Originals an imported slot came from (still in HA, disabled). */
+  private _importedSources(slot: SlotRecord | undefined): ImportedSource[] {
+    const from = slot?.imported_from;
+    if (!from) return [];
+    const list = from.sources?.length ? from.sources : [from];
+    return list.filter((s) => !!s.config_id);
   }
 
   public notify(message: string): void {
@@ -1059,12 +1074,20 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                     disabled: !view?.assigned || !!view.archived,
                   })}
                   ${(() => {
-                    const path = this._automationEditPath(remote.slots[a.action_id]);
-                    return path
-                      ? this._iconButton("mdi:robot", "Open in HA's automation editor", () =>
-                          this._navigate(path)
-                        )
-                      : nothing;
+                    const slot = remote.slots[a.action_id];
+                    const path = this._automationEditPath(slot);
+                    if (path) {
+                      return this._iconButton("mdi:robot", "Open in HA's automation editor", () =>
+                        this._navigate(path)
+                      );
+                    }
+                    return this._importedSources(slot).map((src) =>
+                      this._iconButton(
+                        "mdi:history",
+                        `Open the imported original (disabled): ${src.entity_id ?? src.config_id}`,
+                        () => this._navigate(`/config/automation/edit/${src.config_id}`)
+                      )
+                    );
                   })()}
                   ${this._iconButton("mdi:pencil", "Edit", () => void this._openEditor(a.action_id))}
                 </li>
