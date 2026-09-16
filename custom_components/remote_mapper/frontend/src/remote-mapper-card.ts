@@ -2075,7 +2075,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
               `
             : nothing}
           ${scan.proposals.some((p) => p.conflict)
-            ? html`<label class="hint">
+            ? html`<label class="hint check-row">
                 <input
                   type="checkbox"
                   .checked=${this._importOverwrite}
@@ -2454,31 +2454,52 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       color: var(--error-color, #db4437);
       border-color: var(--error-color, #db4437);
     }
+    /* Lists inside modals: HA tokens only (em/px ignore the user's
+       --ha-font-size-scale and read tiny next to HA's own dialogs). */
     .import-list {
-      margin: 4px 0 8px;
-      padding-left: 18px;
-      font-size: 0.85em;
+      list-style: none;
+      margin: var(--ha-space-1, 4px) 0 var(--ha-space-2, 8px);
+      padding: 0;
+      font-size: var(--ha-font-size-m, 14px);
+      line-height: var(--ha-line-height-normal, 1.6);
     }
     .import-list li {
-      margin: 2px 0;
+      margin: var(--ha-space-1, 4px) 0;
+    }
+    .import-list label,
+    .check-row {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--ha-space-1, 4px) var(--ha-space-2, 8px);
+    }
+    .import-list code {
+      font-family: var(--ha-font-family-code, monospace);
+      font-size: var(--ha-font-size-s, 12px);
+    }
+    .modal input[type="checkbox"] {
+      width: var(--ha-space-5, 20px);
+      height: var(--ha-space-5, 20px);
+      margin: 0;
+      accent-color: var(--primary-color);
     }
     .import-list select.mode {
-      margin-left: var(--ha-space-1, 4px);
       font: inherit;
-      font-size: var(--ha-font-size-s, 12px);
+      font-size: var(--ha-font-size-m, 14px);
+      min-height: var(--ha-space-8, 32px);
+      padding: 0 var(--ha-space-2, 8px);
       background: var(--card-background-color, inherit);
       color: inherit;
       border: 1px solid var(--divider-color, #444);
-      border-radius: var(--ha-border-radius-sm, 4px);
+      border-radius: var(--ha-border-radius-md, 8px);
     }
     .hint-inline {
-      margin-left: var(--ha-space-1, 4px);
       font-size: var(--ha-font-size-s, 12px);
       color: var(--secondary-text-color);
     }
     .warn {
       color: var(--warning-color, #ffa600);
-      font-size: 0.85em;
+      font-size: var(--ha-font-size-s, 12px);
     }
     .decision {
       margin-top: 12px;
@@ -2532,8 +2553,8 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     textarea {
       width: 100%;
       min-height: 160px;
-      font-family: var(--code-font-family, monospace);
-      font-size: 0.85em;
+      font-family: var(--ha-font-family-code, var(--code-font-family, monospace));
+      font-size: var(--ha-font-size-s, 12px);
       box-sizing: border-box;
       background: inherit;
       color: inherit;
