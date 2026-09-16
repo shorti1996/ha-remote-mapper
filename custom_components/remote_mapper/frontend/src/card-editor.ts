@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 /**
  * Lovelace config editor for the card (static getConfigElement). One
  * ha-form: remote picker (from list_remotes), layout kind, display mode,

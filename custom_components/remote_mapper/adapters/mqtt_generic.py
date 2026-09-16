@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Fallback adapter: arbitrary MQTT topic + template.
 
 Escape hatch for deCONZ, ESPHome, custom firmware — anything that

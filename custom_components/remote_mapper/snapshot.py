@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Snapshot-to-persistent-scene flow (design §8).
 
 Set the room how you like it → press save on the card → the state

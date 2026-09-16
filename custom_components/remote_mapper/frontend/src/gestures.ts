@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 /**
  * Tap recognizer for the "replica" display mode: dashboard gestures on a
  * button cell map 1:1 to the physical remote's events (tap → single,

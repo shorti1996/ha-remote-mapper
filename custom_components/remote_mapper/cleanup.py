@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Owned-artifact cleanup policy (design §7).
 
 A slot may own two kinds of artifacts: a snapshot scene (tracked in the

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Import assistant tests — shapes A/B, flags, disable-not-delete."""
 
 from __future__ import annotations

@@ -3,7 +3,7 @@
 User-facing docs live in [README.md](README.md); this file covers the dev
 loop, dev HA, and releases. Outside contributions need the [CLA](CLA.md)
 signed (the CLA Assistant bot asks on the first PR); every source file
-starts with an `SPDX-License-Identifier: AGPL-3.0-only` line.
+starts with an `SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0` line.
 
 Requirements: [uv](https://docs.astral.sh/uv/) (Python ≥ 3.14.2 fetched
 automatically), Node 22+, Docker.

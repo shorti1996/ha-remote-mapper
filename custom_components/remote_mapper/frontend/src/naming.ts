@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 /**
  * Infer a human name for a slot from its sequence — no model, just a
  * lookup: verb from the service, target from HA's registries (friendly

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Materialization tests: yaml round-trip, external edits, orphans."""
 
 from __future__ import annotations

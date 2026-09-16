@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 /**
  * Vendored from widget-canvas-ha src/model/types.ts (no upstream release
  * exists yet — repo has no commits, so a tag-pinned npm git dependency is

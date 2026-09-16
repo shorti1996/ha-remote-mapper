@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Dispatch physical remote events to slot sequences.
 
 One adapter subscription per remote; sequences run as ad-hoc Script

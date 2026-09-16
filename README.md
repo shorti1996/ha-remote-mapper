@@ -167,11 +167,14 @@ HA, and releases.
 
 ## License
 
-[AGPL-3.0-only](LICENSE). Use it, change it, ship it, host it — derived
-work stays open under the same terms, also when it is only offered as a
-service. **Commercial or closed use without the AGPL obligations:** contact
-the author for a commercial license.
+Source-available under the
+[PolyForm Noncommercial License 1.0.0](LICENSE). **Free for personal and
+any other noncommercial use** — your home, your family, your hobby. Use
+it, change it, share it. **Commercial use: contact me** for a commercial
+license.
 
-Contributions are accepted under the [CLA](CLA.md) (Apache-2.0 grant to
-the maintainer, the same model Home Assistant uses), which keeps a
-commercial license and an upstream contribution possible.
+This is not an OSI open-source license (it limits commercial use). The
+source is public, forks are fine, and contributions are welcome under the
+[CLA](CLA.md), which licenses them to the maintainer under Apache-2.0 so a
+commercial license and a future contribution to Home Assistant core stay
+possible.

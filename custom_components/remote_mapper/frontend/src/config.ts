@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 /** Dashboard-side card config (per card instance, lives in Lovelace). */
 import type { DisplayMode, LayoutKind } from "./model";
 

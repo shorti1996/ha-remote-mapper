@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """In-process scenes.yaml management (mirrors materializer.py).
 
 Same pattern as the automation config store: yaml upsert/delete by id,

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Config flow for Remote Mapper: pick device → probe actions → confirm."""
 
 from __future__ import annotations

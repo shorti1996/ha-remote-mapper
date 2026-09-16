@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Persistent slot store — single Store shared by all config entries.
 
 Schema (design doc §4): remotes keyed by config entry id, plus the

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """End-to-end dispatch tests: entry setup → MQTT event → service call."""
 
 from __future__ import annotations

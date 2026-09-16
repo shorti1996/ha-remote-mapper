@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """In-process automations.yaml management (materialization).
 
 Replicates what the native editor's admin-only HTTP view does

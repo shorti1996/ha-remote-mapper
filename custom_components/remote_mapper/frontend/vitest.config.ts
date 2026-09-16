@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 import { defineConfig } from "vitest/config";
 
 // Pure-module tests only (HA frontend convention): logic lives outside the

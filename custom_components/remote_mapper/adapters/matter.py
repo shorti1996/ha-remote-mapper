@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Matter / multi-button remote adapter.
 
 A Matter remote exposes each physical button as its OWN `event.*` entity

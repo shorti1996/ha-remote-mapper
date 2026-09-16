@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 /**
  * MS-Word style table picker: hover (or tap) a cell to preview rows×cols,
  * click to pick. The visible matrix grows as the pointer nears its edge

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TapRecognizer, tipAnchor, type Gesture, type GestureCaps } from "../src/gestures";

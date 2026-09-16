@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Fallback adapter: raw Zigbee2MQTT topic.
 
 Subscribes to zigbee2mqtt/<name> and extracts the `action` field. Works

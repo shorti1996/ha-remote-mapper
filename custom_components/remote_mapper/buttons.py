@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Button grouping — action ids → physical buttons x events.
 
 Derived on every read, never stored: the card needs "button" as a unit

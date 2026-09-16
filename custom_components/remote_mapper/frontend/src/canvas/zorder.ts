@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 /**
  * Vendored from widget-canvas-ha src/model/zorder.ts (verbatim).
  * All ops return a NEW widget array with z re-normalized to 1..n

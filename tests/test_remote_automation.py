@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Per-remote shared automation ("Shape A") — plan ai/06."""
 
 from __future__ import annotations
