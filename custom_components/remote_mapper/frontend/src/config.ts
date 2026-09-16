@@ -14,7 +14,7 @@ export interface RemoteMapperCardConfig {
   show_title?: boolean;
   /** grid (default) — button grid; canvas — legacy free-drag tiles. */
   layout?: LayoutKind;
-  /** Grid only: normal (physical remote), all (every event), assisted (popover). */
+  /** Grid only: assisted (default, popover), replica (physical remote), all (every event). */
   display?: DisplayMode;
   /** assisted only: auto (touch → press, mouse → tap), tap, or press (Pinterest). */
   assisted_trigger?: AssistedTrigger;
@@ -30,9 +30,9 @@ export interface RemoteMapperCardConfig {
 }
 
 export const DISPLAY_MODES: Array<{ value: DisplayMode; label: string }> = [
-  { value: "normal", label: "Normal — tap/double-tap/hold like the physical remote" },
-  { value: "all", label: "All visible — every event of every button" },
   { value: "assisted", label: "Assisted — press a button, pick the event" },
+  { value: "replica", label: "Replica — tap / double-tap / hold like the physical remote" },
+  { value: "all", label: "All visible — every event of every button" },
 ];
 
 export const LAYOUT_KINDS: Array<{ value: LayoutKind; label: string }> = [
@@ -55,8 +55,10 @@ export const CHIPS_LAYOUTS: Array<{ value: ChipsLayout; label: string }> = [
 ];
 
 export function displayOf(config: RemoteMapperCardConfig | undefined): DisplayMode {
-  const value = config?.display;
-  return DISPLAY_MODES.some((m) => m.value === value) ? (value as DisplayMode) : "normal";
+  // "normal" was the pre-release name of replica — keep old dashboards working
+  const raw: unknown = config?.display;
+  const value = raw === "normal" ? "replica" : raw;
+  return DISPLAY_MODES.some((m) => m.value === value) ? (value as DisplayMode) : "assisted";
 }
 
 export function layoutOf(config: RemoteMapperCardConfig | undefined): LayoutKind {
@@ -135,7 +137,7 @@ export function applyEditorValue(
   set("title", value.title, typeof value.title === "string" && !value.title.trim());
   set("show_title", value.show_title, value.show_title !== false);
   set("layout", value.layout, value.layout !== "canvas");
-  set("display", value.display, value.display === "normal");
+  set("display", value.display, value.display === "assisted");
   set("assisted_trigger", value.assisted_trigger, value.assisted_trigger === "auto");
   set("chips_layout", value.chips_layout, value.chips_layout === "vertical");
   for (const key of COLOR_KEYS) {

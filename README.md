@@ -7,7 +7,7 @@ No blueprints, no one-automation-per-button, no YAML hunting. Pick the
 button, pick the action, done. Everything else (automations, scenes, the
 device's quirks) is handled for you.
 
-<!-- screenshot: the card in "normal" mode next to the physical remote -->
+<!-- screenshot: the card (replica mode) next to the physical remote -->
 ![Remote Mapper card mirroring a 6-button Zigbee remote](docs/img/hero.png)
 
 ## Why
@@ -36,12 +36,12 @@ device, where every button shows what it does and lets you change it.
 
   | Mode | What you see | What a tap does |
   |---|---|---|
-  | **Normal** | one pad per button, marks for single / double / hold | tap = single, double-tap = double, hold = hold — the card *is* the remote |
+  | **Assisted** (default) | one pad per button | press → the button's events fan out inside it, slide onto one and lift (mouse: click, click) |
+  | **Replica** | one pad per button, marks for single / double / hold | tap = single, double-tap = double, hold = hold — the card *is* the remote |
   | **All visible** | every event of every button as a chip | tap a chip |
-  | **Assisted** | one pad per button | press → the button's events fan out inside it, slide onto one and lift (mouse: click, click) |
 
   <!-- screenshots: the three modes side by side -->
-  ![Normal / all visible / assisted](docs/img/modes.png)
+  ![Replica / all visible / assisted](docs/img/modes.png)
 
 - **Assign in seconds.** Tap an event → *Activate scene*, *Toggle entity*,
   *Run script*, *Set WLED preset*… with HA's own pickers. Need more? A
@@ -51,9 +51,12 @@ device, where every button shows what it does and lets you change it.
   <!-- screenshot: the slot editor, Quick tab -->
   ![Assign an action](docs/img/assign.png)
 
-- **📸 Snapshot to scene.** Set the room the way you like it, press
-  *Snapshot* on a button: the current state of the room becomes a scene
-  bound to that button. Press again later to update it in place.
+- **📸 Scene from current state.** Set the room the way you like it, pick
+  *Scene from current state* on a button, tick the entities: their current
+  state becomes a scene bound to that button. *Re-snapshot* later updates
+  it in place. Prefer HA's editor? *Automation for this button* or
+  *Automation for the whole remote* creates the shell with the right
+  triggers and opens it there.
 
 - **Real automations when you want them.** Tick *Create as automation* on
   any button: it becomes a native HA automation (traces, the HA editor,
@@ -116,7 +119,7 @@ type: custom:remote-mapper-card
 entry_id: …               # optional with a single remote
 title: ""                 # empty = the remote's name; show_title: false hides it
 layout: grid              # grid (default) | canvas (free-drag tiles)
-display: normal           # normal | all | assisted
+display: assisted         # assisted (default) | replica | all
 assisted_trigger: auto    # assisted: auto (touch→press, mouse→tap) | tap | press
 chips_layout: vertical    # all: vertical | horizontal (wrapped) | compact | spines | grid
 button_color: "#3f51b5"   # any CSS color; unset = theme

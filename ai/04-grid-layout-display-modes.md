@@ -58,12 +58,12 @@ remote. Three things are missing:
    type: custom:remote-mapper-card
    entry_id: …            # optional with one remote
    layout: grid           # grid (default) | canvas (legacy free-drag)
-   display: normal        # normal (default) | all | assisted
+   display: assisted      # assisted (default) | replica | all   (replica was "normal" pre-release)
    ```
    A real **card config editor** (`getConfigElement`, `ha-form`) with a
    remote picker (from `list_remotes`) replaces "paste the entry_id".
 4. **Display modes** (view mode, `layout: grid`):
-   - `normal` — cell = physical button. Dashboard gestures map to events:
+   - `replica` (was `normal`) — cell = physical button. Dashboard gestures map to events:
      tap → `single`, double-tap → `double`, triple → `triple`, hold →
      `hold` (then `release` on lift if the button has one). The double-tap
      wait (~280 ms) only applies when the button actually has a double/triple

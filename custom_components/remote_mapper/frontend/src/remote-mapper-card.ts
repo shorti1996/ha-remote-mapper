@@ -376,7 +376,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   }
 
   public static getStubConfig(): Record<string, unknown> {
-    return { layout: "grid", display: "normal" };
+    return { layout: "grid", display: "assisted" };
   }
 
   public override connectedCallback(): void {

@@ -17,7 +17,10 @@ import {
 
 describe("config parsing", () => {
   it("falls back to defaults for unknown values", () => {
-    expect(displayOf({ type: "x", display: "nope" as never })).toBe("normal");
+    expect(displayOf({ type: "x", display: "nope" as never })).toBe("assisted");
+    expect(displayOf({ type: "x", display: "replica" })).toBe("replica");
+    // pre-release name still accepted
+    expect(displayOf({ type: "x", display: "normal" as never })).toBe("replica");
     expect(layoutOf({ type: "x" })).toBe("grid");
     expect(layoutOf({ type: "x", layout: "canvas" })).toBe("canvas");
     expect(assistedTriggerOf({ type: "x" })).toBe("auto");
@@ -62,7 +65,7 @@ describe("editor round-trip", () => {
       title: "",
       show_title: true,
       layout: "grid",
-      display: "normal",
+      display: "assisted",
       assisted_trigger: "auto",
       chips_layout: "vertical",
       button_color_set: false,
@@ -75,7 +78,7 @@ describe("editor round-trip", () => {
       ...editorValue(base),
       title: "Desk ",
       show_title: true,
-      display: "normal",
+      display: "assisted",
       button_opacity: 1,
     });
     expect(next).toEqual({ ...base, title: "Desk " });
@@ -88,7 +91,7 @@ describe("editor round-trip", () => {
       entry_id: "abc",
       show_title: false,
       layout: "canvas",
-      display: "assisted",
+      display: "replica",
       assisted_trigger: "press",
       chips_layout: "spines",
       button_opacity: 0.4,
@@ -98,12 +101,12 @@ describe("editor round-trip", () => {
       entry_id: "abc",
       show_title: false,
       layout: "canvas",
-      display: "assisted",
+      display: "replica",
       assisted_trigger: "press",
       chips_layout: "spines",
       button_opacity: 0.4,
     });
-    const off = applyEditorValue(on, { ...editorValue(on), entry_id: AUTO_REMOTE, show_title: true, layout: "grid", display: "normal", assisted_trigger: "auto", chips_layout: "vertical", button_opacity: 1 });
+    const off = applyEditorValue(on, { ...editorValue(on), entry_id: AUTO_REMOTE, show_title: true, layout: "grid", display: "assisted", assisted_trigger: "auto", chips_layout: "vertical", button_opacity: 1 });
     expect(off).toEqual(base);
   });
 

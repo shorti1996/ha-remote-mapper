@@ -73,7 +73,7 @@ export class RemoteMapperGrid extends LitElement {
   @property({ attribute: false }) public buttons: ButtonModel[] = [];
   @property({ attribute: false }) public layout?: GridLayout;
   @property({ attribute: false }) public slots: Record<string, SlotView> = {};
-  @property() public display: DisplayMode = "normal";
+  @property() public display: DisplayMode = "assisted";
   @property({ type: Boolean }) public editing = false;
   /** Action id currently flashing (after a run). */
   @property() public flash?: string;
@@ -171,7 +171,7 @@ export class RemoteMapperGrid extends LitElement {
     }
   };
 
-  // ── normal mode gestures ──────────────────────────────────────────
+  // ── replica mode gestures ─────────────────────────────────────────
 
   private _recognizer(button: ButtonModel): TapRecognizer {
     let rec = this._recognizers.get(button.id);
@@ -240,7 +240,7 @@ export class RemoteMapperGrid extends LitElement {
       };
       return;
     }
-    if (this.display === "normal") {
+    if (this.display === "replica") {
       el.setPointerCapture(e.pointerId);
       this._recognizer(button).down(e, this._caps(button));
     } else if (this.display === "assisted") {
@@ -285,7 +285,7 @@ export class RemoteMapperGrid extends LitElement {
       return;
     }
     if (this.editing) return;
-    if (this.display === "normal") {
+    if (this.display === "replica") {
       this._recognizers.get(button.id)?.move(e);
     } else if (this.display === "assisted" && this._popover === button.id) {
       const over = this._optAt(e.clientX, e.clientY);
@@ -312,7 +312,7 @@ export class RemoteMapperGrid extends LitElement {
       }
       return;
     }
-    if (this.display === "normal") {
+    if (this.display === "replica") {
       this._recognizers.get(button.id)?.up();
       return;
     }
@@ -570,7 +570,7 @@ export class RemoteMapperGrid extends LitElement {
       min-width: 0;
       border-radius: var(--ha-border-radius-lg, 12px);
     }
-    .grid.normal .cell,
+    .grid.replica .cell,
     .grid.assisted .cell {
       aspect-ratio: 1.15;
     }

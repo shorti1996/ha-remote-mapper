@@ -36,7 +36,8 @@ export interface GridLayout {
   buttons: Record<string, GridPos>;
 }
 
-export type DisplayMode = "normal" | "all" | "assisted";
+/** assisted (default) — press a button, pick the event; replica — gestures like the physical remote; all — every event as a chip. */
+export type DisplayMode = "replica" | "all" | "assisted";
 export type LayoutKind = "grid" | "canvas";
 
 export const GRID_SCHEMA_VERSION = 1;
