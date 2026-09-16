@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Infer a human name for a slot from its sequence — no model, just a
  * lookup: verb from the service, target from HA's registries (friendly

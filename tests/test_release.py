@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Hand-back flow: re-enable originals, convert/keep automations, remove entry."""
 
 from __future__ import annotations

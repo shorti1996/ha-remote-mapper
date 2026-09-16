@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Remote Mapper — physical remotes as first-class dashboard objects."""
 
 from __future__ import annotations

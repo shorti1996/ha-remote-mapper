@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """WebSocket API for the Remote Mapper card.
 
 Flat command naming (remote_mapper/<verb>_<noun>). Every mutating handler

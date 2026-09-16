@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Playwright template for the card in the dev HA (see ai/local-ha-testing.md).
 
 Phone viewport, dark scheme, token injected before navigation so there is

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Import assistant — absorb existing button automations into slots.
 
 Two observed shapes (plan §5):

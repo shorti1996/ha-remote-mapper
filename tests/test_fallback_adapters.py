@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Conformance tests for the fallback adapters + drift diff."""
 
 from __future__ import annotations

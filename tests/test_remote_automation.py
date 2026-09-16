@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Per-remote shared automation ("Shape A") — plan ai/06."""
 
 from __future__ import annotations

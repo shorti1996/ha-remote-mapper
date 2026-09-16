@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Live E2E smoke test against a running HA instance (M0-M4 surface).
 
 Prerequisites: the integration installed with a configured "E2E Remote"

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """End-to-end dispatch tests: entry setup → MQTT event → service call."""
 
 from __future__ import annotations

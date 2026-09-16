@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Constants for Remote Mapper."""
 
 from __future__ import annotations

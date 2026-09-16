@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """JavaScript module registration for the frontend card (edm pattern)."""
 
 from __future__ import annotations

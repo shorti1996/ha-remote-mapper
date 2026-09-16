@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Vendored from widget-canvas-ha src/model/types.ts (no upstream release
  * exists yet — repo has no commits, so a tag-pinned npm git dependency is

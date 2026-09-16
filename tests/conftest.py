@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Shared fixtures for Remote Mapper tests."""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /** Dashboard-side card config (per card instance, lives in Lovelace). */
 import type { DisplayMode, LayoutKind } from "./model";
 

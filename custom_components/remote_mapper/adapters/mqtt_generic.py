@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Fallback adapter: arbitrary MQTT topic + template.
 
 Escape hatch for deCONZ, ESPHome, custom firmware — anything that

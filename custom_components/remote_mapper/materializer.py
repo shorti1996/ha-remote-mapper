@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """In-process automations.yaml management (materialization).
 
 Replicates what the native editor's admin-only HTTP view does

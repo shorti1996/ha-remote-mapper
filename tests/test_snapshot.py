@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Snapshot flow + scene ownership + clear policy tests."""
 
 from __future__ import annotations

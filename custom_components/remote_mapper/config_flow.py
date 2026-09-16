@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Config flow for Remote Mapper: pick device → probe actions → confirm."""
 
 from __future__ import annotations

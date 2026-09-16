@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Tap recognizer for the "normal" display mode: dashboard gestures on a
  * button cell map 1:1 to the physical remote's events (tap → single,

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Link mode: slots point at native automations that stay enabled and canonical."""
 
 from __future__ import annotations

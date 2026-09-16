@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Vendored from widget-canvas-ha src/render/scaling.ts (verbatim, section
  * constants inlined).

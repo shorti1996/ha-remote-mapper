@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * <remote-mapper-grid> — the button grid in all three display modes,
  * plus edit-mode drag-to-swap. Pure presentation: takes buttons, layout

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Vendored from widget-canvas-ha src/model/migrate.ts — the snap/cell
  * helpers only (normalizeConfig stays upstream; our layout is

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Hand a remote back to Home Assistant — opt out without losing anything.
 
 Per slot:

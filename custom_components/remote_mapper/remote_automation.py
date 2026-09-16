@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """One automation per remote — the importer's "Shape A" (plan ai/06).
 
 One automation, one trigger per event with ``id: <action_id>``, a single

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Primary adapter: HA device triggers (Z2M via MQTT, ZHA, any provider).
 
 Subscribes to a device's published device triggers with the same coroutine

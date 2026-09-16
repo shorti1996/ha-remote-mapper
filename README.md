@@ -24,7 +24,10 @@ device, where every button shows what it does and lets you change it.
 
 - **A card shaped like the remote.** A Word-style picker sets the grid
   (2×3, 1×4, …); drag buttons into place; rename them. Saved with the
-  remote, so every dashboard shows the same layout.
+  remote, so every dashboard shows the same layout. Odd-shaped remote?
+  Switch the card to the **canvas** layout: free-drag, resizable tiles on
+  a design surface, with nudge arrows and z-order, for a round dial or a
+  remote with an off-grid button.
 
   <!-- screenshot: edit mode with the ⊞ grid picker open -->
   ![Grid picker](docs/img/grid-picker.png)
@@ -152,5 +155,11 @@ HA, and releases.
 
 ## License
 
-[GPL-3.0](LICENSE). Use it, change it, ship it — derived work stays open
-under the same terms. For a different arrangement, ask the author.
+[AGPL-3.0-only](LICENSE). Use it, change it, ship it, host it — derived
+work stays open under the same terms, also when it is only offered as a
+service. **Commercial or closed use without the AGPL obligations:** contact
+the author for a commercial license.
+
+Contributions are accepted under the [CLA](CLA.md) (Apache-2.0 grant to
+the maintainer, the same model Home Assistant uses), which keeps a
+commercial license and an upstream contribution possible.

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Adapter registry — one entry per remote source type.
 
 Adding a protocol (Matter/BTHome/…) is one new adapter file plus a

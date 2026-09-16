@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Tests for integration setup, unload, and the WS handshake."""
 
 from __future__ import annotations

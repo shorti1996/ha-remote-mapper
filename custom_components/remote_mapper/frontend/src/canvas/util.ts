@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Vendored from widget-canvas-ha src/util/hash.ts + src/util/uuid.ts
  * (verbatim; see types.ts header for why vendored).

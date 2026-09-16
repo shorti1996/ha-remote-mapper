@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Tests for the Matter / multi-button remote adapter + config flow.
 
 Matter remotes expose one event.* entity per physical button; this source

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Import assistant tests — shapes A/B, flags, disable-not-delete."""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Vendored from widget-canvas-ha src/editor/ha-loader.ts +
  * src/util/actions.ts loadHelpers (verbatim).

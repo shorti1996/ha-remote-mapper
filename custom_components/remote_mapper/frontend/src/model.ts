@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Grid model — server-derived buttons × stored cell positions.
  *
