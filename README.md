@@ -26,7 +26,8 @@ device, where every button shows what it does and lets you change it.
 
 - **A card shaped like the remote.** A Word-style picker sets the grid
   (2×3, 1×4, …); drag buttons into place; rename them. Saved with the
-  remote, so every dashboard shows the same layout. Odd-shaped remote?
+  remote, so every dashboard shows the same layout. 
+ > Odd-shaped remote?
   Switch the card to the **canvas** layout: free-drag, resizable tiles on
   a design surface, with nudge arrows and z-order, for a round dial or a
   remote with an off-grid button.
