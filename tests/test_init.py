@@ -52,3 +52,81 @@ async def test_ws_ping(hass, hass_ws_client) -> None:
 
     assert msg["success"]
     assert msg["result"] == {"version": INTEGRATION_VERSION}
+
+
+async def _setup_device_remote(hass, device_id: str) -> MockConfigEntry:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Test Remote",
+        unique_id=device_id,
+        data={
+            "source": "device_trigger",
+            "source_config": {"device_id": device_id},
+            "layout": {"actions": ["1_single", "1_double"]},
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    return entry
+
+
+async def test_stale_source_device_link_is_dropped(hass, remote_device, device_registry) -> None:
+    """Pre-1744afd remotes tagged the physical device with our entry: untag it, keep it."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Test Remote",
+        unique_id=remote_device,
+        data={
+            "source": "device_trigger",
+            "source_config": {"device_id": remote_device},
+            "layout": {"actions": ["1_single"]},
+        },
+    )
+    entry.add_to_hass(hass)
+    # simulate the old model: the physical (MQTT) device also carries our entry
+    device_registry.async_update_device(remote_device, add_config_entry_id=entry.entry_id)
+    before = device_registry.async_get(remote_device)
+    assert entry.entry_id in before.config_entries
+    others = before.config_entries - {entry.entry_id}
+    assert others  # the MQTT entry
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    physical = device_registry.async_get(remote_device)
+    assert physical is not None, "physical device must survive"
+    assert entry.entry_id not in physical.config_entries
+    assert physical.config_entries == others
+    assert physical.identifiers == before.identifiers
+    # our own device exists and still points at the physical one
+    ours = device_registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    assert ours is not None
+    assert ours.via_device_id == remote_device
+
+
+async def test_source_device_owned_only_by_us_is_kept(hass, remote_device, device_registry) -> None:
+    """Guard: never remove the last config entry — that would delete the device."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Test Remote",
+        unique_id=remote_device,
+        data={
+            "source": "device_trigger",
+            "source_config": {"device_id": remote_device},
+            "layout": {"actions": ["1_single"]},
+        },
+    )
+    entry.add_to_hass(hass)
+    # old model link, then the MQTT entry lets go: ours is the last owner
+    mqtt_entry_id = hass.config_entries.async_entries("mqtt")[0].entry_id
+    device_registry.async_update_device(remote_device, add_config_entry_id=entry.entry_id)
+    device_registry.async_update_device(remote_device, remove_config_entry_id=mqtt_entry_id)
+    assert device_registry.async_get(remote_device).config_entries == {entry.entry_id}
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    kept = device_registry.async_get(remote_device)
+    assert kept is not None, "device must not be deleted"
+    assert entry.entry_id in kept.config_entries

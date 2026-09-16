@@ -81,6 +81,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if device_id := source_config.get(CONF_DEVICE_ID):
         if source_device := device_registry.async_get(device_id):
             via_device = next(iter(source_device.identifiers), None)
+            # Remotes set up before 1744afd attached this entry to the
+            # physical device itself, so it showed twice under the
+            # integration. Drop that stale link — only while another entry
+            # (its own integration's) still owns the device: removing the
+            # last config entry would delete the device from the registry.
+            if (
+                entry.entry_id in source_device.config_entries
+                and len(source_device.config_entries) > 1
+            ):
+                device_registry.async_update_device(
+                    device_id, remove_config_entry_id=entry.entry_id
+                )
         else:
             _LOGGER.warning(
                 "Device %s for remote %s no longer exists", device_id, entry.title
