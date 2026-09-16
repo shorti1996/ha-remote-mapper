@@ -5,7 +5,9 @@ remote — and assign what each button does right there, on the dashboard.**
 
 No blueprints, no one-automation-per-button, no YAML hunting. Pick the
 button, pick the action, done. Everything else (automations, scenes, the
-device's quirks) is handled for you.
+device's quirks) is handled for you. Works with any remote Home Assistant
+can hear — Zigbee (Zigbee2MQTT, ZHA), Matter, plain MQTT, event entities —
+one card, whatever the radio.
 
 <!-- screenshot: the card (replica mode) next to the physical remote -->
 ![Remote Mapper card mirroring a 6-button Zigbee remote](docs/img/hero.png)
@@ -84,14 +86,25 @@ device, where every button shows what it does and lets you change it.
 
 ## Supported remotes
 
-Anything that reaches Home Assistant as one of:
+Remote Mapper is transport-agnostic: it listens for button events and maps
+them, it never talks to the radio. If Home Assistant sees the press, the
+card can map it. Pick the source when adding a remote:
+
+<!-- screenshot: the source-type menu of the config flow -->
+![Add remote: device triggers, Matter, Zigbee2MQTT topic, event entity, generic MQTT](docs/img/sources.png)
 
 | Source | Examples |
 |---|---|
-| **Device triggers** (default) | Zigbee2MQTT and ZHA remotes — Tuya, Aqara, IKEA, Hue, MOES, … |
-| **Matter** multi-button | IKEA BILRESA and other Matter remotes exposing one `event.*` per button |
+| **Device triggers** (default) | Zigbee2MQTT and ZHA remotes — Tuya, Aqara, IKEA, Hue, MOES, … (tested) |
+| **Matter** multi-button | IKEA BILRESA and other Matter remotes exposing one `event.*` per button (tested) |
 | **Event entity** | any `event.*` entity with `event_types` |
 | **Zigbee2MQTT raw topic / generic MQTT** | deCONZ, ESPHome, custom firmware |
+
+Z-Wave remotes (scene device triggers) and Shelly / ESPHome buttons (event
+entities) go through the same two generic paths and should work, but have
+not been tested — an [issue](https://github.com/shorti1996/ha-remote-mapper/issues)
+with the device name is welcome either way. Mixing is fine: a Zigbee remote
+and a Matter remote each get their own card, same editor, same options.
 
 With Zigbee2MQTT 2.x every button and press type is known up front (the
 device definition is read from `bridge/devices`), so all slots exist right
