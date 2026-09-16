@@ -26,6 +26,10 @@ mosquitto_pub -t "zigbee2mqtt/x/action" -m "1_single"
 
 Live smoke test against a running HA (see `ai/local-ha-testing.md`):
 `HA_TOKEN=... MQTT_HOST=... uv run python scripts/e2e_live.py`.
+Browser-level checks (phone viewport, touch, screenshots):
+`HA_TOKEN=... python3 scripts/ui_local.py` — a Playwright template; the
+doc above also covers restart-vs-rebuild rules, the Chrome extension, and
+the production rsync.
 
 The card's canvas engine is vendored from the in-house widget-canvas
 repo (`frontend/src/canvas/`, provenance headers in each file); once that
