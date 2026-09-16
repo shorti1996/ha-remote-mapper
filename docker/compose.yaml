@@ -5,8 +5,9 @@ services:
       - "8123:8123"
     volumes:
       - ./ha-config:/config
-      # HACS-install verification: bind mount disabled (restore for the dev loop)
-      # - ../custom_components/remote_mapper:/config/custom_components/remote_mapper:ro
+      # Dev loop: the repo tree is mounted over whatever HACS installed. To test
+      # a HACS install, comment this line out and recreate the container.
+      - ../custom_components/remote_mapper:/config/custom_components/remote_mapper:ro
     environment:
       - TZ=Europe/Warsaw
     depends_on:
