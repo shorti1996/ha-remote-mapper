@@ -132,8 +132,11 @@ dashboards: add the resource
 
 ## Card options
 
-Everything below is available in the visual card editor; YAML for
-reference:
+Everything below is available in the visual card editor (remote picker,
+layout, display mode, colors — with a live preview); YAML for reference:
+
+<!-- screenshot: the visual card editor with the live preview -->
+![Card editor: remote, title, layout, display mode, popover trigger, colors, live preview](docs/img/card-editor.png)
 
 ```yaml
 type: custom:remote-mapper-card
