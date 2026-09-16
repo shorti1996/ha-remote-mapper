@@ -1,38 +1,673 @@
-function t(t,e,i,s){var o,r=arguments.length,n=r<3?e:null===s?s=Object.getOwnPropertyDescriptor(e,i):s;if("object"==typeof Reflect&&"function"==typeof Reflect.decorate)n=Reflect.decorate(t,e,i,s);else for(var a=t.length-1;a>=0;a--)(o=t[a])&&(n=(r<3?o(n):r>3?o(e,i,n):o(e,i))||n);return r>3&&n&&Object.defineProperty(e,i,n),n}"function"==typeof SuppressedError&&SuppressedError;const e=globalThis,i=e.ShadowRoot&&(void 0===e.ShadyCSS||e.ShadyCSS.nativeShadow)&&"adoptedStyleSheets"in Document.prototype&&"replace"in CSSStyleSheet.prototype,s=Symbol(),o=new WeakMap;let r=class{constructor(t,e,i){if(this._$cssResult$=!0,i!==s)throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");this.cssText=t,this.t=e}get styleSheet(){let t=this.o;const e=this.t;if(i&&void 0===t){const i=void 0!==e&&1===e.length;i&&(t=o.get(e)),void 0===t&&((this.o=t=new CSSStyleSheet).replaceSync(this.cssText),i&&o.set(e,t))}return t}toString(){return this.cssText}};const n=(t,...e)=>{const i=1===t.length?t[0]:e.reduce((e,i,s)=>e+(t=>{if(!0===t._$cssResult$)return t.cssText;if("number"==typeof t)return t;throw Error("Value passed to 'css' function must be a 'css' function result: "+t+". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.")})(i)+t[s+1],t[0]);return new r(i,t,s)},a=i?t=>t:t=>t instanceof CSSStyleSheet?(t=>{let e="";for(const i of t.cssRules)e+=i.cssText;return(t=>new r("string"==typeof t?t:t+"",void 0,s))(e)})(t):t,{is:c,defineProperty:d,getOwnPropertyDescriptor:h,getOwnPropertyNames:l,getOwnPropertySymbols:p,getPrototypeOf:u}=Object,m=globalThis,_=m.trustedTypes,v=_?_.emptyScript:"",f=m.reactiveElementPolyfillSupport,g=(t,e)=>t,y={toAttribute(t,e){switch(e){case Boolean:t=t?v:null;break;case Object:case Array:t=null==t?t:JSON.stringify(t)}return t},fromAttribute(t,e){let i=t;switch(e){case Boolean:i=null!==t;break;case Number:i=null===t?null:Number(t);break;case Object:case Array:try{i=JSON.parse(t)}catch(t){i=null}}return i}},b=(t,e)=>!c(t,e),w={attribute:!0,type:String,converter:y,reflect:!1,useDefault:!1,hasChanged:b};Symbol.metadata??=Symbol("metadata"),m.litPropertyMetadata??=new WeakMap;let $=class extends HTMLElement{static addInitializer(t){this._$Ei(),(this.l??=[]).push(t)}static get observedAttributes(){return this.finalize(),this._$Eh&&[...this._$Eh.keys()]}static createProperty(t,e=w){if(e.state&&(e.attribute=!1),this._$Ei(),this.prototype.hasOwnProperty(t)&&((e=Object.create(e)).wrapped=!0),this.elementProperties.set(t,e),!e.noAccessor){const i=Symbol(),s=this.getPropertyDescriptor(t,i,e);void 0!==s&&d(this.prototype,t,s)}}static getPropertyDescriptor(t,e,i){const{get:s,set:o}=h(this.prototype,t)??{get(){return this[e]},set(t){this[e]=t}};return{get:s,set(e){const r=s?.call(this);o?.call(this,e),this.requestUpdate(t,r,i)},configurable:!0,enumerable:!0}}static getPropertyOptions(t){return this.elementProperties.get(t)??w}static _$Ei(){if(this.hasOwnProperty(g("elementProperties")))return;const t=u(this);t.finalize(),void 0!==t.l&&(this.l=[...t.l]),this.elementProperties=new Map(t.elementProperties)}static finalize(){if(this.hasOwnProperty(g("finalized")))return;if(this.finalized=!0,this._$Ei(),this.hasOwnProperty(g("properties"))){const t=this.properties,e=[...l(t),...p(t)];for(const i of e)this.createProperty(i,t[i])}const t=this[Symbol.metadata];if(null!==t){const e=litPropertyMetadata.get(t);if(void 0!==e)for(const[t,i]of e)this.elementProperties.set(t,i)}this._$Eh=new Map;for(const[t,e]of this.elementProperties){const i=this._$Eu(t,e);void 0!==i&&this._$Eh.set(i,t)}this.elementStyles=this.finalizeStyles(this.styles)}static finalizeStyles(t){const e=[];if(Array.isArray(t)){const i=new Set(t.flat(1/0).reverse());for(const t of i)e.unshift(a(t))}else void 0!==t&&e.push(a(t));return e}static _$Eu(t,e){const i=e.attribute;return!1===i?void 0:"string"==typeof i?i:"string"==typeof t?t.toLowerCase():void 0}constructor(){super(),this._$Ep=void 0,this.isUpdatePending=!1,this.hasUpdated=!1,this._$Em=null,this._$Ev()}_$Ev(){this._$ES=new Promise(t=>this.enableUpdating=t),this._$AL=new Map,this._$E_(),this.requestUpdate(),this.constructor.l?.forEach(t=>t(this))}addController(t){(this._$EO??=new Set).add(t),void 0!==this.renderRoot&&this.isConnected&&t.hostConnected?.()}removeController(t){this._$EO?.delete(t)}_$E_(){const t=new Map,e=this.constructor.elementProperties;for(const i of e.keys())this.hasOwnProperty(i)&&(t.set(i,this[i]),delete this[i]);t.size>0&&(this._$Ep=t)}createRenderRoot(){const t=this.shadowRoot??this.attachShadow(this.constructor.shadowRootOptions);return((t,s)=>{if(i)t.adoptedStyleSheets=s.map(t=>t instanceof CSSStyleSheet?t:t.styleSheet);else for(const i of s){const s=document.createElement("style"),o=e.litNonce;void 0!==o&&s.setAttribute("nonce",o),s.textContent=i.cssText,t.appendChild(s)}})(t,this.constructor.elementStyles),t}connectedCallback(){this.renderRoot??=this.createRenderRoot(),this.enableUpdating(!0),this._$EO?.forEach(t=>t.hostConnected?.())}enableUpdating(t){}disconnectedCallback(){this._$EO?.forEach(t=>t.hostDisconnected?.())}attributeChangedCallback(t,e,i){this._$AK(t,i)}_$ET(t,e){const i=this.constructor.elementProperties.get(t),s=this.constructor._$Eu(t,i);if(void 0!==s&&!0===i.reflect){const o=(void 0!==i.converter?.toAttribute?i.converter:y).toAttribute(e,i.type);this._$Em=t,null==o?this.removeAttribute(s):this.setAttribute(s,o),this._$Em=null}}_$AK(t,e){const i=this.constructor,s=i._$Eh.get(t);if(void 0!==s&&this._$Em!==s){const t=i.getPropertyOptions(s),o="function"==typeof t.converter?{fromAttribute:t.converter}:void 0!==t.converter?.fromAttribute?t.converter:y;this._$Em=s;const r=o.fromAttribute(e,t.type);this[s]=r??this._$Ej?.get(s)??r,this._$Em=null}}requestUpdate(t,e,i,s=!1,o){if(void 0!==t){const r=this.constructor;if(!1===s&&(o=this[t]),i??=r.getPropertyOptions(t),!((i.hasChanged??b)(o,e)||i.useDefault&&i.reflect&&o===this._$Ej?.get(t)&&!this.hasAttribute(r._$Eu(t,i))))return;this.C(t,e,i)}!1===this.isUpdatePending&&(this._$ES=this._$EP())}C(t,e,{useDefault:i,reflect:s,wrapped:o},r){i&&!(this._$Ej??=new Map).has(t)&&(this._$Ej.set(t,r??e??this[t]),!0!==o||void 0!==r)||(this._$AL.has(t)||(this.hasUpdated||i||(e=void 0),this._$AL.set(t,e)),!0===s&&this._$Em!==t&&(this._$Eq??=new Set).add(t))}async _$EP(){this.isUpdatePending=!0;try{await this._$ES}catch(t){Promise.reject(t)}const t=this.scheduleUpdate();return null!=t&&await t,!this.isUpdatePending}scheduleUpdate(){return this.performUpdate()}performUpdate(){if(!this.isUpdatePending)return;if(!this.hasUpdated){if(this.renderRoot??=this.createRenderRoot(),this._$Ep){for(const[t,e]of this._$Ep)this[t]=e;this._$Ep=void 0}const t=this.constructor.elementProperties;if(t.size>0)for(const[e,i]of t){const{wrapped:t}=i,s=this[e];!0!==t||this._$AL.has(e)||void 0===s||this.C(e,void 0,i,s)}}let t=!1;const e=this._$AL;try{t=this.shouldUpdate(e),t?(this.willUpdate(e),this._$EO?.forEach(t=>t.hostUpdate?.()),this.update(e)):this._$EM()}catch(e){throw t=!1,this._$EM(),e}t&&this._$AE(e)}willUpdate(t){}_$AE(t){this._$EO?.forEach(t=>t.hostUpdated?.()),this.hasUpdated||(this.hasUpdated=!0,this.firstUpdated(t)),this.updated(t)}_$EM(){this._$AL=new Map,this.isUpdatePending=!1}get updateComplete(){return this.getUpdateComplete()}getUpdateComplete(){return this._$ES}shouldUpdate(t){return!0}update(t){this._$Eq&&=this._$Eq.forEach(t=>this._$ET(t,this[t])),this._$EM()}updated(t){}firstUpdated(t){}};$.elementStyles=[],$.shadowRootOptions={mode:"open"},$[g("elementProperties")]=new Map,$[g("finalized")]=new Map,f?.({ReactiveElement:$}),(m.reactiveElementVersions??=[]).push("2.1.2");const x=globalThis,k=t=>t,A=x.trustedTypes,E=A?A.createPolicy("lit-html",{createHTML:t=>t}):void 0,S="$lit$",T=`lit$${Math.random().toFixed(9).slice(2)}$`,M="?"+T,z=`<${M}>`,C=document,P=()=>C.createComment(""),O=t=>null===t||"object"!=typeof t&&"function"!=typeof t,I=Array.isArray,q="[ \t\n\f\r]",L=/<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g,D=/-->/g,R=/>/g,H=RegExp(`>|${q}(?:([^\\s"'>=/]+)(${q}*=${q}*(?:[^ \t\n\f\r"'\`<>=]|("|')|))|$)`,"g"),U=/'/g,B=/"/g,N=/^(?:script|style|textarea|title)$/i,j=(t=>(e,...i)=>({_$litType$:t,strings:e,values:i}))(1),W=Symbol.for("lit-noChange"),Y=Symbol.for("lit-nothing"),V=new WeakMap,G=C.createTreeWalker(C,129);function X(t,e){if(!I(t)||!t.hasOwnProperty("raw"))throw Error("invalid template strings array");return void 0!==E?E.createHTML(e):e}const F=(t,e)=>{const i=t.length-1,s=[];let o,r=2===e?"<svg>":3===e?"<math>":"",n=L;for(let e=0;e<i;e++){const i=t[e];let a,c,d=-1,h=0;for(;h<i.length&&(n.lastIndex=h,c=n.exec(i),null!==c);)h=n.lastIndex,n===L?"!--"===c[1]?n=D:void 0!==c[1]?n=R:void 0!==c[2]?(N.test(c[2])&&(o=RegExp("</"+c[2],"g")),n=H):void 0!==c[3]&&(n=H):n===H?">"===c[0]?(n=o??L,d=-1):void 0===c[1]?d=-2:(d=n.lastIndex-c[2].length,a=c[1],n=void 0===c[3]?H:'"'===c[3]?B:U):n===B||n===U?n=H:n===D||n===R?n=L:(n=H,o=void 0);const l=n===H&&t[e+1].startsWith("/>")?" ":"";r+=n===L?i+z:d>=0?(s.push(a),i.slice(0,d)+S+i.slice(d)+T+l):i+T+(-2===d?e:l)}return[X(t,r+(t[i]||"<?>")+(2===e?"</svg>":3===e?"</math>":"")),s]};class K{constructor({strings:t,_$litType$:e},i){let s;this.parts=[];let o=0,r=0;const n=t.length-1,a=this.parts,[c,d]=F(t,e);if(this.el=K.createElement(c,i),G.currentNode=this.el.content,2===e||3===e){const t=this.el.content.firstChild;t.replaceWith(...t.childNodes)}for(;null!==(s=G.nextNode())&&a.length<n;){if(1===s.nodeType){if(s.hasAttributes())for(const t of s.getAttributeNames())if(t.endsWith(S)){const e=d[r++],i=s.getAttribute(t).split(T),n=/([.?@])?(.*)/.exec(e);a.push({type:1,index:o,name:n[2],strings:i,ctor:"."===n[1]?et:"?"===n[1]?it:"@"===n[1]?st:tt}),s.removeAttribute(t)}else t.startsWith(T)&&(a.push({type:6,index:o}),s.removeAttribute(t));if(N.test(s.tagName)){const t=s.textContent.split(T),e=t.length-1;if(e>0){s.textContent=A?A.emptyScript:"";for(let i=0;i<e;i++)s.append(t[i],P()),G.nextNode(),a.push({type:2,index:++o});s.append(t[e],P())}}}else if(8===s.nodeType)if(s.data===M)a.push({type:2,index:o});else{let t=-1;for(;-1!==(t=s.data.indexOf(T,t+1));)a.push({type:7,index:o}),t+=T.length-1}o++}}static createElement(t,e){const i=C.createElement("template");return i.innerHTML=t,i}}function J(t,e,i=t,s){if(e===W)return e;let o=void 0!==s?i._$Co?.[s]:i._$Cl;const r=O(e)?void 0:e._$litDirective$;return o?.constructor!==r&&(o?._$AO?.(!1),void 0===r?o=void 0:(o=new r(t),o._$AT(t,i,s)),void 0!==s?(i._$Co??=[])[s]=o:i._$Cl=o),void 0!==o&&(e=J(t,o._$AS(t,e.values),o,s)),e}class Q{constructor(t,e){this._$AV=[],this._$AN=void 0,this._$AD=t,this._$AM=e}get parentNode(){return this._$AM.parentNode}get _$AU(){return this._$AM._$AU}u(t){const{el:{content:e},parts:i}=this._$AD,s=(t?.creationScope??C).importNode(e,!0);G.currentNode=s;let o=G.nextNode(),r=0,n=0,a=i[0];for(;void 0!==a;){if(r===a.index){let e;2===a.type?e=new Z(o,o.nextSibling,this,t):1===a.type?e=new a.ctor(o,a.name,a.strings,this,t):6===a.type&&(e=new ot(o,this,t)),this._$AV.push(e),a=i[++n]}r!==a?.index&&(o=G.nextNode(),r++)}return G.currentNode=C,s}p(t){let e=0;for(const i of this._$AV)void 0!==i&&(void 0!==i.strings?(i._$AI(t,i,e),e+=i.strings.length-2):i._$AI(t[e])),e++}}class Z{get _$AU(){return this._$AM?._$AU??this._$Cv}constructor(t,e,i,s){this.type=2,this._$AH=Y,this._$AN=void 0,this._$AA=t,this._$AB=e,this._$AM=i,this.options=s,this._$Cv=s?.isConnected??!0}get parentNode(){let t=this._$AA.parentNode;const e=this._$AM;return void 0!==e&&11===t?.nodeType&&(t=e.parentNode),t}get startNode(){return this._$AA}get endNode(){return this._$AB}_$AI(t,e=this){t=J(this,t,e),O(t)?t===Y||null==t||""===t?(this._$AH!==Y&&this._$AR(),this._$AH=Y):t!==this._$AH&&t!==W&&this._(t):void 0!==t._$litType$?this.$(t):void 0!==t.nodeType?this.T(t):(t=>I(t)||"function"==typeof t?.[Symbol.iterator])(t)?this.k(t):this._(t)}O(t){return this._$AA.parentNode.insertBefore(t,this._$AB)}T(t){this._$AH!==t&&(this._$AR(),this._$AH=this.O(t))}_(t){this._$AH!==Y&&O(this._$AH)?this._$AA.nextSibling.data=t:this.T(C.createTextNode(t)),this._$AH=t}$(t){const{values:e,_$litType$:i}=t,s="number"==typeof i?this._$AC(t):(void 0===i.el&&(i.el=K.createElement(X(i.h,i.h[0]),this.options)),i);if(this._$AH?._$AD===s)this._$AH.p(e);else{const t=new Q(s,this),i=t.u(this.options);t.p(e),this.T(i),this._$AH=t}}_$AC(t){let e=V.get(t.strings);return void 0===e&&V.set(t.strings,e=new K(t)),e}k(t){I(this._$AH)||(this._$AH=[],this._$AR());const e=this._$AH;let i,s=0;for(const o of t)s===e.length?e.push(i=new Z(this.O(P()),this.O(P()),this,this.options)):i=e[s],i._$AI(o),s++;s<e.length&&(this._$AR(i&&i._$AB.nextSibling,s),e.length=s)}_$AR(t=this._$AA.nextSibling,e){for(this._$AP?.(!1,!0,e);t!==this._$AB;){const e=k(t).nextSibling;k(t).remove(),t=e}}setConnected(t){void 0===this._$AM&&(this._$Cv=t,this._$AP?.(t))}}class tt{get tagName(){return this.element.tagName}get _$AU(){return this._$AM._$AU}constructor(t,e,i,s,o){this.type=1,this._$AH=Y,this._$AN=void 0,this.element=t,this.name=e,this._$AM=s,this.options=o,i.length>2||""!==i[0]||""!==i[1]?(this._$AH=Array(i.length-1).fill(new String),this.strings=i):this._$AH=Y}_$AI(t,e=this,i,s){const o=this.strings;let r=!1;if(void 0===o)t=J(this,t,e,0),r=!O(t)||t!==this._$AH&&t!==W,r&&(this._$AH=t);else{const s=t;let n,a;for(t=o[0],n=0;n<o.length-1;n++)a=J(this,s[i+n],e,n),a===W&&(a=this._$AH[n]),r||=!O(a)||a!==this._$AH[n],a===Y?t=Y:t!==Y&&(t+=(a??"")+o[n+1]),this._$AH[n]=a}r&&!s&&this.j(t)}j(t){t===Y?this.element.removeAttribute(this.name):this.element.setAttribute(this.name,t??"")}}class et extends tt{constructor(){super(...arguments),this.type=3}j(t){this.element[this.name]=t===Y?void 0:t}}class it extends tt{constructor(){super(...arguments),this.type=4}j(t){this.element.toggleAttribute(this.name,!!t&&t!==Y)}}class st extends tt{constructor(t,e,i,s,o){super(t,e,i,s,o),this.type=5}_$AI(t,e=this){if((t=J(this,t,e,0)??Y)===W)return;const i=this._$AH,s=t===Y&&i!==Y||t.capture!==i.capture||t.once!==i.once||t.passive!==i.passive,o=t!==Y&&(i===Y||s);s&&this.element.removeEventListener(this.name,this,i),o&&this.element.addEventListener(this.name,this,t),this._$AH=t}handleEvent(t){"function"==typeof this._$AH?this._$AH.call(this.options?.host??this.element,t):this._$AH.handleEvent(t)}}class ot{constructor(t,e,i){this.element=t,this.type=6,this._$AN=void 0,this._$AM=e,this.options=i}get _$AU(){return this._$AM._$AU}_$AI(t){J(this,t)}}const rt=x.litHtmlPolyfillSupport;rt?.(K,Z),(x.litHtmlVersions??=[]).push("3.3.3");const nt=globalThis;class at extends ${constructor(){super(...arguments),this.renderOptions={host:this},this._$Do=void 0}createRenderRoot(){const t=super.createRenderRoot();return this.renderOptions.renderBefore??=t.firstChild,t}update(t){const e=this.render();this.hasUpdated||(this.renderOptions.isConnected=this.isConnected),super.update(t),this._$Do=((t,e,i)=>{const s=i?.renderBefore??e;let o=s._$litPart$;if(void 0===o){const t=i?.renderBefore??null;s._$litPart$=o=new Z(e.insertBefore(P(),t),t,void 0,i??{})}return o._$AI(t),o})(e,this.renderRoot,this.renderOptions)}connectedCallback(){super.connectedCallback(),this._$Do?.setConnected(!0)}disconnectedCallback(){super.disconnectedCallback(),this._$Do?.setConnected(!1)}render(){return W}}at._$litElement$=!0,at.finalized=!0,nt.litElementHydrateSupport?.({LitElement:at});const ct=nt.litElementPolyfillSupport;ct?.({LitElement:at}),(nt.litElementVersions??=[]).push("4.2.2");const dt=t=>(e,i)=>{void 0!==i?i.addInitializer(()=>{customElements.define(t,e)}):customElements.define(t,e)},ht={attribute:!0,type:String,converter:y,reflect:!1,hasChanged:b},lt=(t=ht,e,i)=>{const{kind:s,metadata:o}=i;let r=globalThis.litPropertyMetadata.get(o);if(void 0===r&&globalThis.litPropertyMetadata.set(o,r=new Map),"setter"===s&&((t=Object.create(t)).wrapped=!0),r.set(i.name,t),"accessor"===s){const{name:s}=i;return{set(i){const o=e.get.call(this);e.set.call(this,i),this.requestUpdate(s,o,t,!0,i)},init(e){return void 0!==e&&this.C(s,void 0,t,e),e}}}if("setter"===s){const{name:s}=i;return function(i){const o=this[s];e.call(this,i),this.requestUpdate(s,o,t,!0,i)}}throw Error("Unsupported decorator location: "+s)};function pt(t){return(e,i)=>"object"==typeof i?lt(t,e,i):((t,e,i)=>{const s=e.hasOwnProperty(i);return e.constructor.createProperty(i,t),s?Object.getOwnPropertyDescriptor(e,i):void 0})(t,e,i)}function ut(t){return pt({...t,state:!0,attribute:!1})}let mt=null;function _t(){return mt||(mt=window.loadCardHelpers?window.loadCardHelpers():Promise.resolve(null)),mt}let vt=null;function ft(){return customElements.get("ha-form")?Promise.resolve(!0):(vt||(vt=(async()=>{try{const t=await _t(),e=t?.createCardElement?.({type:"entities",entities:[]});await(e?.constructor?.getConfigElement?.())}catch{}const t=await Promise.race([customElements.whenDefined("ha-form").then(()=>!0),new Promise(t=>setTimeout(()=>t(!1),2e3))]),e=t&&!!customElements.get("ha-form");return e||(vt=null),e})()),vt)}let gt=null;const yt=[{value:"assisted",label:"Assisted — press a button, pick the event"},{value:"replica",label:"Replica — tap / double-tap / hold like the physical remote"},{value:"all",label:"All visible — every event of every button"}],bt=[{value:"grid",label:"Grid — buttons arranged like the remote"},{value:"canvas",label:"Canvas — free-drag tiles (legacy)"}],wt=[{value:"auto",label:"Auto — slide with a finger, tap with a mouse"},{value:"tap",label:"Tap opens, tap again closes; tap an option"},{value:"press",label:"Long-press opens; slide to an option and lift"}],$t=[{value:"vertical",label:"Vertical list"},{value:"horizontal",label:"Wrapped row — chips flow like tags"},{value:"compact",label:"Compact icons — one row, name on hover / long-press"},{value:"spines",label:"Spines — one row, names rotated 90°"},{value:"grid",label:"Two-column grid"}];function xt(t){const e=t?.display,i="normal"===e?"replica":e;return yt.some(t=>t.value===i)?i:"assisted"}function kt(t){return"canvas"===t?.layout?"canvas":"grid"}function At(t){const e=t?.assisted_trigger;return"press"===e||"tap"===e?e:"auto"}function Et(t){const e=t?.chips_layout;return $t.some(t=>t.value===e)?e:"vertical"}function St(t){if("string"!=typeof t)return;const e=/^#([0-9a-f]{6})$/i.exec(t.trim());if(!e)return;const i=parseInt(e[1],16);return[i>>16&255,i>>8&255,255&i]}function Tt(t){if(!Array.isArray(t)||3!==t.length)return;const e=t.map(t=>Math.max(0,Math.min(255,0|Number(t))).toString(16).padStart(2,"0"));return`#${e.join("")}`}const Mt="__auto__",zt=["button_color","accent_color","text_color"],Ct="#3f51b5";const Pt={entry_id:"Remote",title:"Title",show_title:"Show title",layout:"Layout",display:"Display mode",assisted_trigger:"Popover opens on",chips_layout:"Event chips",button_color:"Button color",accent_color:"Accent color",text_color:"Text color",button_opacity:"Button opacity"},Ot={title:"Empty = the remote's name.",button_color:"Pad background. Turn the switch off to use the theme.",accent_color:"Borders, assigned marks, flashes. Off = theme primary color.",text_color:"Off = theme text color.",button_opacity:"Pad background only; text stays readable."},It=t=>({select:{mode:"dropdown",options:t}});let qt=class extends at{constructor(){super(...arguments),this._formOk=!1,this._fetching=!1,this._changed=t=>{t.stopPropagation(),this._emit(function(t,e){const i={...t,type:t.type},s=(t,e,s)=>{void 0===e||""===e||s?delete i[t]:i[t]=e};s("entry_id",e.entry_id,e.entry_id===Mt),s("title",e.title,"string"==typeof e.title&&!e.title.trim()),s("show_title",e.show_title,!1!==e.show_title),s("layout",e.layout,"canvas"!==e.layout),s("display",e.display,"assisted"===e.display),s("assisted_trigger",e.assisted_trigger,"auto"===e.assisted_trigger),s("chips_layout",e.chips_layout,"vertical"===e.chips_layout);for(const t of zt){if(!e[`${t}_set`]){delete i[t];continue}const s=Tt(e[t]),o="string"==typeof i[t]?i[t]:void 0;(!o||St(o)||s&&s!==Ct)&&(i[t]=s??o??Ct)}const o=e.button_opacity;return s("button_opacity",o,"number"!=typeof o||o>=1),i}(this._config,t.detail.value))},this._trimOnBlur=()=>{const t=function(t){let e=!1;const i={...t};for(const t of["title",...zt]){const s=i[t];if("string"!=typeof s)continue;const o=s.trim();o!==s&&(e=!0,o?i[t]=o:delete i[t])}return e?i:t}(this._config);t!==this._config&&this._emit(t)}}setConfig(t){this._config=t}connectedCallback(){super.connectedCallback(),ft().then(t=>{this._formOk=t})}willUpdate(){!this.hass||this._remotes||this._fetching||(this._fetching=!0,this.hass.callWS({type:"remote_mapper/list_remotes"}).then(t=>{this._remotes=t.remotes}).catch(()=>{this._remotes=[]}))}render(){const t=this._config;if(!t)return Y;if(!this._formOk)return j`<p class="hint">Loading editor components…</p>`;const e=xt(t),i=[{name:"entry_id",selector:It([{value:Mt,label:"Auto (the only remote)"},...(this._remotes??[]).map(t=>({value:t.entry_id,label:t.title}))])},{name:"title",selector:{text:{}}},{name:"show_title",selector:{boolean:{}}},{name:"layout",selector:It(bt)},{name:"display",selector:It(yt)}];"assisted"===e&&i.push({name:"assisted_trigger",selector:It(wt)}),"all"===e&&i.push({name:"chips_layout",selector:It($t)});for(const e of zt)i.push({name:`${e}_set`,selector:{boolean:{}}}),t[e]&&i.push({name:e,selector:{color_rgb:{}}});i.push({name:"button_opacity",selector:{number:{min:.1,max:1,step:.05,mode:"slider"}}});const s=function(t){return{entry_id:t.entry_id||Mt,title:t.title??"",show_title:!1!==t.show_title,layout:kt(t),display:xt(t),assisted_trigger:At(t),chips_layout:Et(t),button_color_set:!!t.button_color,accent_color_set:!!t.accent_color,text_color_set:!!t.text_color,button_color:St(t.button_color)??[63,81,181],accent_color:St(t.accent_color)??[63,81,181],text_color:St(t.text_color)??[255,255,255],button_opacity:t.button_opacity??1}}(t);return j`
+/******************************************************************************
+Copyright (c) Microsoft Corporation.
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE.
+***************************************************************************** */
+/* global Reflect, Promise, SuppressedError, Symbol, Iterator */
+
+
+function __decorate(decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+}
+
+typeof SuppressedError === "function" ? SuppressedError : function (error, suppressed, message) {
+    var e = new Error(message);
+    return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
+};
+
+/**
+ * @license
+ * Copyright 2019 Google LLC
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+const t$2=globalThis,e$2=t$2.ShadowRoot&&(void 0===t$2.ShadyCSS||t$2.ShadyCSS.nativeShadow)&&"adoptedStyleSheets"in Document.prototype&&"replace"in CSSStyleSheet.prototype,s$2=Symbol(),o$4=new WeakMap;let n$3 = class n{constructor(t,e,o){if(this._$cssResult$=true,o!==s$2)throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");this.cssText=t,this.t=e;}get styleSheet(){let t=this.o;const s=this.t;if(e$2&&void 0===t){const e=void 0!==s&&1===s.length;e&&(t=o$4.get(s)),void 0===t&&((this.o=t=new CSSStyleSheet).replaceSync(this.cssText),e&&o$4.set(s,t));}return t}toString(){return this.cssText}};const r$4=t=>new n$3("string"==typeof t?t:t+"",void 0,s$2),i$3=(t,...e)=>{const o=1===t.length?t[0]:e.reduce((e,s,o)=>e+(t=>{if(true===t._$cssResult$)return t.cssText;if("number"==typeof t)return t;throw Error("Value passed to 'css' function must be a 'css' function result: "+t+". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.")})(s)+t[o+1],t[0]);return new n$3(o,t,s$2)},S$1=(s,o)=>{if(e$2)s.adoptedStyleSheets=o.map(t=>t instanceof CSSStyleSheet?t:t.styleSheet);else for(const e of o){const o=document.createElement("style"),n=t$2.litNonce;void 0!==n&&o.setAttribute("nonce",n),o.textContent=e.cssText,s.appendChild(o);}},c$2=e$2?t=>t:t=>t instanceof CSSStyleSheet?(t=>{let e="";for(const s of t.cssRules)e+=s.cssText;return r$4(e)})(t):t;
+
+/**
+ * @license
+ * Copyright 2017 Google LLC
+ * SPDX-License-Identifier: BSD-3-Clause
+ */const{is:i$2,defineProperty:e$1,getOwnPropertyDescriptor:h$1,getOwnPropertyNames:r$3,getOwnPropertySymbols:o$3,getPrototypeOf:n$2}=Object,a$1=globalThis,c$1=a$1.trustedTypes,l$1=c$1?c$1.emptyScript:"",p$1=a$1.reactiveElementPolyfillSupport,d$1=(t,s)=>t,u$1={toAttribute(t,s){switch(s){case Boolean:t=t?l$1:null;break;case Object:case Array:t=null==t?t:JSON.stringify(t);}return t},fromAttribute(t,s){let i=t;switch(s){case Boolean:i=null!==t;break;case Number:i=null===t?null:Number(t);break;case Object:case Array:try{i=JSON.parse(t);}catch(t){i=null;}}return i}},f$1=(t,s)=>!i$2(t,s),b$1={attribute:true,type:String,converter:u$1,reflect:false,useDefault:false,hasChanged:f$1};Symbol.metadata??=Symbol("metadata"),a$1.litPropertyMetadata??=new WeakMap;let y$1 = class y extends HTMLElement{static addInitializer(t){this._$Ei(),(this.l??=[]).push(t);}static get observedAttributes(){return this.finalize(),this._$Eh&&[...this._$Eh.keys()]}static createProperty(t,s=b$1){if(s.state&&(s.attribute=false),this._$Ei(),this.prototype.hasOwnProperty(t)&&((s=Object.create(s)).wrapped=true),this.elementProperties.set(t,s),!s.noAccessor){const i=Symbol(),h=this.getPropertyDescriptor(t,i,s);void 0!==h&&e$1(this.prototype,t,h);}}static getPropertyDescriptor(t,s,i){const{get:e,set:r}=h$1(this.prototype,t)??{get(){return this[s]},set(t){this[s]=t;}};return {get:e,set(s){const h=e?.call(this);r?.call(this,s),this.requestUpdate(t,h,i);},configurable:true,enumerable:true}}static getPropertyOptions(t){return this.elementProperties.get(t)??b$1}static _$Ei(){if(this.hasOwnProperty(d$1("elementProperties")))return;const t=n$2(this);t.finalize(),void 0!==t.l&&(this.l=[...t.l]),this.elementProperties=new Map(t.elementProperties);}static finalize(){if(this.hasOwnProperty(d$1("finalized")))return;if(this.finalized=true,this._$Ei(),this.hasOwnProperty(d$1("properties"))){const t=this.properties,s=[...r$3(t),...o$3(t)];for(const i of s)this.createProperty(i,t[i]);}const t=this[Symbol.metadata];if(null!==t){const s=litPropertyMetadata.get(t);if(void 0!==s)for(const[t,i]of s)this.elementProperties.set(t,i);}this._$Eh=new Map;for(const[t,s]of this.elementProperties){const i=this._$Eu(t,s);void 0!==i&&this._$Eh.set(i,t);}this.elementStyles=this.finalizeStyles(this.styles);}static finalizeStyles(s){const i=[];if(Array.isArray(s)){const e=new Set(s.flat(1/0).reverse());for(const s of e)i.unshift(c$2(s));}else void 0!==s&&i.push(c$2(s));return i}static _$Eu(t,s){const i=s.attribute;return  false===i?void 0:"string"==typeof i?i:"string"==typeof t?t.toLowerCase():void 0}constructor(){super(),this._$Ep=void 0,this.isUpdatePending=false,this.hasUpdated=false,this._$Em=null,this._$Ev();}_$Ev(){this._$ES=new Promise(t=>this.enableUpdating=t),this._$AL=new Map,this._$E_(),this.requestUpdate(),this.constructor.l?.forEach(t=>t(this));}addController(t){(this._$EO??=new Set).add(t),void 0!==this.renderRoot&&this.isConnected&&t.hostConnected?.();}removeController(t){this._$EO?.delete(t);}_$E_(){const t=new Map,s=this.constructor.elementProperties;for(const i of s.keys())this.hasOwnProperty(i)&&(t.set(i,this[i]),delete this[i]);t.size>0&&(this._$Ep=t);}createRenderRoot(){const t=this.shadowRoot??this.attachShadow(this.constructor.shadowRootOptions);return S$1(t,this.constructor.elementStyles),t}connectedCallback(){this.renderRoot??=this.createRenderRoot(),this.enableUpdating(true),this._$EO?.forEach(t=>t.hostConnected?.());}enableUpdating(t){}disconnectedCallback(){this._$EO?.forEach(t=>t.hostDisconnected?.());}attributeChangedCallback(t,s,i){this._$AK(t,i);}_$ET(t,s){const i=this.constructor.elementProperties.get(t),e=this.constructor._$Eu(t,i);if(void 0!==e&&true===i.reflect){const h=(void 0!==i.converter?.toAttribute?i.converter:u$1).toAttribute(s,i.type);this._$Em=t,null==h?this.removeAttribute(e):this.setAttribute(e,h),this._$Em=null;}}_$AK(t,s){const i=this.constructor,e=i._$Eh.get(t);if(void 0!==e&&this._$Em!==e){const t=i.getPropertyOptions(e),h="function"==typeof t.converter?{fromAttribute:t.converter}:void 0!==t.converter?.fromAttribute?t.converter:u$1;this._$Em=e;const r=h.fromAttribute(s,t.type);this[e]=r??this._$Ej?.get(e)??r,this._$Em=null;}}requestUpdate(t,s,i,e=false,h){if(void 0!==t){const r=this.constructor;if(false===e&&(h=this[t]),i??=r.getPropertyOptions(t),!((i.hasChanged??f$1)(h,s)||i.useDefault&&i.reflect&&h===this._$Ej?.get(t)&&!this.hasAttribute(r._$Eu(t,i))))return;this.C(t,s,i);} false===this.isUpdatePending&&(this._$ES=this._$EP());}C(t,s,{useDefault:i,reflect:e,wrapped:h},r){i&&!(this._$Ej??=new Map).has(t)&&(this._$Ej.set(t,r??s??this[t]),true!==h||void 0!==r)||(this._$AL.has(t)||(this.hasUpdated||i||(s=void 0),this._$AL.set(t,s)),true===e&&this._$Em!==t&&(this._$Eq??=new Set).add(t));}async _$EP(){this.isUpdatePending=true;try{await this._$ES;}catch(t){Promise.reject(t);}const t=this.scheduleUpdate();return null!=t&&await t,!this.isUpdatePending}scheduleUpdate(){return this.performUpdate()}performUpdate(){if(!this.isUpdatePending)return;if(!this.hasUpdated){if(this.renderRoot??=this.createRenderRoot(),this._$Ep){for(const[t,s]of this._$Ep)this[t]=s;this._$Ep=void 0;}const t=this.constructor.elementProperties;if(t.size>0)for(const[s,i]of t){const{wrapped:t}=i,e=this[s];true!==t||this._$AL.has(s)||void 0===e||this.C(s,void 0,i,e);}}let t=false;const s=this._$AL;try{t=this.shouldUpdate(s),t?(this.willUpdate(s),this._$EO?.forEach(t=>t.hostUpdate?.()),this.update(s)):this._$EM();}catch(s){throw t=false,this._$EM(),s}t&&this._$AE(s);}willUpdate(t){}_$AE(t){this._$EO?.forEach(t=>t.hostUpdated?.()),this.hasUpdated||(this.hasUpdated=true,this.firstUpdated(t)),this.updated(t);}_$EM(){this._$AL=new Map,this.isUpdatePending=false;}get updateComplete(){return this.getUpdateComplete()}getUpdateComplete(){return this._$ES}shouldUpdate(t){return  true}update(t){this._$Eq&&=this._$Eq.forEach(t=>this._$ET(t,this[t])),this._$EM();}updated(t){}firstUpdated(t){}};y$1.elementStyles=[],y$1.shadowRootOptions={mode:"open"},y$1[d$1("elementProperties")]=new Map,y$1[d$1("finalized")]=new Map,p$1?.({ReactiveElement:y$1}),(a$1.reactiveElementVersions??=[]).push("2.1.2");
+
+/**
+ * @license
+ * Copyright 2017 Google LLC
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+const t$1=globalThis,i$1=t=>t,s$1=t$1.trustedTypes,e=s$1?s$1.createPolicy("lit-html",{createHTML:t=>t}):void 0,h="$lit$",o$2=`lit$${Math.random().toFixed(9).slice(2)}$`,n$1="?"+o$2,r$2=`<${n$1}>`,l=document,c=()=>l.createComment(""),a=t=>null===t||"object"!=typeof t&&"function"!=typeof t,u=Array.isArray,d=t=>u(t)||"function"==typeof t?.[Symbol.iterator],f="[ \t\n\f\r]",v=/<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g,_=/-->/g,m=/>/g,p=RegExp(`>|${f}(?:([^\\s"'>=/]+)(${f}*=${f}*(?:[^ \t\n\f\r"'\`<>=]|("|')|))|$)`,"g"),g=/'/g,$=/"/g,y=/^(?:script|style|textarea|title)$/i,x=t=>(i,...s)=>({_$litType$:t,strings:i,values:s}),b=x(1),E=Symbol.for("lit-noChange"),A=Symbol.for("lit-nothing"),C=new WeakMap,P=l.createTreeWalker(l,129);function V(t,i){if(!u(t)||!t.hasOwnProperty("raw"))throw Error("invalid template strings array");return void 0!==e?e.createHTML(i):i}const N=(t,i)=>{const s=t.length-1,e=[];let n,l=2===i?"<svg>":3===i?"<math>":"",c=v;for(let i=0;i<s;i++){const s=t[i];let a,u,d=-1,f=0;for(;f<s.length&&(c.lastIndex=f,u=c.exec(s),null!==u);)f=c.lastIndex,c===v?"!--"===u[1]?c=_:void 0!==u[1]?c=m:void 0!==u[2]?(y.test(u[2])&&(n=RegExp("</"+u[2],"g")),c=p):void 0!==u[3]&&(c=p):c===p?">"===u[0]?(c=n??v,d=-1):void 0===u[1]?d=-2:(d=c.lastIndex-u[2].length,a=u[1],c=void 0===u[3]?p:'"'===u[3]?$:g):c===$||c===g?c=p:c===_||c===m?c=v:(c=p,n=void 0);const x=c===p&&t[i+1].startsWith("/>")?" ":"";l+=c===v?s+r$2:d>=0?(e.push(a),s.slice(0,d)+h+s.slice(d)+o$2+x):s+o$2+(-2===d?i:x);}return [V(t,l+(t[s]||"<?>")+(2===i?"</svg>":3===i?"</math>":"")),e]};class S{constructor({strings:t,_$litType$:i},e){let r;this.parts=[];let l=0,a=0;const u=t.length-1,d=this.parts,[f,v]=N(t,i);if(this.el=S.createElement(f,e),P.currentNode=this.el.content,2===i||3===i){const t=this.el.content.firstChild;t.replaceWith(...t.childNodes);}for(;null!==(r=P.nextNode())&&d.length<u;){if(1===r.nodeType){if(r.hasAttributes())for(const t of r.getAttributeNames())if(t.endsWith(h)){const i=v[a++],s=r.getAttribute(t).split(o$2),e=/([.?@])?(.*)/.exec(i);d.push({type:1,index:l,name:e[2],strings:s,ctor:"."===e[1]?I:"?"===e[1]?L:"@"===e[1]?z:H}),r.removeAttribute(t);}else t.startsWith(o$2)&&(d.push({type:6,index:l}),r.removeAttribute(t));if(y.test(r.tagName)){const t=r.textContent.split(o$2),i=t.length-1;if(i>0){r.textContent=s$1?s$1.emptyScript:"";for(let s=0;s<i;s++)r.append(t[s],c()),P.nextNode(),d.push({type:2,index:++l});r.append(t[i],c());}}}else if(8===r.nodeType)if(r.data===n$1)d.push({type:2,index:l});else {let t=-1;for(;-1!==(t=r.data.indexOf(o$2,t+1));)d.push({type:7,index:l}),t+=o$2.length-1;}l++;}}static createElement(t,i){const s=l.createElement("template");return s.innerHTML=t,s}}function M(t,i,s=t,e){if(i===E)return i;let h=void 0!==e?s._$Co?.[e]:s._$Cl;const o=a(i)?void 0:i._$litDirective$;return h?.constructor!==o&&(h?._$AO?.(false),void 0===o?h=void 0:(h=new o(t),h._$AT(t,s,e)),void 0!==e?(s._$Co??=[])[e]=h:s._$Cl=h),void 0!==h&&(i=M(t,h._$AS(t,i.values),h,e)),i}class R{constructor(t,i){this._$AV=[],this._$AN=void 0,this._$AD=t,this._$AM=i;}get parentNode(){return this._$AM.parentNode}get _$AU(){return this._$AM._$AU}u(t){const{el:{content:i},parts:s}=this._$AD,e=(t?.creationScope??l).importNode(i,true);P.currentNode=e;let h=P.nextNode(),o=0,n=0,r=s[0];for(;void 0!==r;){if(o===r.index){let i;2===r.type?i=new k(h,h.nextSibling,this,t):1===r.type?i=new r.ctor(h,r.name,r.strings,this,t):6===r.type&&(i=new Z(h,this,t)),this._$AV.push(i),r=s[++n];}o!==r?.index&&(h=P.nextNode(),o++);}return P.currentNode=l,e}p(t){let i=0;for(const s of this._$AV) void 0!==s&&(void 0!==s.strings?(s._$AI(t,s,i),i+=s.strings.length-2):s._$AI(t[i])),i++;}}class k{get _$AU(){return this._$AM?._$AU??this._$Cv}constructor(t,i,s,e){this.type=2,this._$AH=A,this._$AN=void 0,this._$AA=t,this._$AB=i,this._$AM=s,this.options=e,this._$Cv=e?.isConnected??true;}get parentNode(){let t=this._$AA.parentNode;const i=this._$AM;return void 0!==i&&11===t?.nodeType&&(t=i.parentNode),t}get startNode(){return this._$AA}get endNode(){return this._$AB}_$AI(t,i=this){t=M(this,t,i),a(t)?t===A||null==t||""===t?(this._$AH!==A&&this._$AR(),this._$AH=A):t!==this._$AH&&t!==E&&this._(t):void 0!==t._$litType$?this.$(t):void 0!==t.nodeType?this.T(t):d(t)?this.k(t):this._(t);}O(t){return this._$AA.parentNode.insertBefore(t,this._$AB)}T(t){this._$AH!==t&&(this._$AR(),this._$AH=this.O(t));}_(t){this._$AH!==A&&a(this._$AH)?this._$AA.nextSibling.data=t:this.T(l.createTextNode(t)),this._$AH=t;}$(t){const{values:i,_$litType$:s}=t,e="number"==typeof s?this._$AC(t):(void 0===s.el&&(s.el=S.createElement(V(s.h,s.h[0]),this.options)),s);if(this._$AH?._$AD===e)this._$AH.p(i);else {const t=new R(e,this),s=t.u(this.options);t.p(i),this.T(s),this._$AH=t;}}_$AC(t){let i=C.get(t.strings);return void 0===i&&C.set(t.strings,i=new S(t)),i}k(t){u(this._$AH)||(this._$AH=[],this._$AR());const i=this._$AH;let s,e=0;for(const h of t)e===i.length?i.push(s=new k(this.O(c()),this.O(c()),this,this.options)):s=i[e],s._$AI(h),e++;e<i.length&&(this._$AR(s&&s._$AB.nextSibling,e),i.length=e);}_$AR(t=this._$AA.nextSibling,s){for(this._$AP?.(false,true,s);t!==this._$AB;){const s=i$1(t).nextSibling;i$1(t).remove(),t=s;}}setConnected(t){ void 0===this._$AM&&(this._$Cv=t,this._$AP?.(t));}}class H{get tagName(){return this.element.tagName}get _$AU(){return this._$AM._$AU}constructor(t,i,s,e,h){this.type=1,this._$AH=A,this._$AN=void 0,this.element=t,this.name=i,this._$AM=e,this.options=h,s.length>2||""!==s[0]||""!==s[1]?(this._$AH=Array(s.length-1).fill(new String),this.strings=s):this._$AH=A;}_$AI(t,i=this,s,e){const h=this.strings;let o=false;if(void 0===h)t=M(this,t,i,0),o=!a(t)||t!==this._$AH&&t!==E,o&&(this._$AH=t);else {const e=t;let n,r;for(t=h[0],n=0;n<h.length-1;n++)r=M(this,e[s+n],i,n),r===E&&(r=this._$AH[n]),o||=!a(r)||r!==this._$AH[n],r===A?t=A:t!==A&&(t+=(r??"")+h[n+1]),this._$AH[n]=r;}o&&!e&&this.j(t);}j(t){t===A?this.element.removeAttribute(this.name):this.element.setAttribute(this.name,t??"");}}class I extends H{constructor(){super(...arguments),this.type=3;}j(t){this.element[this.name]=t===A?void 0:t;}}class L extends H{constructor(){super(...arguments),this.type=4;}j(t){this.element.toggleAttribute(this.name,!!t&&t!==A);}}class z extends H{constructor(t,i,s,e,h){super(t,i,s,e,h),this.type=5;}_$AI(t,i=this){if((t=M(this,t,i,0)??A)===E)return;const s=this._$AH,e=t===A&&s!==A||t.capture!==s.capture||t.once!==s.once||t.passive!==s.passive,h=t!==A&&(s===A||e);e&&this.element.removeEventListener(this.name,this,s),h&&this.element.addEventListener(this.name,this,t),this._$AH=t;}handleEvent(t){"function"==typeof this._$AH?this._$AH.call(this.options?.host??this.element,t):this._$AH.handleEvent(t);}}class Z{constructor(t,i,s){this.element=t,this.type=6,this._$AN=void 0,this._$AM=i,this.options=s;}get _$AU(){return this._$AM._$AU}_$AI(t){M(this,t);}}const B=t$1.litHtmlPolyfillSupport;B?.(S,k),(t$1.litHtmlVersions??=[]).push("3.3.3");const D=(t,i,s)=>{const e=s?.renderBefore??i;let h=e._$litPart$;if(void 0===h){const t=s?.renderBefore??null;e._$litPart$=h=new k(i.insertBefore(c(),t),t,void 0,s??{});}return h._$AI(t),h};
+
+/**
+ * @license
+ * Copyright 2017 Google LLC
+ * SPDX-License-Identifier: BSD-3-Clause
+ */const s=globalThis;class i extends y$1{constructor(){super(...arguments),this.renderOptions={host:this},this._$Do=void 0;}createRenderRoot(){const t=super.createRenderRoot();return this.renderOptions.renderBefore??=t.firstChild,t}update(t){const r=this.render();this.hasUpdated||(this.renderOptions.isConnected=this.isConnected),super.update(t),this._$Do=D(r,this.renderRoot,this.renderOptions);}connectedCallback(){super.connectedCallback(),this._$Do?.setConnected(true);}disconnectedCallback(){super.disconnectedCallback(),this._$Do?.setConnected(false);}render(){return E}}i._$litElement$=true,i["finalized"]=true,s.litElementHydrateSupport?.({LitElement:i});const o$1=s.litElementPolyfillSupport;o$1?.({LitElement:i});(s.litElementVersions??=[]).push("4.2.2");
+
+/**
+ * @license
+ * Copyright 2017 Google LLC
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+const t=t=>(e,o)=>{ void 0!==o?o.addInitializer(()=>{customElements.define(t,e);}):customElements.define(t,e);};
+
+/**
+ * @license
+ * Copyright 2017 Google LLC
+ * SPDX-License-Identifier: BSD-3-Clause
+ */const o={attribute:true,type:String,converter:u$1,reflect:false,hasChanged:f$1},r$1=(t=o,e,r)=>{const{kind:n,metadata:i}=r;let s=globalThis.litPropertyMetadata.get(i);if(void 0===s&&globalThis.litPropertyMetadata.set(i,s=new Map),"setter"===n&&((t=Object.create(t)).wrapped=true),s.set(r.name,t),"accessor"===n){const{name:o}=r;return {set(r){const n=e.get.call(this);e.set.call(this,r),this.requestUpdate(o,n,t,true,r);},init(e){return void 0!==e&&this.C(o,void 0,t,e),e}}}if("setter"===n){const{name:o}=r;return function(r){const n=this[o];e.call(this,r),this.requestUpdate(o,n,t,true,r);}}throw Error("Unsupported decorator location: "+n)};function n(t){return (e,o)=>"object"==typeof o?r$1(t,e,o):((t,e,o)=>{const r=e.hasOwnProperty(o);return e.constructor.createProperty(o,t),r?Object.getOwnPropertyDescriptor(e,o):void 0})(t,e,o)}
+
+/**
+ * @license
+ * Copyright 2017 Google LLC
+ * SPDX-License-Identifier: BSD-3-Clause
+ */function r(r){return n({...r,state:true,attribute:false})}
+
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+/**
+ * Vendored from widget-canvas-ha src/editor/ha-loader.ts +
+ * src/util/actions.ts loadHelpers (verbatim).
+ *
+ * HA lazy-loads its editor components (ha-form, selectors,
+ * ha-yaml-editor) with the editor dialogs. Custom cards can force that
+ * chunk in by instantiating a built-in card's config editor — the
+ * standard boilerplate-card trick. Failed attempts are NOT cached so a
+ * slow chunk load can retry.
+ */
+let helpersPromise = null;
+function loadHelpers() {
+    if (!helpersPromise) {
+        helpersPromise = window.loadCardHelpers
+            ? window.loadCardHelpers()
+            : Promise.resolve(null);
+    }
+    return helpersPromise;
+}
+let formPromise = null;
+function ensureHaForm() {
+    if (customElements.get("ha-form"))
+        return Promise.resolve(true);
+    if (!formPromise) {
+        formPromise = (async () => {
+            try {
+                const helpers = await loadHelpers();
+                const card = helpers?.createCardElement?.({ type: "entities", entities: [] });
+                await card?.constructor?.getConfigElement?.();
+            }
+            catch {
+                /* best effort */
+            }
+            // whenDefined never rejects — race it against a timeout
+            const defined = await Promise.race([
+                customElements.whenDefined("ha-form").then(() => true),
+                new Promise((r) => setTimeout(() => r(false), 2000)),
+            ]);
+            const ok = defined && !!customElements.get("ha-form");
+            if (!ok)
+                formPromise = null; // retry on next call
+            return ok;
+        })();
+    }
+    return formPromise;
+}
+let yamlPromise = null;
+/**
+ * ha-yaml-editor parses YAML internally and fires value-changed with
+ * {value, isValid}. Not guaranteed loadable outside the editor dialogs;
+ * callers must handle false (fall back to a textarea).
+ */
+function ensureYamlEditor() {
+    if (customElements.get("ha-yaml-editor"))
+        return Promise.resolve(true);
+    if (!yamlPromise) {
+        yamlPromise = (async () => {
+            try {
+                const helpers = await loadHelpers();
+                // conditional-card editor pulls hui-card-element-editor → ha-yaml-editor
+                const card = helpers?.createCardElement?.({
+                    type: "conditional",
+                    conditions: [],
+                    card: { type: "entities", entities: [] },
+                });
+                await card?.constructor?.getConfigElement?.();
+            }
+            catch {
+                /* best effort */
+            }
+            if (customElements.get("ha-yaml-editor"))
+                return true;
+            await new Promise((r) => setTimeout(r, 300));
+            const ok = !!customElements.get("ha-yaml-editor");
+            if (!ok)
+                yamlPromise = null; // retry on next call
+            return ok;
+        })();
+    }
+    return yamlPromise;
+}
+
+const DISPLAY_MODES = [
+    { value: "assisted", label: "Assisted — press a button, pick the event" },
+    { value: "replica", label: "Replica — tap / double-tap / hold like the physical remote" },
+    { value: "all", label: "All visible — every event of every button" },
+];
+const LAYOUT_KINDS = [
+    { value: "grid", label: "Grid — buttons arranged like the remote" },
+    { value: "canvas", label: "Canvas — free-drag tiles (legacy)" },
+];
+const ASSISTED_TRIGGERS = [
+    { value: "auto", label: "Auto — slide with a finger, tap with a mouse" },
+    { value: "tap", label: "Tap opens, tap again closes; tap an option" },
+    { value: "press", label: "Long-press opens; slide to an option and lift" },
+];
+const CHIPS_LAYOUTS = [
+    { value: "vertical", label: "Vertical list" },
+    { value: "horizontal", label: "Wrapped row — chips flow like tags" },
+    { value: "compact", label: "Compact icons — one row, name on hover / long-press" },
+    { value: "spines", label: "Spines — one row, names rotated 90°" },
+    { value: "grid", label: "Two-column grid" },
+];
+function displayOf(config) {
+    // "normal" was the pre-release name of replica — keep old dashboards working
+    const raw = config?.display;
+    const value = raw === "normal" ? "replica" : raw;
+    return DISPLAY_MODES.some((m) => m.value === value) ? value : "assisted";
+}
+function layoutOf(config) {
+    return config?.layout === "canvas" ? "canvas" : "grid";
+}
+function assistedTriggerOf(config) {
+    const value = config?.assisted_trigger;
+    return value === "press" || value === "tap" ? value : "auto";
+}
+function chipsLayoutOf(config) {
+    const value = config?.chips_layout;
+    return CHIPS_LAYOUTS.some((c) => c.value === value) ? value : "vertical";
+}
+/** "#rrggbb" → [r, g, b] for HA's color_rgb selector; anything else → undefined. */
+function hexToRgb(value) {
+    if (typeof value !== "string")
+        return undefined;
+    const m = /^#([0-9a-f]{6})$/i.exec(value.trim());
+    if (!m)
+        return undefined;
+    const n = parseInt(m[1], 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function rgbToHex(rgb) {
+    if (!Array.isArray(rgb) || rgb.length !== 3)
+        return undefined;
+    const hex = rgb.map((c) => Math.max(0, Math.min(255, Number(c) | 0)).toString(16).padStart(2, "0"));
+    return `#${hex.join("")}`;
+}
+/** Editor sentinel for "no entry_id — use the only remote". */
+const AUTO_REMOTE = "__auto__";
+const COLOR_KEYS = ["button_color", "accent_color", "text_color"];
+const DEFAULT_PICKER_COLOR = "#3f51b5";
+/** What the editor form shows for a config (defaults filled in). */
+function editorValue(config) {
+    return {
+        entry_id: config.entry_id || AUTO_REMOTE,
+        title: config.title ?? "",
+        show_title: config.show_title !== false,
+        layout: layoutOf(config),
+        display: displayOf(config),
+        assisted_trigger: assistedTriggerOf(config),
+        chips_layout: chipsLayoutOf(config),
+        button_color_set: !!config.button_color,
+        accent_color_set: !!config.accent_color,
+        text_color_set: !!config.text_color,
+        button_color: hexToRgb(config.button_color) ?? [63, 81, 181],
+        accent_color: hexToRgb(config.accent_color) ?? [63, 81, 181],
+        text_color: hexToRgb(config.text_color) ?? [255, 255, 255],
+        button_opacity: config.button_opacity ?? 1,
+    };
+}
+/**
+ * Fold an ha-form value back into the card config: defaults are dropped
+ * (so YAML stays minimal), strings are trimmed, keys the editor doesn't
+ * own (HA's grid_options, visibility, …) are preserved untouched.
+ */
+function applyEditorValue(config, value) {
+    const next = { ...config, type: config.type };
+    const set = (key, v, isDefault) => {
+        if (v === undefined || v === "" || isDefault)
+            delete next[key];
+        else
+            next[key] = v;
+    };
+    set("entry_id", value.entry_id, value.entry_id === AUTO_REMOTE);
+    // Not trimmed while typing (a trailing space would vanish under the
+    // cursor); whitespace-only counts as empty.
+    set("title", value.title, typeof value.title === "string" && !value.title.trim());
+    set("show_title", value.show_title, value.show_title !== false);
+    set("layout", value.layout, value.layout !== "canvas");
+    set("display", value.display, value.display === "assisted");
+    set("assisted_trigger", value.assisted_trigger, value.assisted_trigger === "auto");
+    set("chips_layout", value.chips_layout, value.chips_layout === "vertical");
+    for (const key of COLOR_KEYS) {
+        if (!value[`${key}_set`]) {
+            delete next[key];
+            continue;
+        }
+        const picked = rgbToHex(value[key]);
+        const existing = typeof next[key] === "string" ? next[key] : undefined;
+        // A YAML-only value (theme var, rgba()) can't be shown by the picker,
+        // which then holds the seed default — an untouched picker must not
+        // overwrite it. Switch just turned on: seed so the field shows.
+        if (existing && !hexToRgb(existing) && (!picked || picked === DEFAULT_PICKER_COLOR)) {
+            continue;
+        }
+        next[key] = picked ?? existing ?? DEFAULT_PICKER_COLOR;
+    }
+    const opacity = value.button_opacity;
+    set("button_opacity", opacity, typeof opacity !== "number" || opacity >= 1);
+    return next;
+}
+/**
+ * Trim free-text fields; empty ones are dropped. Run when a field loses
+ * focus (typing keeps spaces, see applyEditorValue). Returns the same
+ * object when nothing changes so callers can skip re-emitting.
+ */
+function trimConfigStrings(config) {
+    let changed = false;
+    const next = { ...config };
+    for (const key of ["title", ...COLOR_KEYS]) {
+        const v = next[key];
+        if (typeof v !== "string")
+            continue;
+        const trimmed = v.trim();
+        if (trimmed === v)
+            continue;
+        changed = true;
+        if (trimmed)
+            next[key] = trimmed;
+        else
+            delete next[key];
+    }
+    return changed ? next : config;
+}
+/**
+ * Inline CSS custom properties for the grid element. Unset values fall
+ * through to theme variables (--remote-mapper-*) and then HA defaults.
+ */
+function styleVarsOf(config) {
+    const vars = [];
+    const color = (name, value) => {
+        if (typeof value === "string" && value.trim())
+            vars.push(`${name}:${value.trim()}`);
+    };
+    color("--rm-button-bg", config?.button_color);
+    color("--rm-accent", config?.accent_color);
+    color("--rm-text", config?.text_color);
+    const opacity = config?.button_opacity;
+    if (typeof opacity === "number" && opacity > 0 && opacity < 1) {
+        vars.push(`--rm-opacity:${opacity}`);
+    }
+    return vars.join(";");
+}
+
+const LABELS = {
+    entry_id: "Remote",
+    title: "Title",
+    show_title: "Show title",
+    layout: "Layout",
+    display: "Display mode",
+    assisted_trigger: "Popover opens on",
+    chips_layout: "Event chips",
+    button_color: "Button color",
+    accent_color: "Accent color",
+    text_color: "Text color",
+    button_opacity: "Button opacity",
+};
+const HELPERS = {
+    title: "Empty = the remote's name.",
+    button_color: "Pad background. Turn the switch off to use the theme.",
+    accent_color: "Borders, assigned marks, flashes. Off = theme primary color.",
+    text_color: "Off = theme text color.",
+    button_opacity: "Pad background only; text stays readable.",
+};
+const dropdown = (options) => ({ select: { mode: "dropdown", options } });
+let RemoteMapperCardEditor = class RemoteMapperCardEditor extends i {
+    constructor() {
+        super(...arguments);
+        this._formOk = false;
+        this._fetching = false;
+        this._changed = (e) => {
+            e.stopPropagation();
+            this._emit(applyEditorValue(this._config, e.detail.value));
+        };
+        /** Leaving a text field (or clicking Save, which blurs it) trims it. */
+        this._trimOnBlur = () => {
+            const next = trimConfigStrings(this._config);
+            if (next !== this._config)
+                this._emit(next);
+        };
+    }
+    setConfig(config) {
+        this._config = config;
+    }
+    connectedCallback() {
+        super.connectedCallback();
+        void ensureHaForm().then((ok) => {
+            this._formOk = ok;
+        });
+    }
+    willUpdate() {
+        if (this.hass && !this._remotes && !this._fetching) {
+            this._fetching = true;
+            void this.hass
+                .callWS({ type: "remote_mapper/list_remotes" })
+                .then((res) => {
+                this._remotes = res.remotes;
+            })
+                .catch(() => {
+                this._remotes = [];
+            });
+        }
+    }
+    render() {
+        const config = this._config;
+        if (!config)
+            return A;
+        if (!this._formOk) {
+            return b `<p class="hint">Loading editor components…</p>`;
+        }
+        const display = displayOf(config);
+        const schema = [
+            {
+                name: "entry_id",
+                selector: dropdown([
+                    { value: AUTO_REMOTE, label: "Auto (the only remote)" },
+                    ...(this._remotes ?? []).map((r) => ({ value: r.entry_id, label: r.title })),
+                ]),
+            },
+            { name: "title", selector: { text: {} } },
+            { name: "show_title", selector: { boolean: {} } },
+            { name: "layout", selector: dropdown(LAYOUT_KINDS) },
+            { name: "display", selector: dropdown(DISPLAY_MODES) },
+        ];
+        if (display === "assisted") {
+            schema.push({ name: "assisted_trigger", selector: dropdown(ASSISTED_TRIGGERS) });
+        }
+        if (display === "all") {
+            schema.push({ name: "chips_layout", selector: dropdown(CHIPS_LAYOUTS) });
+        }
+        // Native color picker (HA color_rgb selector) behind an on/off switch so
+        // "use the theme" stays expressible; YAML may still hold any CSS color.
+        for (const key of COLOR_KEYS) {
+            schema.push({ name: `${key}_set`, selector: { boolean: {} } });
+            if (config[key])
+                schema.push({ name: key, selector: { color_rgb: {} } });
+        }
+        schema.push({
+            name: "button_opacity",
+            selector: { number: { min: 0.1, max: 1, step: 0.05, mode: "slider" } },
+        });
+        const data = editorValue(config);
+        return b `
       <ha-form
         .hass=${this.hass}
-        .data=${s}
-        .schema=${i}
-        .computeLabel=${t=>t.name.endsWith("_set")?`Custom ${Pt[t.name.slice(0,-4)].toLowerCase()}`:Pt[t.name]??t.name}
-        .computeHelper=${e=>"display"===e.name&&"canvas"===kt(t)?"Ignored for the canvas layout (every tile is already visible).":Ot[e.name]??""}
+        .data=${data}
+        .schema=${schema}
+        .computeLabel=${(s) => s.name.endsWith("_set")
+            ? `Custom ${LABELS[s.name.slice(0, -4)].toLowerCase()}`
+            : (LABELS[s.name] ?? s.name)}
+        .computeHelper=${(s) => s.name === "display" && layoutOf(config) === "canvas"
+            ? "Ignored for the canvas layout (every tile is already visible)."
+            : (HELPERS[s.name] ?? "")}
         @value-changed=${this._changed}
         @focusout=${this._trimOnBlur}
       ></ha-form>
-    `}_emit(t){this._config=t,this.dispatchEvent(new CustomEvent("config-changed",{detail:{config:t},bubbles:!0,composed:!0}))}};qt.styles=n`
+    `;
+    }
+    _emit(next) {
+        this._config = next;
+        this.dispatchEvent(new CustomEvent("config-changed", {
+            detail: { config: next },
+            bubbles: true,
+            composed: true,
+        }));
+    }
+};
+RemoteMapperCardEditor.styles = i$3 `
     .hint {
       font-size: var(--ha-font-size-m, 14px);
       color: var(--secondary-text-color);
     }
-  `,t([pt({attribute:!1})],qt.prototype,"hass",void 0),t([ut()],qt.prototype,"_config",void 0),t([ut()],qt.prototype,"_remotes",void 0),t([ut()],qt.prototype,"_formOk",void 0),qt=t([dt("remote-mapper-card-editor")],qt);const Lt={single:"1",double:"2",triple:"3",hold:"⧗",release:"↥",other:"•"},Dt={single:"single press",double:"double press",triple:"triple press",hold:"hold",release:"release",other:"other"},Rt=(t,e)=>`${t},${e}`;function Ht(t,e){const i=t&&t.rows>0&&t.cols>0?{rows:t.rows,cols:t.cols}:function(t){if(t<=1)return{rows:1,cols:1};const e=t<=6?2:Math.min(12,Math.ceil(Math.sqrt(t)));return{rows:Math.ceil(t/e),cols:e}}(e.length),s=Math.min(12,i.cols);let o=Math.min(12,i.rows);const r={},n=new Set,a=[];for(const i of e){const e=t?.buttons?.[i.id],c=e?.label?.trim()?{label:e.label.trim()}:{};e&&Number.isInteger(e.row)&&Number.isInteger(e.col)&&e.row>=0&&e.col>=0&&e.row<o&&e.col<s&&!n.has(Rt(e.row,e.col))?(r[i.id]={row:e.row,col:e.col,...c},n.add(Rt(e.row,e.col))):a.push({id:i.id,...c})}let c=0;for(const t of a)for(;;){const e=Math.floor(c/s),i=c%s;if(c++,e>=o&&(o=e+1),!n.has(Rt(e,i))){r[t.id]={row:e,col:i,...t.label?{label:t.label}:{}},n.add(Rt(e,i));break}}return{schema_version:1,rows:o,cols:s,buttons:r}}function Ut(t){const e=new Map;for(const[i,s]of Object.entries(t.buttons))e.set(Rt(s.row,s.col),i);return e}function Bt(t){const e={};for(const[i,s]of Object.entries(t.buttons)){const{label:t,...o}=s,r=t?.trim();e[i]=r?{...o,label:r}:o}return{...t,buttons:e}}function Nt(t,e){return e.buttons[t.id]?.label||t.label}let jt=class extends at{constructor(){super(...arguments),this.rows=1,this.cols=1,this.minCells=1}render(){const t=this._hover??{r:this.rows-1,c:this.cols-1},e=Math.min(12,Math.max(5,t.r+2,this.rows+1)),i=Math.min(12,Math.max(5,t.c+2,this.cols+1)),s=[];for(let o=0;o<e;o++)for(let e=0;e<i;e++)s.push(j`
+  `;
+__decorate([
+    n({ attribute: false })
+], RemoteMapperCardEditor.prototype, "hass", void 0);
+__decorate([
+    r()
+], RemoteMapperCardEditor.prototype, "_config", void 0);
+__decorate([
+    r()
+], RemoteMapperCardEditor.prototype, "_remotes", void 0);
+__decorate([
+    r()
+], RemoteMapperCardEditor.prototype, "_formOk", void 0);
+RemoteMapperCardEditor = __decorate([
+    t("remote-mapper-card-editor")
+], RemoteMapperCardEditor);
+
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+/**
+ * Grid model — server-derived buttons × stored cell positions.
+ *
+ * Pure functions only; the card and the grid element own the state. The
+ * stored layout carries positions + optional label overrides, nothing
+ * else (plan 04 §1.2): the button ↔ action grouping is always derived
+ * server-side, so newly discovered actions land on the right button
+ * without a layout change.
+ */
+const GRID_SCHEMA_VERSION = 1;
+/** Mirrors GRID_MAX in websocket.py. */
+const GRID_MAX = 12;
+const KIND_ICON = {
+    single: "1",
+    double: "2",
+    triple: "3",
+    hold: "⧗",
+    release: "↥",
+    other: "•",
+};
+const KIND_TITLE = {
+    single: "single press",
+    double: "double press",
+    triple: "triple press",
+    hold: "hold",
+    release: "release",
+    other: "other",
+};
+const key = (row, col) => `${row},${col}`;
+/** Default shape for N buttons: 2 columns up to 6 (2×2, 2×3), √N beyond. */
+function autoDims(n) {
+    if (n <= 1)
+        return { rows: 1, cols: 1 };
+    const cols = n <= 6 ? 2 : Math.min(GRID_MAX, Math.ceil(Math.sqrt(n)));
+    return { rows: Math.ceil(n / cols), cols };
+}
+/**
+ * Stored layout (possibly absent, stale or out of range) + the current
+ * button list → a complete layout: every button placed exactly once,
+ * inside rows×cols. Unplaced buttons fill free cells in reading order,
+ * growing rows when the grid is full. Label overrides survive re-flow.
+ */
+function normalizeGrid(stored, buttons) {
+    const dims = stored && stored.rows > 0 && stored.cols > 0
+        ? { rows: stored.rows, cols: stored.cols }
+        : autoDims(buttons.length);
+    const cols = Math.min(GRID_MAX, dims.cols);
+    let rows = Math.min(GRID_MAX, dims.rows);
+    const out = {};
+    const taken = new Set();
+    const unplaced = [];
+    for (const b of buttons) {
+        const pos = stored?.buttons?.[b.id];
+        const label = pos?.label?.trim() ? { label: pos.label.trim() } : {};
+        const inRange = pos &&
+            Number.isInteger(pos.row) &&
+            Number.isInteger(pos.col) &&
+            pos.row >= 0 &&
+            pos.col >= 0 &&
+            pos.row < rows &&
+            pos.col < cols;
+        if (inRange && !taken.has(key(pos.row, pos.col))) {
+            out[b.id] = { row: pos.row, col: pos.col, ...label };
+            taken.add(key(pos.row, pos.col));
+        }
+        else {
+            unplaced.push({ id: b.id, ...label });
+        }
+    }
+    let cursor = 0;
+    for (const b of unplaced) {
+        for (;;) {
+            const row = Math.floor(cursor / cols);
+            const col = cursor % cols;
+            cursor++;
+            if (row >= rows)
+                rows = row + 1;
+            if (!taken.has(key(row, col))) {
+                out[b.id] = { row, col, ...(b.label ? { label: b.label } : {}) };
+                taken.add(key(row, col));
+                break;
+            }
+        }
+    }
+    return { schema_version: GRID_SCHEMA_VERSION, rows, cols, buttons: out };
+}
+/** Change the shape; in-range buttons stay put, the rest re-flow. */
+function resizeGrid(layout, rows, cols, buttons) {
+    return normalizeGrid({ ...layout, rows, cols }, buttons);
+}
+/** "row,col" → button id. */
+function cellMap(layout) {
+    const map = new Map();
+    for (const [id, pos] of Object.entries(layout.buttons)) {
+        map.set(key(pos.row, pos.col), id);
+    }
+    return map;
+}
+/** Move the button at `from` to `to`, swapping with any occupant. */
+function swapCells(layout, from, to) {
+    if (from.row === to.row && from.col === to.col)
+        return layout;
+    const map = cellMap(layout);
+    const a = map.get(key(from.row, from.col));
+    if (!a)
+        return layout;
+    const b = map.get(key(to.row, to.col));
+    const buttons = { ...layout.buttons };
+    buttons[a] = { ...buttons[a], row: to.row, col: to.col };
+    if (b)
+        buttons[b] = { ...buttons[b], row: from.row, col: from.col };
+    return { ...layout, buttons };
+}
+function setButtonLabel(layout, id, label) {
+    const pos = layout.buttons[id];
+    if (!pos)
+        return layout;
+    const { label: _old, ...rest } = pos;
+    // kept as typed while editing (trailing space must survive the cursor);
+    // trimLabels() runs before save
+    return {
+        ...layout,
+        buttons: {
+            ...layout.buttons,
+            [id]: label.trim() ? { ...rest, label } : rest,
+        },
+    };
+}
+/** Trim label overrides (before persisting). */
+function trimLabels(layout) {
+    const buttons = {};
+    for (const [id, pos] of Object.entries(layout.buttons)) {
+        const { label, ...rest } = pos;
+        const trimmed = label?.trim();
+        buttons[id] = trimmed ? { ...rest, label: trimmed } : rest;
+    }
+    return { ...layout, buttons };
+}
+function buttonLabel(button, layout) {
+    return layout.buttons[button.id]?.label || button.label;
+}
+/** First action of a kind, in the server's canonical order. */
+function actionOfKind(button, kind) {
+    return button.actions.find((a) => a.kind === kind);
+}
+
+const BASE_VISIBLE = 5;
+let RemoteMapperGridPicker = class RemoteMapperGridPicker extends i {
+    constructor() {
+        super(...arguments);
+        /** Current shape — highlighted when nothing is hovered. */
+        this.rows = 1;
+        this.cols = 1;
+        /** Button count: picking fewer cells is allowed, the card grows rows. */
+        this.minCells = 1;
+    }
+    render() {
+        const sel = this._hover ?? { r: this.rows - 1, c: this.cols - 1 };
+        const visRows = Math.min(GRID_MAX, Math.max(BASE_VISIBLE, sel.r + 2, this.rows + 1));
+        const visCols = Math.min(GRID_MAX, Math.max(BASE_VISIBLE, sel.c + 2, this.cols + 1));
+        const cells = [];
+        for (let r = 0; r < visRows; r++) {
+            for (let c = 0; c < visCols; c++) {
+                cells.push(b `
           <div
-            class="cell ${o<=t.r&&e<=t.c?"on":""}"
-            @pointerenter=${()=>{this._hover={r:o,c:e}}}
-            @pointerdown=${()=>{this._hover={r:o,c:e}}}
-            @click=${()=>this._pick(o+1,e+1)}
+            class="cell ${r <= sel.r && c <= sel.c ? "on" : ""}"
+            @pointerenter=${() => {
+                    this._hover = { r, c };
+                }}
+            @pointerdown=${() => {
+                    this._hover = { r, c };
+                }}
+            @click=${() => this._pick(r + 1, c + 1)}
           ></div>
-        `);const o=(t.r+1)*(t.c+1);return j`
+        `);
+            }
+        }
+        const picked = (sel.r + 1) * (sel.c + 1);
+        return b `
       <div
         class="matrix"
-        style="grid-template-columns: repeat(${i}, var(--ha-space-7, 28px))"
-        @pointerleave=${()=>{this._hover=void 0}}
+        style="grid-template-columns: repeat(${visCols}, var(--ha-space-7, 28px))"
+        @pointerleave=${() => {
+            this._hover = undefined;
+        }}
       >
-        ${s}
+        ${cells}
       </div>
       <div class="caption">
-        ${t.r+1} rows × ${t.c+1} cols
-        ${o<this.minCells?j`<span class="warn">· grows to fit ${this.minCells} buttons</span>`:""}
+        ${sel.r + 1} rows × ${sel.c + 1} cols
+        ${picked < this.minCells
+            ? b `<span class="warn">· grows to fit ${this.minCells} buttons</span>`
+            : ""}
       </div>
-    `}_pick(t,e){this._hover=void 0,this.dispatchEvent(new CustomEvent("grid-picked",{detail:{rows:t,cols:e},bubbles:!0,composed:!0}))}};jt.styles=n`
+    `;
+    }
+    _pick(rows, cols) {
+        this._hover = undefined;
+        this.dispatchEvent(new CustomEvent("grid-picked", {
+            detail: { rows, cols },
+            bubbles: true,
+            composed: true,
+        }));
+    }
+};
+RemoteMapperGridPicker.styles = i$3 `
     :host {
       display: block;
       user-select: none;
@@ -64,89 +699,612 @@ function t(t,e,i,s){var o,r=arguments.length,n=r<3?e:null===s?s=Object.getOwnPro
     .warn {
       color: var(--warning-color, #ffa600);
     }
-  `,t([pt({type:Number})],jt.prototype,"rows",void 0),t([pt({type:Number})],jt.prototype,"cols",void 0),t([pt({type:Number})],jt.prototype,"minCells",void 0),t([ut()],jt.prototype,"_hover",void 0),jt=t([dt("remote-mapper-grid-picker")],jt);const Wt={holdMs:500,multiMs:280,moveTolerance:10};class Yt{constructor(t,e={}){this._emit=t,this._taps=0,this._caps={double:!1,triple:!1,hold:!1},this._held=!1,this._down=!1,this._startX=0,this._startY=0,this._opts={...Wt,...e}}get pending(){return void 0!==this._multiTimer}down(t,e){this._down||(this._down=!0,this._held=!1,this._caps=e,this._startX=t.clientX,this._startY=t.clientY,void 0!==this._multiTimer&&(clearTimeout(this._multiTimer),this._multiTimer=void 0),e.hold&&(this._holdTimer=setTimeout(()=>{this._holdTimer=void 0,this._held=!0,this._taps=0,this._emit("hold")},this._opts.holdMs)))}move(t){if(!this._down)return;const e=t.clientX-this._startX,i=t.clientY-this._startY;e*e+i*i>this._opts.moveTolerance**2&&this.cancel()}up(){if(!this._down)return;if(this._down=!1,this._clearHold(),this._held)return this._held=!1,void this._emit("release");this._taps++;const{double:t,triple:e}=this._caps;this._taps>=3||2===this._taps&&!e||1===this._taps&&!t&&!e?this._flush():this._multiTimer=setTimeout(()=>{this._multiTimer=void 0,this._flush()},this._opts.multiMs)}cancel(){this._down=!1,this._held=!1,this._taps=0,this._clearHold(),void 0!==this._multiTimer&&(clearTimeout(this._multiTimer),this._multiTimer=void 0)}_flush(){const t=this._taps;this._taps=0,t>=3?this._emit("triple"):2===t?this._emit("double"):1===t&&this._emit("single")}_clearHold(){void 0!==this._holdTimer&&(clearTimeout(this._holdTimer),this._holdTimer=void 0)}}let Vt=class extends at{constructor(){super(...arguments),this.buttons=[],this.slots={},this.display="assisted",this.editing=!1,this.assistedTrigger="auto",this.chipsLayout="vertical",this._chipTipShown=!1,this._pressMode="tap",this._pressActive=!1,this._touchMoveBlocker=t=>{this._pressActive&&t.cancelable&&t.preventDefault()},this._recognizers=new Map,this._chipPressEnd=()=>{void 0!==this._chipTipTimer&&(clearTimeout(this._chipTipTimer),this._chipTipTimer=void 0)}}connectedCallback(){super.connectedCallback(),this.addEventListener("touchmove",this._touchMoveBlocker,{passive:!1})}disconnectedCallback(){super.disconnectedCallback(),this.removeEventListener("touchmove",this._touchMoveBlocker),this._clearPressTimer();for(const t of this._recognizers.values())t.cancel()}_clearPressTimer(){void 0!==this._pressTimer&&(clearTimeout(this._pressTimer),this._pressTimer=void 0)}willUpdate(t){if(t.has("editing")||t.has("display")){this._popover=void 0,this._drag=void 0,this._dropTarget=void 0;for(const t of this._recognizers.values())t.cancel()}}_emit(t,e){this.dispatchEvent(new CustomEvent(t,{detail:e,bubbles:!0,composed:!0}))}_run(t){const e=this.slots[t];e?.assigned&&!e.archived&&this._emit("run-action",{actionId:t})}_chipPressStart(t,e){"compact"===this.chipsLayout&&"mouse"!==t.pointerType&&(this._chipPressEnd(),this._chipTipShown=!1,this._chipTipTimer=setTimeout(()=>{this._chipTipTimer=void 0,this._chipTipShown=!0;const t=this.slots[e],i=this.buttons.flatMap(t=>t.actions).find(t=>t.action_id===e),s=`${i?Dt[i.kind]:e}: ${t?.summary??"unassigned"}`;this._chipTip={action:e,text:s},setTimeout(()=>{this._chipTip?.action===e&&(this._chipTip=void 0)},1800)},450))}_recognizer(t){let e=this._recognizers.get(t.id);return e||(e=new Yt(e=>this._onGesture(t.id,e)),this._recognizers.set(t.id,e)),e}_live(t,e){const i=function(t,e){return t.actions.find(t=>t.kind===e)}(t,e),s=i?this.slots[i.action_id]:void 0;return s?.assigned&&!s.archived?i.action_id:void 0}_caps(t){return{double:!!this._live(t,"double"),triple:!!this._live(t,"triple"),hold:!!this._live(t,"hold")}}_onGesture(t,e){const i=this.buttons.find(e=>e.id===t);if(!i)return;const s=this._live(i,e);s&&this._emit("run-action",{actionId:s})}_elementAt(t,e){return this.shadowRoot?.elementFromPoint(t,e)??null}_cellKeyAt(t,e){const i=this._elementAt(t,e)?.closest(".cell");return void 0!==i?.dataset.row?`${i.dataset.row},${i.dataset.col}`:void 0}_onCellDown(t,e,i,s){if("mouse"===t.pointerType&&0!==t.button)return;const o=t.currentTarget;if(this.editing){o.setPointerCapture(t.pointerId);const r=t.target.closest?.(".chip");return void(this._drag={id:e.id,row:i,col:s,startX:t.clientX,startY:t.clientY,x:t.clientX,y:t.clientY,moved:!1,fromChip:r?.dataset.action})}"replica"===this.display?(o.setPointerCapture(t.pointerId),this._recognizer(e).down(t,this._caps(e))):"assisted"===this.display&&(o.setPointerCapture(t.pointerId),this._pressMode="auto"===this.assistedTrigger?"touch"===t.pointerType?"press":"tap":this.assistedTrigger,this._pressActive=!1,this._clearPressTimer(),"press"===this._pressMode&&(this._pressTimer=setTimeout(()=>{this._pressTimer=void 0,this._pressActive=!0,this._popover=e.id},400)))}_optAt(t,e){const i=this._elementAt(t,e)?.closest(".opt");return i?.dataset.action}_onCellMove(t,e){const i=this._drag;if(i){if(!i.moved){const e=t.clientX-i.startX,s=t.clientY-i.startY;if(e*e+s*s<64)return}return this._drag={...i,moved:!0,x:t.clientX,y:t.clientY},void(this._dropTarget=this._cellKeyAt(t.clientX,t.clientY))}if(!this.editing)if("replica"===this.display)this._recognizers.get(e.id)?.move(t);else if("assisted"===this.display&&this._popover===e.id){const e=this._optAt(t.clientX,t.clientY);e!==this._hoverOpt&&(this._hoverOpt=e)}}_onCellUp(t,e){const i=this._drag;if(i){const t=this._dropTarget;if(this._drag=void 0,this._dropTarget=void 0,i.moved){if(t&&this.layout){const[e,s]=t.split(",").map(Number),o=function(t,e,i){if(e.row===i.row&&e.col===i.col)return t;const s=Ut(t),o=s.get(Rt(e.row,e.col));if(!o)return t;const r=s.get(Rt(i.row,i.col)),n={...t.buttons};return n[o]={...n[o],row:i.row,col:i.col},r&&(n[r]={...n[r],row:e.row,col:e.col}),{...t,buttons:n}}(this.layout,i,{row:e,col:s});o!==this.layout&&this._emit("layout-changed",{layout:o})}}else i.fromChip?this._emit("edit-action",{actionId:i.fromChip}):this._emit("open-button",{buttonId:i.id});return}if("replica"!==this.display){if("assisted"===this.display){const i=this._popover===e.id?this._optAt(t.clientX,t.clientY):void 0;this._hoverOpt=void 0;const s=this._pressActive;this._pressActive=!1,this._clearPressTimer(),i?(this._popover=void 0,this._run(i)):this._popover=s||this._popover===e.id?void 0:e.id}}else this._recognizers.get(e.id)?.up()}_onCellCancel(t){this._drag=void 0,this._dropTarget=void 0,this._hoverOpt=void 0,this._pressActive=!1,this._clearPressTimer(),this._recognizers.get(t.id)?.cancel()}render(){const t=this.layout;if(!t)return Y;const e=Ut(t),i=new Map(this.buttons.map(t=>[t.id,t])),s=[];for(let o=0;o<t.rows;o++)for(let r=0;r<t.cols;r++){const n=e.get(`${o},${r}`),a=n?i.get(n):void 0;s.push(a?this._renderButton(a,t,o,r):this._renderEmpty(o,r))}const o=this._drag,r=o?.moved?i.get(o.id):void 0;return j`
-      ${this._popover?j`<div
+  `;
+__decorate([
+    n({ type: Number })
+], RemoteMapperGridPicker.prototype, "rows", void 0);
+__decorate([
+    n({ type: Number })
+], RemoteMapperGridPicker.prototype, "cols", void 0);
+__decorate([
+    n({ type: Number })
+], RemoteMapperGridPicker.prototype, "minCells", void 0);
+__decorate([
+    r()
+], RemoteMapperGridPicker.prototype, "_hover", void 0);
+RemoteMapperGridPicker = __decorate([
+    t("remote-mapper-grid-picker")
+], RemoteMapperGridPicker);
+
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+/**
+ * Tap recognizer for the "replica" display mode: dashboard gestures on a
+ * button cell map 1:1 to the physical remote's events (tap → single,
+ * double-tap → double, triple → triple, hold → hold, lift after hold →
+ * release).
+ *
+ * Capability-aware: the multi-tap wait only applies when the button has a
+ * double/triple action, so single-only buttons fire on lift. Movement past
+ * a small tolerance (or a pointercancel from the browser taking over for a
+ * scroll) aborts the gesture.
+ */
+const DEFAULTS = { holdMs: 500, multiMs: 280, moveTolerance: 10 };
+class TapRecognizer {
+    constructor(_emit, opts = {}) {
+        this._emit = _emit;
+        this._taps = 0;
+        this._caps = { double: false, triple: false, hold: false };
+        this._held = false;
+        this._down = false;
+        this._startX = 0;
+        this._startY = 0;
+        this._opts = { ...DEFAULTS, ...opts };
+    }
+    /** True while a multi-tap window is open (cell can show "…"). */
+    get pending() {
+        return this._multiTimer !== undefined;
+    }
+    down(e, caps) {
+        if (this._down)
+            return;
+        this._down = true;
+        this._held = false;
+        this._caps = caps;
+        this._startX = e.clientX;
+        this._startY = e.clientY;
+        // a new press inside the window continues the tap sequence
+        if (this._multiTimer !== undefined) {
+            clearTimeout(this._multiTimer);
+            this._multiTimer = undefined;
+        }
+        if (caps.hold) {
+            this._holdTimer = setTimeout(() => {
+                this._holdTimer = undefined;
+                this._held = true;
+                this._taps = 0;
+                this._emit("hold");
+            }, this._opts.holdMs);
+        }
+    }
+    move(e) {
+        if (!this._down)
+            return;
+        const dx = e.clientX - this._startX;
+        const dy = e.clientY - this._startY;
+        if (dx * dx + dy * dy > this._opts.moveTolerance ** 2)
+            this.cancel();
+    }
+    up() {
+        if (!this._down)
+            return;
+        this._down = false;
+        this._clearHold();
+        if (this._held) {
+            this._held = false;
+            this._emit("release");
+            return;
+        }
+        this._taps++;
+        const { double, triple } = this._caps;
+        if (this._taps >= 3 || (this._taps === 2 && !triple) || (this._taps === 1 && !double && !triple)) {
+            this._flush();
+            return;
+        }
+        this._multiTimer = setTimeout(() => {
+            this._multiTimer = undefined;
+            this._flush();
+        }, this._opts.multiMs);
+    }
+    /** Abort without emitting (scroll, pointercancel, element teardown). */
+    cancel() {
+        this._down = false;
+        this._held = false;
+        this._taps = 0;
+        this._clearHold();
+        if (this._multiTimer !== undefined) {
+            clearTimeout(this._multiTimer);
+            this._multiTimer = undefined;
+        }
+    }
+    _flush() {
+        const taps = this._taps;
+        this._taps = 0;
+        if (taps >= 3)
+            this._emit("triple");
+        else if (taps === 2)
+            this._emit("double");
+        else if (taps === 1)
+            this._emit("single");
+    }
+    _clearHold() {
+        if (this._holdTimer !== undefined) {
+            clearTimeout(this._holdTimer);
+            this._holdTimer = undefined;
+        }
+    }
+}
+const TIP_GAP = 6;
+const TIP_MARGIN = 8;
+/**
+ * Anchor a tooltip under `rect` like a native title bubble: it hangs off
+ * the button's edge that is nearer the viewport edge, so it never runs
+ * off-screen (header icons live at the right, so they open leftwards).
+ */
+function tipAnchor(text, rect, viewportWidth) {
+    const top = rect.bottom + TIP_GAP;
+    const center = (rect.left + rect.right) / 2;
+    return center > viewportWidth / 2
+        ? { text, top, right: Math.max(TIP_MARGIN, viewportWidth - rect.right) }
+        : { text, top, left: Math.max(TIP_MARGIN, rect.left) };
+}
+
+const DRAG_THRESHOLD = 8;
+/** Press mode: hold this long before the fan opens (a quicker tap toggles). */
+const PRESS_OPEN_MS = 400;
+/** Arc radius for assisted options, in % of the cell's width/height. */
+const ARC_RADIUS = 34;
+/**
+ * Pinterest-style fan: angles (degrees clockwise from "up") for n options.
+ * Up to four fan across the top half; more go all the way around.
+ */
+function arcAngles(n) {
+    if (n <= 1)
+        return [0];
+    if (n <= 4) {
+        const span = n === 2 ? 70 : n === 3 ? 120 : 165;
+        return Array.from({ length: n }, (_, i) => -span / 2 + (i * span) / (n - 1));
+    }
+    return Array.from({ length: n }, (_, i) => (i * 360) / n);
+}
+let RemoteMapperGrid = class RemoteMapperGrid extends i {
+    constructor() {
+        super(...arguments);
+        this.buttons = [];
+        this.slots = {};
+        this.display = "assisted";
+        this.editing = false;
+        /** assisted: auto (per pointer type), tap (toggle) or press (hold, slide, lift). */
+        this.assistedTrigger = "auto";
+        /** all: arrangement of a button's event chips. */
+        this.chipsLayout = "vertical";
+        this._chipTipShown = false;
+        /** Trigger resolved at pointerdown (auto → by pointerType), used at pointerup. */
+        this._pressMode = "tap";
+        /** True while a long-press fan is open under a still-down finger. */
+        this._pressActive = false;
+        this._touchMoveBlocker = (e) => {
+            // Once the fan is open under the finger, the slide must not scroll the page.
+            if (this._pressActive && e.cancelable)
+                e.preventDefault();
+        };
+        this._recognizers = new Map();
+        this._chipPressEnd = () => {
+            if (this._chipTipTimer !== undefined) {
+                clearTimeout(this._chipTipTimer);
+                this._chipTipTimer = undefined;
+            }
+        };
+    }
+    connectedCallback() {
+        super.connectedCallback();
+        this.addEventListener("touchmove", this._touchMoveBlocker, { passive: false });
+    }
+    disconnectedCallback() {
+        super.disconnectedCallback();
+        this.removeEventListener("touchmove", this._touchMoveBlocker);
+        this._clearPressTimer();
+        for (const rec of this._recognizers.values())
+            rec.cancel();
+    }
+    _clearPressTimer() {
+        if (this._pressTimer !== undefined) {
+            clearTimeout(this._pressTimer);
+            this._pressTimer = undefined;
+        }
+    }
+    willUpdate(changed) {
+        if (changed.has("editing") || changed.has("display")) {
+            this._popover = undefined;
+            this._drag = undefined;
+            this._dropTarget = undefined;
+            for (const rec of this._recognizers.values())
+                rec.cancel();
+        }
+    }
+    // ── events out ────────────────────────────────────────────────────
+    _emit(type, detail) {
+        this.dispatchEvent(new CustomEvent(type, { detail, bubbles: true, composed: true }));
+    }
+    _run(actionId) {
+        const slot = this.slots[actionId];
+        if (slot?.assigned && !slot.archived)
+            this._emit("run-action", { actionId });
+    }
+    // ── compact chips: long-press tooltip ─────────────────────────────
+    _chipPressStart(e, actionId) {
+        if (this.chipsLayout !== "compact" || e.pointerType === "mouse")
+            return;
+        this._chipPressEnd();
+        this._chipTipShown = false;
+        this._chipTipTimer = setTimeout(() => {
+            this._chipTipTimer = undefined;
+            this._chipTipShown = true;
+            const slot = this.slots[actionId];
+            const kind = this.buttons
+                .flatMap((b) => b.actions)
+                .find((a) => a.action_id === actionId);
+            const text = `${kind ? KIND_TITLE[kind.kind] : actionId}: ${slot?.summary ?? "unassigned"}`;
+            this._chipTip = { action: actionId, text };
+            setTimeout(() => {
+                if (this._chipTip?.action === actionId)
+                    this._chipTip = undefined;
+            }, 1800);
+        }, 450);
+    }
+    // ── replica mode gestures ─────────────────────────────────────────
+    _recognizer(button) {
+        let rec = this._recognizers.get(button.id);
+        if (!rec) {
+            rec = new TapRecognizer((g) => this._onGesture(button.id, g));
+            this._recognizers.set(button.id, rec);
+        }
+        return rec;
+    }
+    _live(button, kind) {
+        const action = actionOfKind(button, kind);
+        const slot = action ? this.slots[action.action_id] : undefined;
+        return slot?.assigned && !slot.archived ? action.action_id : undefined;
+    }
+    _caps(button) {
+        return {
+            double: !!this._live(button, "double"),
+            triple: !!this._live(button, "triple"),
+            hold: !!this._live(button, "hold"),
+        };
+    }
+    _onGesture(buttonId, gesture) {
+        const button = this.buttons.find((b) => b.id === buttonId);
+        if (!button)
+            return;
+        const actionId = this._live(button, gesture);
+        if (actionId)
+            this._emit("run-action", { actionId });
+    }
+    // ── pointer plumbing ──────────────────────────────────────────────
+    _elementAt(x, y) {
+        return this.shadowRoot?.elementFromPoint(x, y) ?? null;
+    }
+    _cellKeyAt(x, y) {
+        const cell = this._elementAt(x, y)?.closest(".cell");
+        return cell?.dataset.row !== undefined
+            ? `${cell.dataset.row},${cell.dataset.col}`
+            : undefined;
+    }
+    _onCellDown(e, button, row, col) {
+        if (e.pointerType === "mouse" && e.button !== 0)
+            return;
+        const el = e.currentTarget;
+        if (this.editing) {
+            el.setPointerCapture(e.pointerId);
+            const chip = e.target.closest?.(".chip");
+            this._drag = {
+                id: button.id,
+                row,
+                col,
+                startX: e.clientX,
+                startY: e.clientY,
+                x: e.clientX,
+                y: e.clientY,
+                moved: false,
+                fromChip: chip?.dataset.action,
+            };
+            return;
+        }
+        if (this.display === "replica") {
+            el.setPointerCapture(e.pointerId);
+            this._recognizer(button).down(e, this._caps(button));
+        }
+        else if (this.display === "assisted") {
+            el.setPointerCapture(e.pointerId);
+            // auto: a finger gets Pinterest press-slide-lift, a mouse/pen gets tap
+            this._pressMode =
+                this.assistedTrigger === "auto"
+                    ? e.pointerType === "touch"
+                        ? "press"
+                        : "tap"
+                    : this.assistedTrigger;
+            // press mode: a long press opens the fan under the finger (slide,
+            // lift); releasing earlier counts as a tap and toggles it instead
+            this._pressActive = false;
+            this._clearPressTimer();
+            if (this._pressMode === "press") {
+                this._pressTimer = setTimeout(() => {
+                    this._pressTimer = undefined;
+                    this._pressActive = true;
+                    this._popover = button.id;
+                }, PRESS_OPEN_MS);
+            }
+        }
+        // "all": chips handle their own clicks
+    }
+    _optAt(x, y) {
+        const opt = this._elementAt(x, y)?.closest(".opt");
+        return opt?.dataset.action;
+    }
+    _onCellMove(e, button) {
+        const drag = this._drag;
+        if (drag) {
+            if (!drag.moved) {
+                const dx = e.clientX - drag.startX;
+                const dy = e.clientY - drag.startY;
+                if (dx * dx + dy * dy < DRAG_THRESHOLD * DRAG_THRESHOLD)
+                    return;
+            }
+            this._drag = { ...drag, moved: true, x: e.clientX, y: e.clientY };
+            this._dropTarget = this._cellKeyAt(e.clientX, e.clientY);
+            return;
+        }
+        if (this.editing)
+            return;
+        if (this.display === "replica") {
+            this._recognizers.get(button.id)?.move(e);
+        }
+        else if (this.display === "assisted" && this._popover === button.id) {
+            const over = this._optAt(e.clientX, e.clientY);
+            if (over !== this._hoverOpt)
+                this._hoverOpt = over;
+        }
+    }
+    _onCellUp(e, button) {
+        const drag = this._drag;
+        if (drag) {
+            const target = this._dropTarget;
+            this._drag = undefined;
+            this._dropTarget = undefined;
+            if (drag.moved) {
+                if (target && this.layout) {
+                    const [row, col] = target.split(",").map(Number);
+                    const next = swapCells(this.layout, drag, { row, col });
+                    if (next !== this.layout)
+                        this._emit("layout-changed", { layout: next });
+                }
+            }
+            else if (drag.fromChip) {
+                this._emit("edit-action", { actionId: drag.fromChip });
+            }
+            else {
+                this._emit("open-button", { buttonId: drag.id });
+            }
+            return;
+        }
+        if (this.display === "replica") {
+            this._recognizers.get(button.id)?.up();
+            return;
+        }
+        if (this.display === "assisted") {
+            const picked = this._popover === button.id
+                ? this._optAt(e.clientX, e.clientY)
+                : undefined;
+            this._hoverOpt = undefined;
+            const wasPress = this._pressActive;
+            this._pressActive = false;
+            this._clearPressTimer();
+            if (picked) {
+                // lifted (or tapped) on an option
+                this._popover = undefined;
+                this._run(picked);
+            }
+            else if (wasPress) {
+                // Pinterest: lifting anywhere else dismisses
+                this._popover = undefined;
+            }
+            else {
+                // tap (or a press released early): toggle this button's fan
+                this._popover = this._popover === button.id ? undefined : button.id;
+            }
+        }
+    }
+    _onCellCancel(button) {
+        this._drag = undefined;
+        this._dropTarget = undefined;
+        this._hoverOpt = undefined;
+        this._pressActive = false;
+        this._clearPressTimer();
+        this._recognizers.get(button.id)?.cancel();
+    }
+    // ── render ────────────────────────────────────────────────────────
+    render() {
+        const layout = this.layout;
+        if (!layout)
+            return A;
+        const map = cellMap(layout);
+        const byId = new Map(this.buttons.map((b) => [b.id, b]));
+        const cells = [];
+        for (let r = 0; r < layout.rows; r++) {
+            for (let c = 0; c < layout.cols; c++) {
+                const id = map.get(`${r},${c}`);
+                const button = id ? byId.get(id) : undefined;
+                cells.push(button ? this._renderButton(button, layout, r, c) : this._renderEmpty(r, c));
+            }
+        }
+        const drag = this._drag;
+        const dragButton = drag?.moved ? byId.get(drag.id) : undefined;
+        return b `
+      ${this._popover
+            ? b `<div
             class="backdrop"
-            @pointerdown=${()=>{this._popover=void 0}}
-          ></div>`:Y}
+            @pointerdown=${() => {
+                this._popover = undefined;
+            }}
+          ></div>`
+            : A}
       <div
-        class="grid ${this.display} ${this.editing?"editing":""}"
-        style="grid-template-columns: repeat(${t.cols}, minmax(0, 1fr))"
+        class="grid ${this.display} ${this.editing ? "editing" : ""}"
+        style="grid-template-columns: repeat(${layout.cols}, minmax(0, 1fr))"
       >
-        ${s}
+        ${cells}
       </div>
-      ${r&&o?j`<div class="ghost" style="left:${o.x}px;top:${o.y}px">
-            ${Nt(r,t)}
-          </div>`:Y}
-    `}_renderEmpty(t,e){const i=`${t},${e}`;return j`<div
-      class="cell empty ${this._dropTarget===i?"drop":""}"
-      data-row=${t}
-      data-col=${e}
-    ></div>`}_renderButton(t,e,i,s){const o=`${i},${s}`,r=this.flash&&t.actions.some(t=>t.action_id===this.flash),n=t.actions.map(t=>this.slots[t.action_id]?.error).find(t=>!!t),a=["cell","btn",this._drag?.id===t.id&&this._drag.moved?"dragging":"",this._dropTarget===o?"drop":"",this._popover===t.id?"active":"",r&&"all"!==this.display?"flash":""].join(" ");return j`
+      ${dragButton && drag
+            ? b `<div class="ghost" style="left:${drag.x}px;top:${drag.y}px">
+            ${buttonLabel(dragButton, layout)}
+          </div>`
+            : A}
+    `;
+    }
+    _renderEmpty(row, col) {
+        const key = `${row},${col}`;
+        return b `<div
+      class="cell empty ${this._dropTarget === key ? "drop" : ""}"
+      data-row=${row}
+      data-col=${col}
+    ></div>`;
+    }
+    _renderButton(button, layout, row, col) {
+        const key = `${row},${col}`;
+        const flashing = this.flash && button.actions.some((a) => a.action_id === this.flash);
+        const error = button.actions
+            .map((a) => this.slots[a.action_id]?.error)
+            .find((e) => !!e);
+        const classes = [
+            "cell",
+            "btn",
+            this._drag?.id === button.id && this._drag.moved ? "dragging" : "",
+            this._dropTarget === key ? "drop" : "",
+            this._popover === button.id ? "active" : "",
+            flashing && this.display !== "all" ? "flash" : "",
+        ].join(" ");
+        return b `
       <div
-        class=${a}
-        data-row=${i}
-        data-col=${s}
-        data-button=${t.id}
-        @pointerdown=${e=>this._onCellDown(e,t,i,s)}
-        @pointermove=${e=>this._onCellMove(e,t)}
-        @pointerup=${e=>this._onCellUp(e,t)}
-        @pointercancel=${()=>this._onCellCancel(t)}
-        @contextmenu=${t=>{("assisted"===this.display||this.editing)&&t.preventDefault()}}
+        class=${classes}
+        data-row=${row}
+        data-col=${col}
+        data-button=${button.id}
+        @pointerdown=${(e) => this._onCellDown(e, button, row, col)}
+        @pointermove=${(e) => this._onCellMove(e, button)}
+        @pointerup=${(e) => this._onCellUp(e, button)}
+        @pointercancel=${() => this._onCellCancel(button)}
+        @contextmenu=${(e) => {
+            if (this.display === "assisted" || this.editing)
+                e.preventDefault();
+        }}
       >
-        <span class="label">${Nt(t,e)}</span>
-        ${"all"===this.display?this._renderChips(t):this._renderCompact(t)}
-        ${this._chipTip&&t.actions.some(t=>t.action_id===this._chipTip.action)?j`<div class="chip-tip">${this._chipTip.text}</div>`:Y}
-        ${n?j`<span class="badge err" title=${n}>!</span>`:Y}
-        ${this._popover===t.id?this._renderPopover(t):Y}
+        <span class="label">${buttonLabel(button, layout)}</span>
+        ${this.display === "all"
+            ? this._renderChips(button)
+            : this._renderCompact(button)}
+        ${this._chipTip && button.actions.some((a) => a.action_id === this._chipTip.action)
+            ? b `<div class="chip-tip">${this._chipTip.text}</div>`
+            : A}
+        ${error
+            ? b `<span class="badge err" title=${error}>!</span>`
+            : A}
+        ${this._popover === button.id ? this._renderPopover(button) : A}
       </div>
-    `}_renderCompact(t){const e=t.actions.filter(t=>this.slots[t.action_id]?.assigned),i=e[0];return j`
+    `;
+    }
+    _renderCompact(button) {
+        const live = button.actions.filter((a) => this.slots[a.action_id]?.assigned);
+        const primary = live[0];
+        return b `
       <span class="summary"
-        >${i?this.slots[i.action_id].summary:"unassigned"}</span
+        >${primary ? this.slots[primary.action_id].summary : "unassigned"}</span
       >
       <span class="kinds">
-        ${t.actions.map(t=>{const e=this.slots[t.action_id],i=e?.assigned&&!e.archived;return j`<span
-            class="kind ${i?"on":""} ${this.flash===t.action_id?"flash":""}"
-            title="${t.event} (${Dt[t.kind]}): ${e?.summary??"unassigned"}"
-            >${Lt[t.kind]}</span
-          >`})}
+        ${button.actions.map((a) => {
+            const slot = this.slots[a.action_id];
+            const on = slot?.assigned && !slot.archived;
+            return b `<span
+            class="kind ${on ? "on" : ""} ${this.flash === a.action_id ? "flash" : ""}"
+            title="${a.event} (${KIND_TITLE[a.kind]}): ${slot?.summary ?? "unassigned"}"
+            >${KIND_ICON[a.kind]}</span
+          >`;
+        })}
       </span>
-    `}_renderChips(t){return j`
+    `;
+    }
+    _renderChips(button) {
+        return b `
       <div class="chips ${this.chipsLayout}">
-        ${t.actions.map(t=>{const e=this.slots[t.action_id],i=["chip",e?.assigned?"on":"",e?.archived?"archived":"",this.flash===t.action_id?"flash":""].join(" ");return j`
+        ${button.actions.map((a) => {
+            const slot = this.slots[a.action_id];
+            const classes = [
+                "chip",
+                slot?.assigned ? "on" : "",
+                slot?.archived ? "archived" : "",
+                this.flash === a.action_id ? "flash" : "",
+            ].join(" ");
+            return b `
             <button
-              class=${i}
-              data-action=${t.action_id}
-              title="${t.event} (${Dt[t.kind]}): ${e?.summary??"unassigned"}"
-              @pointerdown=${e=>this._chipPressStart(e,t.action_id)}
+              class=${classes}
+              data-action=${a.action_id}
+              title="${a.event} (${KIND_TITLE[a.kind]}): ${slot?.summary ?? "unassigned"}"
+              @pointerdown=${(e) => this._chipPressStart(e, a.action_id)}
               @pointerup=${this._chipPressEnd}
               @pointercancel=${this._chipPressEnd}
-              @contextmenu=${t=>{this._chipTip&&t.preventDefault()}}
-              @click=${e=>{if(this._chipTipShown)return e.stopPropagation(),void(this._chipTipShown=!1);this.editing||(e.stopPropagation(),this._run(t.action_id))}}
+              @contextmenu=${(e) => {
+                if (this._chipTip)
+                    e.preventDefault();
+            }}
+              @click=${(e) => {
+                if (this._chipTipShown) {
+                    // long press was "what is this?", not a command
+                    e.stopPropagation();
+                    this._chipTipShown = false;
+                    return;
+                }
+                if (this.editing)
+                    return;
+                e.stopPropagation();
+                this._run(a.action_id);
+            }}
             >
-              <span class="icon">${Lt[t.kind]}</span>
-              <span class="text">${e?.summary??"unassigned"}</span>
-              ${e?.error?j`<span class="err" title=${e.error}>!</span>`:Y}
-              ${e?.stale?j`<span class="stale" title="Source no longer reports this action">stale</span>`:Y}
+              <span class="icon">${KIND_ICON[a.kind]}</span>
+              <span class="text">${slot?.summary ?? "unassigned"}</span>
+              ${slot?.error ? b `<span class="err" title=${slot.error}>!</span>` : A}
+              ${slot?.stale ? b `<span class="stale" title="Source no longer reports this action">stale</span>` : A}
             </button>
-          `})}
+          `;
+        })}
       </div>
-    `}_renderPopover(t){const e=function(t){if(t<=1)return[0];if(t<=4){const e=2===t?70:3===t?120:165;return Array.from({length:t},(i,s)=>-e/2+s*e/(t-1))}return Array.from({length:t},(e,i)=>360*i/t)}(t.actions.length),i=this._hoverOpt?t.actions.find(t=>t.action_id===this._hoverOpt):void 0,s=i?`${Dt[i.kind]}: ${this.slots[i.action_id]?.summary??"unassigned"}`:this._pressActive?"slide to an event, lift to run":"tap an event";return j`
+    `;
+    }
+    _renderPopover(button) {
+        const angles = arcAngles(button.actions.length);
+        const hovered = this._hoverOpt
+            ? button.actions.find((a) => a.action_id === this._hoverOpt)
+            : undefined;
+        const status = hovered
+            ? `${KIND_TITLE[hovered.kind]}: ${this.slots[hovered.action_id]?.summary ?? "unassigned"}`
+            : this._pressActive
+                ? "slide to an event, lift to run"
+                : "tap an event";
+        return b `
       <div class="popover">
-        <div class="opt-status">${s}</div>
-        ${t.actions.map((t,i)=>{const s=this.slots[t.action_id],o=s?.assigned&&!s.archived,r=this._hoverOpt===t.action_id?"hover":"",n=e[i]*Math.PI/180,a=50+34*Math.sin(n),c=50-34*Math.cos(n);return j`
+        <div class="opt-status">${status}</div>
+        ${button.actions.map((a, i) => {
+            const slot = this.slots[a.action_id];
+            const on = slot?.assigned && !slot.archived;
+            const hover = this._hoverOpt === a.action_id ? "hover" : "";
+            const rad = (angles[i] * Math.PI) / 180;
+            const x = 50 + Math.sin(rad) * ARC_RADIUS;
+            const y = 50 - Math.cos(rad) * ARC_RADIUS;
+            return b `
             <div
-              class="opt ${o?"on":""} ${r}"
-              style="--i:${i};left:${a.toFixed(1)}%;top:${c.toFixed(1)}%"
-              data-action=${t.action_id}
+              class="opt ${on ? "on" : ""} ${hover}"
+              style="--i:${i};left:${x.toFixed(1)}%;top:${y.toFixed(1)}%"
+              data-action=${a.action_id}
             >
-              <span class="circle" title="${t.event} (${Dt[t.kind]})"
-                >${Lt[t.kind]}</span
+              <span class="circle" title="${a.event} (${KIND_TITLE[a.kind]})"
+                >${KIND_ICON[a.kind]}</span
               >
             </div>
-          `})}
+          `;
+        })}
       </div>
-    `}};Vt.styles=n`
+    `;
+    }
+};
+RemoteMapperGrid.styles = i$3 `
     :host {
       display: block;
       position: relative;
@@ -555,9 +1713,1634 @@ function t(t,e,i,s){var o,r=arguments.length,n=r<3?e:null===s?s=Object.getOwnPro
         transition: none;
       }
     }
-  `,t([pt({attribute:!1})],Vt.prototype,"buttons",void 0),t([pt({attribute:!1})],Vt.prototype,"layout",void 0),t([pt({attribute:!1})],Vt.prototype,"slots",void 0),t([pt()],Vt.prototype,"display",void 0),t([pt({type:Boolean})],Vt.prototype,"editing",void 0),t([pt()],Vt.prototype,"flash",void 0),t([pt()],Vt.prototype,"assistedTrigger",void 0),t([pt()],Vt.prototype,"chipsLayout",void 0),t([ut()],Vt.prototype,"_popover",void 0),t([ut()],Vt.prototype,"_hoverOpt",void 0),t([ut()],Vt.prototype,"_chipTip",void 0),t([ut()],Vt.prototype,"_drag",void 0),t([ut()],Vt.prototype,"_dropTarget",void 0),Vt=t([dt("remote-mapper-grid")],Vt);function Gt(t,e){return Math.max(e,Math.round(t/e)*e)}function Xt(t,e){return Math.round(t/e)*e}function Ft(t){const e=t.cell;if("number"==typeof e&&Number.isFinite(e))return{x:e,y:e};const i=e??{};return{x:"number"==typeof i.x&&Number.isFinite(i.x)?i.x:10,y:"number"==typeof i.y&&Number.isFinite(i.y)?i.y:10}}function Kt(t){return t.map((t,e)=>({w:t,i:e})).sort((t,e)=>(t.w.z??0)-(e.w.z??0)||t.i-e.i).map(t=>t.w)}function Jt(t,e){const i=new Map;return t.forEach((t,e)=>i.set(t.id,e+1)),e.map(t=>({...t,z:i.get(t.id)??t.z??1}))}function Qt(t){return Jt(Kt(t),t)}const Zt=new Map;function te(t,e){const i={canvasId:t,active:!0,working:e,original:e.map(t=>({...t})),selectedId:null,undoStack:[],dpadMode:"fine"};return Zt.set(t,i),i}function ee(t){return JSON.stringify(ie(t))}function ie(t){if(Array.isArray(t))return t.map(ie);if(t&&"object"==typeof t){const e={};for(const i of Object.keys(t).sort()){const s=t[i];void 0!==s&&(e[i]=ie(s))}return e}return t}function se(t){return null==t?t:JSON.parse(JSON.stringify(t))}class oe{constructor(t){this.session=null,this.drag=null,this.lpStart=null,this.keydownBound=t=>this.onKeyDown(t),this.host=t}get active(){return this.session?.active??!1}get working(){return this.session?.working??[]}get selectedId(){return this.session?.selectedId??null}get selected(){const t=this.selectedId;return t?this.working.find(e=>e.id===t):void 0}get dpadMode(){return this.session?.dpadMode??"fine"}get dpadSteps(){if("fine"===this.dpadMode)return{x:1,y:1};const t=this.host.config();return t?Ft(t.grid):{x:1,y:1}}get dirty(){return!!this.session&&!function(t,e){return ee(t)===ee(e)}(this.session.working,this.session.original)}get canUndo(){return(this.session?.undoStack.length??0)>0}get dragging(){return null!==this.drag}tryResume(){const t=this.host.config(),e=(i=t?.canvas_id,i?Zt.get(i):void 0);var i;return!!e?.active&&(this.session=e,window.addEventListener("keydown",this.keydownBound),!0)}enter(){if(this.session?.active)return;const t=this.host.config();t?.canvas_id&&(this.session=te(t.canvas_id,se(t.widgets)),window.addEventListener("keydown",this.keydownBound),this.host.requestUpdate())}async done(){const t=this.session;if(!t)return;const e=Qt(t.working);this.teardown();if(!await this.host.saveWorking(e)){const i=this.host.config();this.session=te(t.canvasId,e),this.session.original=se(i?.widgets??[]),window.addEventListener("keydown",this.keydownBound)}this.host.requestUpdate()}cancel(){this.session&&(this.dirty&&!window.confirm("Discard layout changes?")||(this.teardown(),this.host.requestUpdate()))}detach(){window.removeEventListener("keydown",this.keydownBound),this.clearDpadRepeat(),this.cancelLongPress(),this.session=null}teardown(){var t;window.removeEventListener("keydown",this.keydownBound),this.clearDpadRepeat(),this.cancelLongPress(),t=this.session?.canvasId,t&&Zt.delete(t),this.session=null,this.drag=null}pushUndo(){const t=this.session;t&&(t.undoStack.push(se(t.working)),t.undoStack.length>25&&t.undoStack.shift())}undo(){const t=this.session;if(!t)return;const e=t.undoStack.pop();e&&(t.working=e,t.selectedId&&!e.some(e=>e.id===t.selectedId)&&(t.selectedId=null),this.host.requestUpdate())}select(t){const e=this.session;e&&(e.selectedId=t,this.host.requestUpdate())}updateWidget(t,e,i){const s=this.session;s&&(!1!==i?.undo&&this.pushUndo(),s.working=s.working.map(i=>i.id===t?{...i,...e}:i),this.host.requestUpdate())}zOp(t){const e=this.session;e?.selectedId&&(this.pushUndo(),e.working=function(t,e,i){const s=Kt(t),o=s.findIndex(t=>t.id===e);if(-1===o)return Qt(t);const r=s.splice(o,1)[0];switch(i){case"forward":s.splice(Math.min(o+1,s.length),0,r);break;case"backward":s.splice(Math.max(o-1,0),0,r);break;case"front":s.push(r);break;case"back":s.unshift(r)}return Jt(s,t)}(e.working,e.selectedId,t),this.host.requestUpdate())}ensureTiles(t,e){const i=this.session;if(!i)return;const s=new Set(i.working.map(t=>t.id)),o=e.filter(t=>!s.has(t));if(!o.length)return;this.pushUndo();const r=o.map((e,s)=>{return{...t(e,s),z:(o=i.working,o.reduce((t,e)=>Math.max(t,e.z??0),0)+1+s)};var o});i.working=[...i.working,...r],this.host.requestUpdate()}toggleDpadStep(){const t=this.session;t&&(t.dpadMode="fine"===t.dpadMode?"cell":"fine",this.host.requestUpdate())}nudge(t,e){const i=this.session,s=this.host.config(),o=this.selected;if(!i||!s||!o)return;const r=re(o.x+t,0,Math.max(0,s.design_size.width-o.w)),n=re(o.y+e,0,Math.max(0,s.design_size.height-o.h));r===o.x&&n===o.y||this.updateWidget(o.id,{x:ne(r),y:ne(n)},{undo:!1})}dpadPress(t,e){if(!this.session)return;this.pushUndo();const i=()=>{const i=this.dpadSteps;this.nudge(t*i.x,e*i.y)};i(),this.clearDpadRepeat(),this.dpadTimer=window.setTimeout(()=>{this.dpadInterval=window.setInterval(i,70)},350)}dpadRelease(){this.clearDpadRepeat()}clearDpadRepeat(){void 0!==this.dpadTimer&&clearTimeout(this.dpadTimer),void 0!==this.dpadInterval&&clearInterval(this.dpadInterval),this.dpadTimer=this.dpadInterval=void 0}onKeyDown(t){if(!this.session?.active)return;if(function(t){const e=t.composedPath();for(const t of e){if(!(t instanceof HTMLElement))continue;const e=t.localName;if("input"===e||"textarea"===e||"select"===e)return!0;if(t.isContentEditable)return!0;const i=t.getAttribute?.("role");if("textbox"===i||"combobox"===i||"searchbox"===i)return!0}return!1}(t))return;switch(t.key){case"Escape":return t.preventDefault(),void this.cancel();case"z":return void((t.ctrlKey||t.metaKey)&&(t.preventDefault(),this.undo()))}const e={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[t.key];if(e&&this.selectedId){t.preventDefault();const i=this.dpadSteps,s=t.shiftKey?5:1;t.repeat||this.pushUndo(),this.nudge(e[0]*i.x*s,e[1]*i.y*s)}}onSlotPointerDown(t,e){const i=this.session;if(!i||this.drag||t.button>0)return;t.preventDefault(),t.stopPropagation(),i.selectedId!==e&&this.select(e);const s=this.working.find(t=>t.id===e);s&&this.startDrag(t,{kind:"move",pointerId:t.pointerId,widgetId:e,startClientX:t.clientX,startClientY:t.clientY,orig:{...s},moved:!1,next:{x:s.x,y:s.y,w:s.w,h:s.h}})}onHandlePointerDown(t,e,i){if(!this.session||this.drag||t.button>0)return;t.preventDefault(),t.stopPropagation();const s=this.working.find(t=>t.id===e);s&&this.startDrag(t,{kind:"resize",pointerId:t.pointerId,widgetId:e,startClientX:t.clientX,startClientY:t.clientY,orig:{...s},corner:i,moved:!1,next:{x:s.x,y:s.y,w:s.w,h:s.h}})}startDrag(t,e){this.drag=e;const i=t.currentTarget;try{i.setPointerCapture(t.pointerId)}catch{}const s=t=>this.onDragMove(t),o=t=>{t.pointerId===e.pointerId&&(i.removeEventListener("pointermove",s),i.removeEventListener("pointerup",o),i.removeEventListener("pointercancel",r),this.finishDrag(!1))},r=t=>{t.pointerId===e.pointerId&&(i.removeEventListener("pointermove",s),i.removeEventListener("pointerup",o),i.removeEventListener("pointercancel",r),this.finishDrag(!0))};i.addEventListener("pointermove",s),i.addEventListener("pointerup",o),i.addEventListener("pointercancel",r)}onDragMove(t){const e=this.drag,i=this.host.config();if(!e||!i||t.pointerId!==e.pointerId)return;const s=this.host.scale()||1,o=(t.clientX-e.startClientX)/s,r=(t.clientY-e.startClientY)/s;if(!e.moved&&Math.hypot(o*s,r*s)<3)return;e.moved=!0;const n=i.design_size,a=Ft(i.grid);if("move"===e.kind)e.next.x=re(e.orig.x+o,0,Math.max(0,n.width-e.orig.w)),e.next.y=re(e.orig.y+r,0,Math.max(0,n.height-e.orig.h));else{const t=e.corner,i=t=>Math.max(a.x,Math.floor(t/a.x)*a.x),s=t=>Math.max(a.y,Math.floor(t/a.y)*a.y);let{x:c,y:d,w:h,h:l}=e.orig;if("se"!==t&&"ne"!==t||(h=e.orig.w+o),"sw"!==t&&"nw"!==t||(h=e.orig.w-o),"se"!==t&&"sw"!==t||(l=e.orig.h+r),"ne"!==t&&"nw"!==t||(l=e.orig.h-r),h=re(Gt(h,a.x),a.x,n.width),l=re(Gt(l,a.y),a.y,n.height),"sw"===t||"nw"===t){const t=e.orig.x+e.orig.w;h>t&&(h=i(t)),c=ne(t-h)}else c+h>n.width&&(h=i(n.width-c));if("ne"===t||"nw"===t){const t=e.orig.y+e.orig.h;l>t&&(l=s(t)),d=ne(t-l)}else d+l>n.height&&(l=s(n.height-d));e.next={x:c,y:d,w:h,h:l}}const c=this.host.slotEl(e.widgetId);c&&(c.style.transform=`translate3d(${e.next.x}px, ${e.next.y}px, 0)`,"resize"===e.kind&&(c.style.width=`${e.next.w}px`,c.style.height=`${e.next.h}px`)),this.updateBadgeText(e.next)}finishDrag(t){const e=this.drag,i=this.host.config();if(this.drag=null,!e||!i)return;if(t||!e.moved)return this.syncSlotStyle(e.widgetId,e.orig),void this.host.requestUpdate();let{x:s,y:o}=e.next;if("move"===e.kind&&i.grid.snap_position){const t=Ft(i.grid);s=re(Xt(s,t.x),0,Math.max(0,i.design_size.width-e.next.w)),o=re(Xt(o,t.y),0,Math.max(0,i.design_size.height-e.next.h))}const r={x:ne(s),y:ne(o),w:e.next.w,h:e.next.h};this.syncSlotStyle(e.widgetId,r),this.updateBadgeText(r),this.pushUndo(),this.updateWidget(e.widgetId,r,{undo:!1})}syncSlotStyle(t,e){const i=this.host.slotEl(t);i&&(i.style.transform=`translate3d(${e.x}px, ${e.y}px, 0)`,i.style.width=`${e.w}px`,i.style.height=`${e.h}px`)}updateBadgeText(t){const e=this.host.badgeEl();e&&(e.textContent=`x ${Math.round(t.x)}  y ${Math.round(t.y)}  ·  ${t.w}×${t.h}`)}onViewPointerDown(t){if(this.session?.active||t.button>0)return;const e=t.composedPath();for(const t of e)if(t instanceof HTMLElement){if(t.classList?.contains("widget-slot"))return;if(t.classList?.contains("pencil"))return}this.lpStart={x:t.clientX,y:t.clientY},this.lpTimer=window.setTimeout(()=>{this.lpTimer=void 0,this.enter()},800)}onViewPointerMove(t){void 0!==this.lpTimer&&this.lpStart&&Math.hypot(t.clientX-this.lpStart.x,t.clientY-this.lpStart.y)>18&&this.cancelLongPress()}cancelLongPress(){void 0!==this.lpTimer&&clearTimeout(this.lpTimer),this.lpTimer=void 0,this.lpStart=null}}function re(t,e,i){return Math.min(i,Math.max(e,t))}function ne(t){return Math.round(100*t)/100}function ae(t){if(t&&"object"==typeof t){const e=t,i="string"==typeof e.message&&e.message?e.message:void 0;if("not_found"===e.code)return`${i??"Remote not found"} — it was removed or never existed. Open the card editor and pick another remote.`;if(i)return i;if(t instanceof Error)return t.message||t.name;try{return JSON.stringify(t)}catch{return String(t)}}return String(t)}const ce={turn_on:"Turn on",turn_off:"Turn off",toggle:"Toggle",open_cover:"Open",close_cover:"Close",stop_cover:"Stop",open_cover_tilt:"Tilt open",close_cover_tilt:"Tilt close",lock:"Lock",unlock:"Unlock",press:"Press",start:"Start",pause:"Pause",stop:"Stop",return_to_base:"Dock",media_play:"Play",media_pause:"Pause",media_play_pause:"Play / pause",media_stop:"Stop",media_next_track:"Next track",media_previous_track:"Previous track",volume_up:"Volume up",volume_down:"Volume down",volume_mute:"Mute",increment:"Increment",decrement:"Decrement",set_value:"Set",set_temperature:"Set temperature",set_hvac_mode:"Set mode",set_preset_mode:"Set preset",trigger:"Trigger",reload:"Reload",notify:"Notify",send_message:"Send message"},de=[["if","Conditional"],["choose","Choose"],["repeat","Repeat"],["parallel","Parallel"],["sequence","Sequence"],["wait_template","Wait"],["wait_for_trigger","Wait"],["delay","Delay"],["event","Fire event"],["variables","Variables"],["stop","Stop"]],he=t=>t.replace(/_/g," ").replace(/^\w/,t=>t.toUpperCase()),le=t=>Array.isArray(t)?t.filter(t=>"string"==typeof t):"string"==typeof t?[t]:[];function pe(t,e){const i=e?.states?.[t]?.attributes?.friendly_name;return"string"==typeof i&&i?i:t}function ue(t,e){if(!t||"object"!=typeof t)return"";const i=t;if("string"==typeof i.alias&&i.alias.trim())return i.alias.trim();if("string"==typeof i.scene)return pe(i.scene,e);for(const[t,e]of de)if(t in i)return e;const s=i.action??i.service;if("string"!=typeof s)return he(Object.keys(i)[0]??"");const[o,r=""]=s.split("."),n=function(t,e){const i=t.target??{},s=[...le(i.entity_id??t.entity_id??t.data?.entity_id).map(t=>pe(t,e)),...le(i.area_id).map(t=>e?.areas?.[t]?.name||t),...le(i.floor_id).map(t=>e?.floors?.[t]?.name||t),...le(i.device_id).map(t=>e?.devices?.[t]?.name_by_user||e?.devices?.[t]?.name||t)];return s.length?1===s.length?s[0]:`${s[0]} +${s.length-1}`:""}(i,e);if("scene"===o&&"turn_on"===r)return n||"Scene";if("script"===o)return"turn_on"===r?n||"Script":pe(s,e);if("select_option"===r){const t=i.data?.option??i.option;return"string"==typeof t&&t?n?`${t} · ${n}`:t:n?`Select · ${n}`:"Select option"}const a=ce[r]??he(r);return n?`${a} ${n}`:a}function me(t,e){if(!t.length)return"";const i=ue(t[0],e);return t.length>1?`${i} +${t.length-1}`:i}const _e="remote-mapper-card",ve=20,fe=new Set(["new_scene","new_automation","new_remote_automation"]);function ge(t){const e=Math.max(1,t.length),i=Math.max(2,Math.ceil(Math.sqrt(e))),s=Math.ceil(e/i);return{schema_version:1,design_size:{width:Math.max(380,120*i+ve),height:80*s+ve},grid:{cell:10,snap_position:!1},widgets:t.map((t,e)=>({id:t,kind:"slot",x:ve+e%i*120,y:ve+80*Math.floor(e/i),w:100,h:60,z:e+1}))}}function ye(t,e,i){const s=t=>[{action:t,target:{entity_id:e}}];return"scene"===t?s("scene.turn_on"):"toggle"===t?s("homeassistant.toggle"):"wled_preset"===t?[{action:"select.select_option",target:{entity_id:e},data:{option:i}}]:s("script.turn_on")}let be=class extends at{constructor(){super(...arguments),this._hostWidth=0,this._gridEditing=!1,this._pickerOpen=!1,this._tipShown=!1,this._modalOpenedAt=0,this._ghostGuard={handleEvent:t=>{Date.now()-this._modalOpenedAt<350&&(t.stopPropagation(),t.preventDefault())},capture:!0},this._editorTab="quick",this._quickMode="scene",this._quickEntity="",this._quickOption="",this._snapEntities=[],this._snapRemember=!1,this._draft="",this._draftName="",this._yamlValid=!0,this._draftMaterialized=!1,this._haFormOk=!1,this._yamlEditorOk=!1,this._clearRemember=!1,this._releaseOpen=!1,this._releaseConvert=!0,this._releaseBusy=!1,this._importSelected=new Set,this._importOverwrite=!1,this._importBusy=!1,this._fetchStarted=!1,this._edit=new oe(this),this._enterGridEdit=()=>{this._remote&&(this._gridDraft=Ht(this._remote.grid_layout,this._remote.buttons??[]),this._gridEditing=!0,this._refreshActions(!0))},this._cancelGridEdit=()=>{this._gridEditing=!1,this._gridDraft=void 0,this._pickerOpen=!1,this._buttonSheet=void 0},this._onGridPicked=t=>{const e=this._gridDraft;var i,s,o,r;e&&this._remote&&(this._gridDraft=(i=e,s=t.detail.rows,o=t.detail.cols,r=this._remote.buttons??[],Ht({...i,rows:s,cols:o},r)),this._pickerOpen=!1)},this._openImport=async()=>{this._importError=void 0,this._importOverwrite=!1,this._importBusy=!1;try{const t=await this._hass.callWS({type:"remote_mapper/scan_import",entry_id:this._entryId});this._importSelected=new Set(t.proposals.flatMap((t,e)=>t.conflict?[]:[e])),this._importScan=t}catch(t){this._error=ae(t)}},this._enterEdit=()=>{this._edit.enter();const t=this._remote?.layout?.actions??[],e=this._currentLayout();if(e){const i=new Map(e.widgets.map(t=>[t.id,t]));this._edit.ensureTiles(t=>i.get(t)??ge([t]).widgets[0],t)}}}_backdropClick(t){return e=>{e.target===e.currentTarget&&(Date.now()-this._modalOpenedAt<350||t())}}set hass(t){this._hass=t,void 0!==this._buttonSheet&&this.requestUpdate(),!this._fetchStarted&&this._config&&(this._fetchStarted=!0,this._initialize())}setConfig(t){this._config=t,this._entryId=t.entry_id,this._fetchStarted=!1,this._cancelGridEdit(),this._hass&&(this._fetchStarted=!0,this._initialize())}getCardSize(){if(this._isGrid()){const t=this._gridLayout(),e="all"===xt(this._config)?2:1;return t?1+t.rows*e:3}const t=this._currentLayout();return t?1+Math.ceil(t.design_size.height/100):3}getGridOptions(){return{columns:12,min_columns:6}}static getConfigElement(){return document.createElement("remote-mapper-card-editor")}static getStubConfig(){return{layout:"grid",display:"assisted"}}connectedCallback(){super.connectedCallback(),this._resizeObserver=new ResizeObserver(t=>{const e=t[0]?.contentRect.width??0;e&&Math.abs(e-this._hostWidth)>.5&&(this._hostWidth=e)}),this._resizeObserver.observe(this),this._edit.tryResume()&&this.requestUpdate(),this._fetchStarted&&!this._unsubEvents&&this._subscribe()}disconnectedCallback(){super.disconnectedCallback(),this._resizeObserver?.disconnect(),this._unsubEvents?.(),this._unsubEvents=void 0,this._unsubActions?.(),this._unsubActions=void 0,this._edit.detach(),clearTimeout(this._tipTimer),clearTimeout(this._tipHideTimer),this._tip=void 0}async _initialize(){try{if(!this._entryId){const t=await this._hass.callWS({type:"remote_mapper/list_remotes"});if(1!==t.remotes.length)return void(this._remoteChoices=t.remotes);this._entryId=t.remotes[0].entry_id}await this._fetchRemote(),await this._subscribe()}catch(t){this._error=ae(t)}}async _subscribe(){this._unsubEvents||(this._unsubEvents=await this._hass.connection.subscribeEvents(t=>{t.data.entry_id===this._entryId&&this._fetchRemote()},"remote_mapper_updated"),this._unsubActions=await this._hass.connection.subscribeEvents(t=>{t.data.entry_id===this._entryId&&this._flashAction(t.data.action_id)},"remote_mapper_action"))}_flashAction(t){this._flash=t,void 0!==this._flashTimer&&clearTimeout(this._flashTimer),this._flashTimer=setTimeout(()=>{this._flashTimer=void 0,this._flash=void 0},400)}async _fetchRemote(){try{this._remote=await this._hass.callWS({type:"remote_mapper/get_remote",entry_id:this._entryId}),this._error=void 0}catch(t){this._error=ae(t)}}config(){return this._currentLayout()}scale(){return this._transform()?.scale??1}slotEl(t){return this.shadowRoot?.querySelector(`[data-slot-id="${CSS.escape(t)}"]`)??null}badgeEl(){return this.shadowRoot?.querySelector(".badge")??null}async saveWorking(t){const e=this._currentLayout();if(!e)return!1;try{return await this._hass.callWS({type:"remote_mapper/save_layout",entry_id:this._entryId,card_layout:{...se(e),widgets:t}}),!0}catch(t){return this.notify(`Layout save failed: ${String(t)}`),!1}}openSettings(t){this._openEditor(t)}_navigate(t){window.history.pushState(null,"",t),window.dispatchEvent(new CustomEvent("location-changed",{detail:{replace:!1}}))}_automationEditPath(t){return t?.materialized&&t.automation_id?`/config/automation/edit/${t.automation_id}`:void 0}_targetEditor(t){const e=(t?.sequence?.length?t.sequence:t?.live_actions??[])[0];if(!e)return;const i=e.action??e.service;let s=e.target?.entity_id??e.entity_id??e.scene;if(Array.isArray(s)&&(s=s[0]),"string"!=typeof s)return;const o=this._hass?.states?.[s]?.attributes?.friendly_name??s;if(s.startsWith("scene.")&&("scene.turn_on"===i||e.scene)){const t=this._hass?.states?.[s]?.attributes?.id;if("string"!=typeof t)return;return{icon:"mdi:palette",title:`Edit scene: ${o}`,path:`/config/scene/edit/${t}`}}if(s.startsWith("script.")&&("script.turn_on"===i||i===s))return{icon:"mdi:script-text",title:`Edit script: ${o}`,path:`/config/script/edit/${s.slice(7)}`};if("string"==typeof i&&i.startsWith("script.")&&"script.turn_on"!==i){const t=i.slice(7);return{icon:"mdi:script-text",title:`Edit script: ${this._hass?.states?.[i]?.attributes?.friendly_name??t}`,path:`/config/script/edit/${t}`}}}_importedSources(t){const e=t?.imported_from;if(!e)return[];return(e.sources?.length?e.sources:[e]).filter(t=>!!t.config_id)}notify(t){window.dispatchEvent(new CustomEvent("hass-notification",{detail:{message:t}}))}_currentLayout(){if(!this._remote)return;const t=this._remote.layout?.actions??[],e=this._remote.card_layout,i=e&&Array.isArray(e.widgets)&&e.design_size?e:ge(t),s=new Set(i.widgets.map(t=>t.id)),o=t.filter(t=>!s.has(t));if(!o.length)return{...i,canvas_id:this._entryId};const r=ge(o).widgets.map((t,e)=>({...t,y:i.design_size.height+ve+80*Math.floor(e/3)}));return{...i,canvas_id:this._entryId,design_size:{width:i.design_size.width,height:i.design_size.height+80*(Math.floor((r.length-1)/3)+1)+ve},widgets:[...i.widgets,...r]}}_transform(){const t=this._currentLayout();if(!t)return;const e=this._hostWidth||this.getBoundingClientRect().width||300;return function(t,e){{const i=Math.max(1,e)/t.width;return{scale:i,offsetX:0,offsetY:0,viewportHeight:t.height*i}}}(t.design_size,e)}_renderTitle(){return!1===this._config?.show_title?j`<span class="title"></span>`:j`<span class="title">${this._config?.title||this._remote?.title}</span>`}_isGrid(){return"grid"===kt(this._config)}_gridLayout(){if(this._remote)return this._gridEditing&&this._gridDraft?this._gridDraft:Ht(this._remote.grid_layout,this._remote.buttons??[])}_slotViews(){const t={};if(!this._remote)return t;const e=new Set(this._remote.stale_actions??[]);for(const i of this._remote.buttons??[])for(const s of i.actions){const i=this._remote.slots[s.action_id];t[s.action_id]={assigned:!!i,archived:!!i?.archived||"off"===this._automationState(i),summary:this._slotSummary(i),error:i?.branch_missing?"The automation has no branch for this event any more — edit the slot to re-add it":i?.last_error??null,stale:e.has(s.action_id)}}return t}async _refreshActions(t=!1){try{const e=await this._hass.callWS({type:"remote_mapper/refresh_actions",entry_id:this._entryId});e.added.length?(this.notify(`Found new actions: ${e.added.join(", ")}`),this._gridEditing&&this._remote&&(await this._fetchRemote(),this._gridDraft=Ht(this._gridDraft,this._remote.buttons??[]))):t||this.notify(e.probed?"No new actions — press each button once (all press types), then refresh again":"This source can't enumerate actions")}catch(t){this.notify(`Refresh failed: ${String(t)}`)}}async _saveGridEdit(){const t=this._gridDraft;if(t)try{await this._hass.callWS({type:"remote_mapper/save_layout",entry_id:this._entryId,grid_layout:Bt(t)}),this._cancelGridEdit()}catch(t){this.notify(`Layout save failed: ${String(t)}`)}else this._cancelGridEdit()}async _runSlot(t){const e=this._remote?.slots[t];if(e&&!e.archived){this._flashAction(t);try{await this._hass.callWS({type:"remote_mapper/run_slot",entry_id:this._entryId,action_id:t})}catch(t){this._error=ae(t)}}}_isLinked(t){return!!t?.materialized&&!!t.automation_id&&!1===t.owned}_automationState(t){const e=t?.automation_entity_id;return e?this._hass?.states?.[e]?.state:void 0}_slotSummary(t){if(!t)return"unassigned";if(t.name)return t.name;if(t.materialized&&t.branch_missing)return"no branch";if(t.materialized&&t.shared_automation)return me(t.live_actions??[],this._hass)||"empty branch";if(t.materialized){const e=t.automation_entity_id,i=e?this._hass?.states?.[e]?.attributes?.friendly_name:void 0;return"string"==typeof i&&i?i:"automation"}return me(t.sequence??[],this._hass)||"empty"}async _openEditor(t){const e=this._remote?.slots[t],i=e?.sequence??[],s=function(t){if(1===t.length&&"object"==typeof t[0]&&t[0]){const e=t[0],i=e.action??e.service,s=e.target?.entity_id??e.entity_id;if("string"==typeof s){if("scene.turn_on"===i)return{mode:"scene",entity:s,option:""};if("homeassistant.toggle"===i)return{mode:"toggle",entity:s,option:""};if("script.turn_on"===i)return{mode:"script",entity:s,option:""};if("select.select_option"===i)return{mode:"wled_preset",entity:s,option:e.data?.option??e.option??""}}}return{mode:"custom",entity:"",option:""}}(i);this._editingAction=t,this._modalOpenedAt=Date.now(),this._quickMode="custom"===s.mode?"scene":s.mode,this._quickEntity=s.entity,this._isLinked(e)&&(this._quickMode="link",this._quickEntity=e?.automation_entity_id??""),this._quickOption=s.option,this._snapEntities=[...this._remote?.snapshot_entities??[]],this._snapRemember=!1,this._editorTab="custom"===s.mode&&i.length?"yaml":"quick",this._draft=JSON.stringify(i,null,2),this._draftName=e?.name??"",this._yamlValue=i,this._yamlValid=!0,this._draftError=void 0,this._draftMaterialized=e?.materialized??!1,this._editingLive=void 0,ft().then(t=>{this._haFormOk=t}),(customElements.get("ha-yaml-editor")?Promise.resolve(!0):(gt||(gt=(async()=>{try{const t=await _t(),e=t?.createCardElement?.({type:"conditional",conditions:[],card:{type:"entities",entities:[]}});await(e?.constructor?.getConfigElement?.())}catch{}if(customElements.get("ha-yaml-editor"))return!0;await new Promise(t=>setTimeout(t,300));const t=!!customElements.get("ha-yaml-editor");return t||(gt=null),t})()),gt)).then(t=>{this._yamlEditorOk=t}),e?.materialized&&this._hass.callWS({type:"remote_mapper/get_slot",entry_id:this._entryId,action_id:t}).then(e=>{this._editingAction===t&&e.live&&(this._editingLive=e.live,this._yamlValue=e.live.actions??[],this._draft=JSON.stringify(e.live.actions??[],null,2),this._editorTab="yaml")})}_closeEditor(){this._editingAction=void 0,this._draftError=void 0,this._editingLive=void 0,this._clearArtifacts=void 0}async _createNew(){const t=this._draftName.trim()||null;try{if("new_scene"===this._quickMode)return this._snapEntities.length?(await this._hass.callWS({type:"remote_mapper/create_snapshot",entry_id:this._entryId,action_id:this._editingAction,entities:this._snapEntities,remember_entities:this._snapRemember,...t?{name:t}:{}}),void this._closeEditor()):void(this._draftError="Pick at least one entity to capture");const e=await this._hass.callWS({type:"remote_mapper/create_automation",entry_id:this._entryId,action_id:this._editingAction,scope:"new_automation"===this._quickMode?"button":"remote",name:t});this._closeEditor(),this._navigate(e.edit_url)}catch(t){this._draftError=t.message??String(t)}}async _saveDraft(){if("quick"===this._editorTab&&fe.has(this._quickMode))return void await this._createNew();const t={type:"remote_mapper/save_slot",entry_id:this._entryId,action_id:this._editingAction,materialized:this._draftMaterialized,name:this._draftName.trim()||null};if("quick"===this._editorTab&&"link"===this._quickMode){if(!this._quickEntity)return void(this._draftError="Pick an automation first");delete t.materialized,t.link_entity_id=this._quickEntity}else if("quick"===this._editorTab){if(!this._quickEntity)return void(this._draftError="Pick an entity first");if("wled_preset"===this._quickMode&&!this._quickOption)return void(this._draftError="Pick a preset first");t.sequence=ye(this._quickMode,this._quickEntity,this._quickOption)}else if(this._yamlEditorOk){if(!this._yamlValid)return void(this._draftError="YAML is not valid");t.sequence=this._yamlValue??[]}else t.sequence_yaml=this._draft;try{await this._hass.callWS(t),this._closeEditor()}catch(t){this._draftError=t.message??String(t)}}async _clearSlot(t){const e=await this._hass.callWS({type:"remote_mapper/clear_slot",entry_id:this._entryId,action_id:this._editingAction,...t?{decision:t,remember:this._clearRemember}:{}});if(e.needs_decision)return this._clearRemember=!1,void(this._clearArtifacts=e.artifacts);this._clearArtifacts=void 0,this._closeEditor()}async _snapshot(t){try{await this._hass.callWS({type:"remote_mapper/create_snapshot",entry_id:this._entryId,action_id:this._editingAction,re_snapshot:t}),this._closeEditor()}catch(t){this._draftError=t.message??String(t)}}async _toggleArchived(){const t=this._remote?.slots[this._editingAction];t&&(await this._hass.callWS({type:"remote_mapper/archive_slot",entry_id:this._entryId,action_id:this._editingAction,archived:!t.archived}),this._closeEditor())}_releasePlan(){let t=0,e=0,i=0,s=0;for(const o of Object.values(this._remote?.slots??{}))o.imported_from?t++:this._isLinked(o)?e++:o.materialized?i++:o.sequence?.length&&!o.archived&&s++;return{imported:t,linked:e,materialized:i,built:s}}async _release(){this._releaseBusy=!0;try{const t=await this._hass.callWS({type:"remote_mapper/release_remote",entry_id:this._entryId,convert_remaining:this._releaseConvert});this._releaseOpen=!1,this._cancelGridEdit(),this._edit.cancel(),this.notify(`Handed back: ${t.reenabled.length} original(s) re-enabled, ${t.converted.length} converted, ${t.kept.length} kept, ${t.dropped.length} dropped.`),this._unsubEvents?.(),this._unsubEvents=void 0,this._unsubActions?.(),this._unsubActions=void 0,this._remote=void 0,this._error="This remote was handed back to Home Assistant and removed from Remote Mapper. Delete this card, or pick another remote in the card editor."}catch(t){this.notify(`Hand back failed: ${t.message??String(t)}`)}finally{this._releaseBusy=!1}}_renderRelease(){const t=this._releasePlan(),e=()=>{this._releaseOpen=!1};return j`
-      <div class="modal-backdrop" @click=${this._backdropClick(e)}>
-        <div class="modal" @click=${t=>t.stopPropagation()}>
+  `;
+__decorate([
+    n({ attribute: false })
+], RemoteMapperGrid.prototype, "buttons", void 0);
+__decorate([
+    n({ attribute: false })
+], RemoteMapperGrid.prototype, "layout", void 0);
+__decorate([
+    n({ attribute: false })
+], RemoteMapperGrid.prototype, "slots", void 0);
+__decorate([
+    n()
+], RemoteMapperGrid.prototype, "display", void 0);
+__decorate([
+    n({ type: Boolean })
+], RemoteMapperGrid.prototype, "editing", void 0);
+__decorate([
+    n()
+], RemoteMapperGrid.prototype, "flash", void 0);
+__decorate([
+    n()
+], RemoteMapperGrid.prototype, "assistedTrigger", void 0);
+__decorate([
+    n()
+], RemoteMapperGrid.prototype, "chipsLayout", void 0);
+__decorate([
+    r()
+], RemoteMapperGrid.prototype, "_popover", void 0);
+__decorate([
+    r()
+], RemoteMapperGrid.prototype, "_hoverOpt", void 0);
+__decorate([
+    r()
+], RemoteMapperGrid.prototype, "_chipTip", void 0);
+__decorate([
+    r()
+], RemoteMapperGrid.prototype, "_drag", void 0);
+__decorate([
+    r()
+], RemoteMapperGrid.prototype, "_dropTarget", void 0);
+RemoteMapperGrid = __decorate([
+    t("remote-mapper-grid")
+], RemoteMapperGrid);
+
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+/**
+ * Vendored from widget-canvas-ha src/model/migrate.ts — the snap/cell
+ * helpers only (normalizeConfig stays upstream; our layout is
+ * server-generated and already normalized).
+ */
+const DEFAULT_CELL = 10;
+function snapSize(v, cell) {
+    return Math.max(cell, Math.round(v / cell) * cell);
+}
+function snapPos(v, cell) {
+    return Math.round(v / cell) * cell;
+}
+/** Resolve a CellSize (number or {x,y}) into per-axis cell sizes. */
+function cellsOf(grid) {
+    const c = grid.cell;
+    if (typeof c === "number" && Number.isFinite(c))
+        return { x: c, y: c };
+    const o = (c ?? {});
+    const x = typeof o.x === "number" && Number.isFinite(o.x) ? o.x : DEFAULT_CELL;
+    const y = typeof o.y === "number" && Number.isFinite(o.y) ? o.y : DEFAULT_CELL;
+    return { x, y };
+}
+
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+/**
+ * Vendored from widget-canvas-ha src/model/zorder.ts (verbatim).
+ * All ops return a NEW widget array with z re-normalized to 1..n
+ * preserving relative order (DDC-proven semantics).
+ */
+function sortedByZ(widgets) {
+    return widgets
+        .map((w, i) => ({ w, i }))
+        .sort((a, b) => (a.w.z ?? 0) - (b.w.z ?? 0) || a.i - b.i)
+        .map((x) => x.w);
+}
+function renumber(ordered, all) {
+    const zById = new Map();
+    ordered.forEach((w, i) => zById.set(w.id, i + 1));
+    return all.map((w) => ({ ...w, z: zById.get(w.id) ?? w.z ?? 1 }));
+}
+function normalizeZ(widgets) {
+    return renumber(sortedByZ(widgets), widgets);
+}
+function applyZOp(widgets, id, op) {
+    const order = sortedByZ(widgets);
+    const idx = order.findIndex((w) => w.id === id);
+    if (idx === -1)
+        return normalizeZ(widgets);
+    const moved = order.splice(idx, 1)[0];
+    switch (op) {
+        case "forward":
+            order.splice(Math.min(idx + 1, order.length), 0, moved);
+            break;
+        case "backward":
+            order.splice(Math.max(idx - 1, 0), 0, moved);
+            break;
+        case "front":
+            order.push(moved);
+            break;
+        case "back":
+            order.unshift(moved);
+            break;
+    }
+    return renumber(order, widgets);
+}
+function maxZ(widgets) {
+    return widgets.reduce((m, w) => Math.max(m, w.z ?? 0), 0);
+}
+
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+/**
+ * Vendored from widget-canvas-ha src/editor/session.ts (verbatim).
+ *
+ * Module-level edit-session registry keyed by canvas id. Saving Lovelace
+ * config rebuilds EVERY card in the view — the element is destroyed and
+ * recreated mid-edit whenever any card saves. Keeping working state here
+ * (the module instance survives; only elements are recreated) lets a
+ * recreated instance re-attach and resume the edit session seamlessly.
+ */
+const sessions = new Map();
+function getSession(canvasId) {
+    return canvasId ? sessions.get(canvasId) : undefined;
+}
+function createSession(canvasId, widgets) {
+    const session = {
+        canvasId,
+        active: true,
+        working: widgets,
+        original: widgets.map((w) => ({ ...w })),
+        selectedId: null,
+        undoStack: [],
+        dpadMode: "fine",
+    };
+    sessions.set(canvasId, session);
+    return session;
+}
+function endSession(canvasId) {
+    if (canvasId)
+        sessions.delete(canvasId);
+}
+
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+/**
+ * Vendored from widget-canvas-ha src/util/hash.ts + src/util/uuid.ts
+ * (verbatim; see types.ts header for why vendored).
+ */
+/** Deterministic JSON stringify (sorted object keys, stable across key order). */
+function stableStringify(value) {
+    return JSON.stringify(sortValue(value));
+}
+function sortValue(value) {
+    if (Array.isArray(value))
+        return value.map(sortValue);
+    if (value && typeof value === "object") {
+        const out = {};
+        for (const key of Object.keys(value).sort()) {
+            const v = value[key];
+            if (v !== undefined)
+                out[key] = sortValue(v);
+        }
+        return out;
+    }
+    return value;
+}
+function deepClone(value) {
+    if (value === undefined || value === null)
+        return value;
+    return JSON.parse(JSON.stringify(value));
+}
+function deepEqual(a, b) {
+    return stableStringify(a) === stableStringify(b);
+}
+
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+/**
+ * Vendored from widget-canvas-ha src/editor/edit-controller.ts.
+ * Adapted for Remote Mapper: slot tiles are fixed by hardware, so the
+ * add / duplicate / delete mutations are removed; everything else
+ * (drag/resize with direct-DOM writes, snap, undo, D-pad, keyboard,
+ * session resume) is upstream behavior.
+ */
+const LONG_PRESS_MS = 800;
+const LONG_PRESS_DRIFT_PX = 18;
+const DPAD_REPEAT_DELAY_MS = 350;
+const DPAD_REPEAT_MS = 70;
+const UNDO_CAP = 25;
+class EditController {
+    constructor(host) {
+        this.session = null;
+        this.drag = null;
+        this.lpStart = null;
+        this.keydownBound = (ev) => this.onKeyDown(ev);
+        this.host = host;
+    }
+    // ── state accessors ────────────────────────────────────────────────
+    get active() {
+        return this.session?.active ?? false;
+    }
+    get working() {
+        return this.session?.working ?? [];
+    }
+    get selectedId() {
+        return this.session?.selectedId ?? null;
+    }
+    get selected() {
+        const id = this.selectedId;
+        return id ? this.working.find((w) => w.id === id) : undefined;
+    }
+    get dpadMode() {
+        return this.session?.dpadMode ?? "fine";
+    }
+    get dpadSteps() {
+        if (this.dpadMode === "fine")
+            return { x: 1, y: 1 };
+        const cfg = this.host.config();
+        return cfg ? cellsOf(cfg.grid) : { x: 1, y: 1 };
+    }
+    get dirty() {
+        return !!this.session && !deepEqual(this.session.working, this.session.original);
+    }
+    get canUndo() {
+        return (this.session?.undoStack.length ?? 0) > 0;
+    }
+    get dragging() {
+        return this.drag !== null;
+    }
+    // ── lifecycle ──────────────────────────────────────────────────────
+    /** Re-attach to a session that survived a view rebuild. */
+    tryResume() {
+        const cfg = this.host.config();
+        const session = getSession(cfg?.canvas_id);
+        if (session?.active) {
+            this.session = session;
+            window.addEventListener("keydown", this.keydownBound);
+            return true;
+        }
+        return false;
+    }
+    enter() {
+        if (this.session?.active)
+            return;
+        const cfg = this.host.config();
+        if (!cfg?.canvas_id)
+            return;
+        this.session = createSession(cfg.canvas_id, deepClone(cfg.widgets));
+        window.addEventListener("keydown", this.keydownBound);
+        this.host.requestUpdate();
+    }
+    /** Done: persist working state. */
+    async done() {
+        const session = this.session;
+        if (!session)
+            return;
+        const widgets = normalizeZ(session.working);
+        this.teardown();
+        const ok = await this.host.saveWorking(widgets);
+        if (!ok) {
+            const cfg = this.host.config();
+            this.session = createSession(session.canvasId, widgets);
+            this.session.original = deepClone(cfg?.widgets ?? []);
+            window.addEventListener("keydown", this.keydownBound);
+        }
+        this.host.requestUpdate();
+    }
+    /** Cancel: discard working state, revert to last saved layout. */
+    cancel() {
+        if (!this.session)
+            return;
+        if (this.dirty && !window.confirm("Discard layout changes?"))
+            return;
+        this.teardown();
+        this.host.requestUpdate();
+    }
+    detach() {
+        // element is going away; keep the session in the registry for resume
+        window.removeEventListener("keydown", this.keydownBound);
+        this.clearDpadRepeat();
+        this.cancelLongPress();
+        this.session = null;
+    }
+    teardown() {
+        window.removeEventListener("keydown", this.keydownBound);
+        this.clearDpadRepeat();
+        this.cancelLongPress();
+        endSession(this.session?.canvasId);
+        this.session = null;
+        this.drag = null;
+    }
+    // ── mutations ──────────────────────────────────────────────────────
+    pushUndo() {
+        const s = this.session;
+        if (!s)
+            return;
+        s.undoStack.push(deepClone(s.working));
+        if (s.undoStack.length > UNDO_CAP)
+            s.undoStack.shift();
+    }
+    undo() {
+        const s = this.session;
+        if (!s)
+            return;
+        const prev = s.undoStack.pop();
+        if (!prev)
+            return;
+        s.working = prev;
+        if (s.selectedId && !prev.some((w) => w.id === s.selectedId))
+            s.selectedId = null;
+        this.host.requestUpdate();
+    }
+    select(id) {
+        const s = this.session;
+        if (!s)
+            return;
+        s.selectedId = id;
+        this.host.requestUpdate();
+    }
+    updateWidget(id, patch, opts) {
+        const s = this.session;
+        if (!s)
+            return;
+        if (opts?.undo !== false)
+            this.pushUndo();
+        s.working = s.working.map((w) => w.id === id ? { ...w, ...patch } : w);
+        this.host.requestUpdate();
+    }
+    zOp(op) {
+        const s = this.session;
+        if (!s?.selectedId)
+            return;
+        this.pushUndo();
+        s.working = applyZOp(s.working, s.selectedId, op);
+        this.host.requestUpdate();
+    }
+    /** Ensure tiles exist for every action id (probe may grow the set). */
+    ensureTiles(make, ids) {
+        const s = this.session;
+        if (!s)
+            return;
+        const have = new Set(s.working.map((w) => w.id));
+        const missing = ids.filter((id) => !have.has(id));
+        if (!missing.length)
+            return;
+        this.pushUndo();
+        const added = missing.map((id, i) => ({
+            ...make(id, i),
+            z: maxZ(s.working) + 1 + i,
+        }));
+        s.working = [...s.working, ...added];
+        this.host.requestUpdate();
+    }
+    toggleDpadStep() {
+        const s = this.session;
+        if (!s)
+            return;
+        s.dpadMode = s.dpadMode === "fine" ? "cell" : "fine";
+        this.host.requestUpdate();
+    }
+    /** Raw position + clamp; NO grid snapping — the D-pad exists for precision. */
+    nudge(dx, dy) {
+        const s = this.session;
+        const cfg = this.host.config();
+        const sel = this.selected;
+        if (!s || !cfg || !sel)
+            return;
+        const nx = clamp(sel.x + dx, 0, Math.max(0, cfg.design_size.width - sel.w));
+        const ny = clamp(sel.y + dy, 0, Math.max(0, cfg.design_size.height - sel.h));
+        if (nx === sel.x && ny === sel.y)
+            return;
+        this.updateWidget(sel.id, { x: round2(nx), y: round2(ny) }, { undo: false });
+    }
+    /** One undo entry per D-pad press-burst, not per repeat tick. */
+    dpadPress(dx, dy) {
+        if (!this.session)
+            return;
+        this.pushUndo();
+        const tick = () => {
+            const steps = this.dpadSteps;
+            this.nudge(dx * steps.x, dy * steps.y);
+        };
+        tick();
+        this.clearDpadRepeat();
+        this.dpadTimer = window.setTimeout(() => {
+            this.dpadInterval = window.setInterval(tick, DPAD_REPEAT_MS);
+        }, DPAD_REPEAT_DELAY_MS);
+    }
+    dpadRelease() {
+        this.clearDpadRepeat();
+    }
+    clearDpadRepeat() {
+        if (this.dpadTimer !== undefined)
+            clearTimeout(this.dpadTimer);
+        if (this.dpadInterval !== undefined)
+            clearInterval(this.dpadInterval);
+        this.dpadTimer = this.dpadInterval = undefined;
+    }
+    // ── keyboard ───────────────────────────────────────────────────────
+    onKeyDown(ev) {
+        if (!this.session?.active)
+            return;
+        if (isTypingTarget(ev))
+            return;
+        switch (ev.key) {
+            case "Escape":
+                ev.preventDefault();
+                this.cancel();
+                return;
+            case "z":
+                if (ev.ctrlKey || ev.metaKey) {
+                    ev.preventDefault();
+                    this.undo();
+                }
+                return;
+        }
+        const arrows = {
+            ArrowLeft: [-1, 0],
+            ArrowRight: [1, 0],
+            ArrowUp: [0, -1],
+            ArrowDown: [0, 1],
+        };
+        const dir = arrows[ev.key];
+        if (dir && this.selectedId) {
+            ev.preventDefault();
+            const steps = this.dpadSteps;
+            const mult = ev.shiftKey ? 5 : 1;
+            if (!ev.repeat)
+                this.pushUndo();
+            this.nudge(dir[0] * steps.x * mult, dir[1] * steps.y * mult);
+        }
+    }
+    // ── pointer: move / resize ─────────────────────────────────────────
+    onSlotPointerDown(ev, widgetId) {
+        const s = this.session;
+        if (!s || this.drag || ev.button > 0)
+            return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (s.selectedId !== widgetId)
+            this.select(widgetId);
+        const orig = this.working.find((w) => w.id === widgetId);
+        if (!orig)
+            return;
+        this.startDrag(ev, {
+            kind: "move",
+            pointerId: ev.pointerId,
+            widgetId,
+            startClientX: ev.clientX,
+            startClientY: ev.clientY,
+            orig: { ...orig },
+            moved: false,
+            next: { x: orig.x, y: orig.y, w: orig.w, h: orig.h },
+        });
+    }
+    onHandlePointerDown(ev, widgetId, corner) {
+        if (!this.session || this.drag || ev.button > 0)
+            return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        const orig = this.working.find((w) => w.id === widgetId);
+        if (!orig)
+            return;
+        this.startDrag(ev, {
+            kind: "resize",
+            pointerId: ev.pointerId,
+            widgetId,
+            startClientX: ev.clientX,
+            startClientY: ev.clientY,
+            orig: { ...orig },
+            corner,
+            moved: false,
+            next: { x: orig.x, y: orig.y, w: orig.w, h: orig.h },
+        });
+    }
+    startDrag(ev, drag) {
+        this.drag = drag;
+        const target = ev.currentTarget;
+        try {
+            target.setPointerCapture(ev.pointerId);
+        }
+        catch {
+            /* detached */
+        }
+        const onMove = (e) => this.onDragMove(e);
+        const onEnd = (e) => {
+            if (e.pointerId !== drag.pointerId)
+                return;
+            target.removeEventListener("pointermove", onMove);
+            target.removeEventListener("pointerup", onEnd);
+            target.removeEventListener("pointercancel", onCancel);
+            this.finishDrag(false);
+        };
+        const onCancel = (e) => {
+            if (e.pointerId !== drag.pointerId)
+                return;
+            target.removeEventListener("pointermove", onMove);
+            target.removeEventListener("pointerup", onEnd);
+            target.removeEventListener("pointercancel", onCancel);
+            this.finishDrag(true);
+        };
+        target.addEventListener("pointermove", onMove);
+        target.addEventListener("pointerup", onEnd);
+        target.addEventListener("pointercancel", onCancel);
+    }
+    onDragMove(ev) {
+        const d = this.drag;
+        const cfg = this.host.config();
+        if (!d || !cfg || ev.pointerId !== d.pointerId)
+            return;
+        const scale = this.host.scale() || 1;
+        // clientX/Y are visual-space px — divide by scale for canvas units
+        const dx = (ev.clientX - d.startClientX) / scale;
+        const dy = (ev.clientY - d.startClientY) / scale;
+        if (!d.moved && Math.hypot(dx * scale, dy * scale) < 3)
+            return;
+        d.moved = true;
+        const design = cfg.design_size;
+        const cells = cellsOf(cfg.grid);
+        if (d.kind === "move") {
+            d.next.x = clamp(d.orig.x + dx, 0, Math.max(0, design.width - d.orig.w));
+            d.next.y = clamp(d.orig.y + dy, 0, Math.max(0, design.height - d.orig.h));
+        }
+        else {
+            const c = d.corner;
+            const wholeCellsX = (v) => Math.max(cells.x, Math.floor(v / cells.x) * cells.x);
+            const wholeCellsY = (v) => Math.max(cells.y, Math.floor(v / cells.y) * cells.y);
+            let { x, y, w, h } = d.orig;
+            if (c === "se" || c === "ne")
+                w = d.orig.w + dx;
+            if (c === "sw" || c === "nw")
+                w = d.orig.w - dx;
+            if (c === "se" || c === "sw")
+                h = d.orig.h + dy;
+            if (c === "ne" || c === "nw")
+                h = d.orig.h - dy;
+            // sizes snap live to the internal grid (phone-widget model)
+            w = clamp(snapSize(w, cells.x), cells.x, design.width);
+            h = clamp(snapSize(h, cells.y), cells.y, design.height);
+            if (c === "sw" || c === "nw") {
+                const right = d.orig.x + d.orig.w;
+                if (w > right)
+                    w = wholeCellsX(right);
+                x = round2(right - w);
+            }
+            else if (x + w > design.width) {
+                w = wholeCellsX(design.width - x);
+            }
+            if (c === "ne" || c === "nw") {
+                const bottom = d.orig.y + d.orig.h;
+                if (h > bottom)
+                    h = wholeCellsY(bottom);
+                y = round2(bottom - h);
+            }
+            else if (y + h > design.height) {
+                h = wholeCellsY(design.height - y);
+            }
+            d.next = { x, y, w, h };
+        }
+        // direct-DOM application during drag — no Lit re-render churn (DDC-proven)
+        const slot = this.host.slotEl(d.widgetId);
+        if (slot) {
+            slot.style.transform = `translate3d(${d.next.x}px, ${d.next.y}px, 0)`;
+            if (d.kind === "resize") {
+                slot.style.width = `${d.next.w}px`;
+                slot.style.height = `${d.next.h}px`;
+            }
+        }
+        this.updateBadgeText(d.next);
+    }
+    finishDrag(canceled) {
+        const d = this.drag;
+        const cfg = this.host.config();
+        this.drag = null;
+        if (!d || !cfg)
+            return;
+        if (canceled || !d.moved) {
+            // Lit memoizes unchanged style expressions and won't undo our direct
+            // DOM writes — restore the slot explicitly.
+            this.syncSlotStyle(d.widgetId, d.orig);
+            this.host.requestUpdate();
+            return;
+        }
+        let { x, y } = d.next;
+        if (d.kind === "move" && cfg.grid.snap_position) {
+            const cells = cellsOf(cfg.grid);
+            x = clamp(snapPos(x, cells.x), 0, Math.max(0, cfg.design_size.width - d.next.w));
+            y = clamp(snapPos(y, cells.y), 0, Math.max(0, cfg.design_size.height - d.next.h));
+        }
+        const final = { x: round2(x), y: round2(y), w: d.next.w, h: d.next.h };
+        // if committed values equal the pre-drag state (snap-back), Lit skips
+        // the attribute write and the raw drag offset would stick
+        this.syncSlotStyle(d.widgetId, final);
+        this.updateBadgeText(final);
+        this.pushUndo();
+        this.updateWidget(d.widgetId, final, { undo: false });
+    }
+    syncSlotStyle(id, r) {
+        const slot = this.host.slotEl(id);
+        if (!slot)
+            return;
+        slot.style.transform = `translate3d(${r.x}px, ${r.y}px, 0)`;
+        slot.style.width = `${r.w}px`;
+        slot.style.height = `${r.h}px`;
+    }
+    updateBadgeText(r) {
+        const badge = this.host.badgeEl();
+        if (badge) {
+            badge.textContent = `x ${Math.round(r.x)}  y ${Math.round(r.y)}  ·  ${r.w}×${r.h}`;
+        }
+    }
+    // ── long-press to enter edit (view mode) ───────────────────────────
+    onViewPointerDown(ev) {
+        if (this.session?.active || ev.button > 0)
+            return;
+        // only from empty canvas area — not over a tile or the pencil
+        const path = ev.composedPath();
+        for (const t of path) {
+            if (t instanceof HTMLElement) {
+                if (t.classList?.contains("widget-slot"))
+                    return;
+                if (t.classList?.contains("pencil"))
+                    return;
+            }
+        }
+        this.lpStart = { x: ev.clientX, y: ev.clientY };
+        this.lpTimer = window.setTimeout(() => {
+            this.lpTimer = undefined;
+            this.enter();
+        }, LONG_PRESS_MS);
+    }
+    onViewPointerMove(ev) {
+        if (this.lpTimer === undefined || !this.lpStart)
+            return;
+        if (Math.hypot(ev.clientX - this.lpStart.x, ev.clientY - this.lpStart.y) >
+            LONG_PRESS_DRIFT_PX) {
+            this.cancelLongPress();
+        }
+    }
+    cancelLongPress() {
+        if (this.lpTimer !== undefined)
+            clearTimeout(this.lpTimer);
+        this.lpTimer = undefined;
+        this.lpStart = null;
+    }
+}
+function clamp(v, lo, hi) {
+    return Math.min(hi, Math.max(lo, v));
+}
+function round2(v) {
+    return Math.round(v * 100) / 100;
+}
+function isTypingTarget(ev) {
+    const path = ev.composedPath();
+    for (const t of path) {
+        if (!(t instanceof HTMLElement))
+            continue;
+        const tag = t.localName;
+        if (tag === "input" || tag === "textarea" || tag === "select")
+            return true;
+        if (t.isContentEditable)
+            return true;
+        const role = t.getAttribute?.("role");
+        if (role === "textbox" || role === "combobox" || role === "searchbox")
+            return true;
+    }
+    return false;
+}
+
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+/**
+ * Vendored from widget-canvas-ha src/render/scaling.ts (verbatim, section
+ * constants inlined).
+ */
+/**
+ * Width-driven by default: scale = hostWidth / design.width, height
+ * follows aspect; with an externally fixed height, contain-fit both axes
+ * and center (letterbox).
+ */
+function computeTransform(design, hostWidth, fixedHeight) {
+    const w = Math.max(1, hostWidth);
+    {
+        const scale = w / design.width;
+        return { scale, offsetX: 0, offsetY: 0, viewportHeight: design.height * scale };
+    }
+}
+
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+/**
+ * Human text for whatever a failed call throws.
+ *
+ * hass.callWS rejects with a plain `{code, message}` object, which
+ * `String(err)` turns into "[object Object]"; Errors carry a message;
+ * anything else is stringified as a last resort. The card's not-found
+ * case (a dashboard card pointing at a remote that was removed) gets a
+ * hint about where to fix it.
+ */
+function errorText(err) {
+    if (err && typeof err === "object") {
+        const e = err;
+        const message = typeof e.message === "string" && e.message ? e.message : undefined;
+        if (e.code === "not_found") {
+            return `${message ?? "Remote not found"} — it was removed or never existed. Open the card editor and pick another remote.`;
+        }
+        if (message)
+            return message;
+        if (err instanceof Error)
+            return err.message || err.name;
+        try {
+            return JSON.stringify(err);
+        }
+        catch {
+            return String(err);
+        }
+    }
+    return String(err);
+}
+
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+/**
+ * Infer a human name for a slot from its sequence — no model, just a
+ * lookup: verb from the service, target from HA's registries (friendly
+ * names the user already sees everywhere), `alias:` wins when present
+ * (HA's own way of naming action steps). Unknown shapes fall back to the
+ * raw action so nothing is ever blank.
+ */
+const VERBS = {
+    turn_on: "Turn on",
+    turn_off: "Turn off",
+    toggle: "Toggle",
+    open_cover: "Open",
+    close_cover: "Close",
+    stop_cover: "Stop",
+    open_cover_tilt: "Tilt open",
+    close_cover_tilt: "Tilt close",
+    lock: "Lock",
+    unlock: "Unlock",
+    press: "Press",
+    start: "Start",
+    pause: "Pause",
+    stop: "Stop",
+    return_to_base: "Dock",
+    media_play: "Play",
+    media_pause: "Pause",
+    media_play_pause: "Play / pause",
+    media_stop: "Stop",
+    media_next_track: "Next track",
+    media_previous_track: "Previous track",
+    volume_up: "Volume up",
+    volume_down: "Volume down",
+    volume_mute: "Mute",
+    increment: "Increment",
+    decrement: "Decrement",
+    set_value: "Set",
+    set_temperature: "Set temperature",
+    set_hvac_mode: "Set mode",
+    set_preset_mode: "Set preset",
+    trigger: "Trigger",
+    reload: "Reload",
+    notify: "Notify",
+    send_message: "Send message",
+};
+const CONTROL_FLOW = [
+    ["if", "Conditional"],
+    ["choose", "Choose"],
+    ["repeat", "Repeat"],
+    ["parallel", "Parallel"],
+    ["sequence", "Sequence"],
+    ["wait_template", "Wait"],
+    ["wait_for_trigger", "Wait"],
+    ["delay", "Delay"],
+    ["event", "Fire event"],
+    ["variables", "Variables"],
+    ["stop", "Stop"],
+];
+const humanize = (s) => s.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+const list = (v) => Array.isArray(v) ? v.filter((x) => typeof x === "string") : typeof v === "string" ? [v] : [];
+function friendly(entityId, hass) {
+    const name = hass?.states?.[entityId]?.attributes?.friendly_name;
+    return typeof name === "string" && name ? name : entityId;
+}
+function targetLabel(step, hass) {
+    const target = (step.target ?? {});
+    const names = [
+        ...list(target.entity_id ?? step.entity_id ?? step.data?.entity_id).map((e) => friendly(e, hass)),
+        ...list(target.area_id).map((a) => hass?.areas?.[a]?.name || a),
+        ...list(target.floor_id).map((f) => hass?.floors?.[f]?.name || f),
+        ...list(target.device_id).map((d) => hass?.devices?.[d]?.name_by_user || hass?.devices?.[d]?.name || d),
+    ];
+    if (!names.length)
+        return "";
+    return names.length === 1 ? names[0] : `${names[0]} +${names.length - 1}`;
+}
+/** Name for one action step. */
+function stepName(raw, hass) {
+    if (!raw || typeof raw !== "object")
+        return "";
+    const step = raw;
+    if (typeof step.alias === "string" && step.alias.trim())
+        return step.alias.trim();
+    if (typeof step.scene === "string")
+        return friendly(step.scene, hass);
+    for (const [key, label] of CONTROL_FLOW) {
+        if (key in step)
+            return label;
+    }
+    const action = step.action ?? step.service;
+    if (typeof action !== "string")
+        return humanize(Object.keys(step)[0] ?? "");
+    const [domain, service = ""] = action.split(".");
+    const target = targetLabel(step, hass);
+    if (domain === "scene" && service === "turn_on")
+        return target || "Scene";
+    if (domain === "script") {
+        if (service === "turn_on")
+            return target || "Script";
+        return friendly(action, hass); // script.my_script called directly
+    }
+    if (service === "select_option") {
+        const option = step.data?.option ?? step.option;
+        if (typeof option === "string" && option)
+            return target ? `${option} · ${target}` : option;
+        return target ? `Select · ${target}` : "Select option";
+    }
+    const verb = VERBS[service] ?? humanize(service);
+    return target ? `${verb} ${target}` : verb;
+}
+/** Name for a whole sequence: first step, "+N" for the rest. */
+function inferName(sequence, hass) {
+    if (!sequence.length)
+        return "";
+    const first = stepName(sequence[0], hass);
+    return sequence.length > 1 ? `${first} +${sequence.length - 1}` : first;
+}
+
+const CARD_TAG = "remote-mapper-card";
+/** HA's own "start a config flow" route — opens Add integration → Remote Mapper. */
+const ADD_REMOTE_PATH = "/_my_redirect/config_flow_start?domain=remote_mapper";
+const UPDATED_EVENT = "remote_mapper_updated";
+const ACTION_EVENT = "remote_mapper_action";
+const LAYOUT_SCHEMA_VERSION = 1;
+const TILE_W = 100;
+const TILE_H = 60;
+const TILE_GAP = 20;
+const DESIGN_WIDTH = 380;
+const CREATE_MODES = new Set([
+    "new_scene",
+    "new_automation",
+    "new_remote_automation",
+]);
+/** Auto-grid fallback layout from the probed action list (design §10). */
+function defaultLayout(actions) {
+    const n = Math.max(1, actions.length);
+    const cols = Math.max(2, Math.ceil(Math.sqrt(n)));
+    const rows = Math.ceil(n / cols);
+    const width = Math.max(DESIGN_WIDTH, cols * (TILE_W + TILE_GAP) + TILE_GAP);
+    const height = rows * (TILE_H + TILE_GAP) + TILE_GAP;
+    return {
+        schema_version: LAYOUT_SCHEMA_VERSION,
+        design_size: { width, height },
+        grid: { cell: 10, snap_position: false },
+        widgets: actions.map((id, i) => ({
+            id,
+            kind: "slot",
+            x: TILE_GAP + (i % cols) * (TILE_W + TILE_GAP),
+            y: TILE_GAP + Math.floor(i / cols) * (TILE_H + TILE_GAP),
+            w: TILE_W,
+            h: TILE_H,
+            z: i + 1,
+        })),
+    };
+}
+/** Recognize the quick-chip shapes inside an existing sequence. */
+function inferQuick(sequence) {
+    if (sequence.length === 1 && typeof sequence[0] === "object" && sequence[0]) {
+        const step = sequence[0];
+        const action = step.action ?? step.service;
+        const entity = step.target?.entity_id ?? step.entity_id;
+        if (typeof entity === "string") {
+            if (action === "scene.turn_on")
+                return { mode: "scene", entity, option: "" };
+            if (action === "homeassistant.toggle")
+                return { mode: "toggle", entity, option: "" };
+            if (action === "script.turn_on")
+                return { mode: "script", entity, option: "" };
+            if (action === "select.select_option") {
+                const option = step.data?.option ?? step.option;
+                return { mode: "wled_preset", entity, option: option ?? "" };
+            }
+        }
+    }
+    return { mode: "custom", entity: "", option: "" };
+}
+function quickSequence(mode, entity, option) {
+    const call = (action) => [
+        { action, target: { entity_id: entity } },
+    ];
+    if (mode === "scene")
+        return call("scene.turn_on");
+    if (mode === "toggle")
+        return call("homeassistant.toggle");
+    if (mode === "wled_preset")
+        return [
+            {
+                action: "select.select_option",
+                target: { entity_id: entity },
+                data: { option },
+            },
+        ];
+    return call("script.turn_on");
+}
+let RemoteMapperCard = class RemoteMapperCard extends i {
+    constructor() {
+        super(...arguments);
+        this._hostWidth = 0;
+        // grid layout (plan 04): draft-then-commit, like the canvas session
+        this._gridEditing = false;
+        this._pickerOpen = false;
+        this._tipShown = false;
+        // Modals opened from pointerup get a synthetic click ~immediately after
+        // (touch); the backdrop must not treat that ghost click as "close".
+        this._modalOpenedAt = 0;
+        /** Capture-phase: swallow the ghost click anywhere inside a just-opened modal. */
+        this._ghostGuard = {
+            handleEvent: (e) => {
+                if (Date.now() - this._modalOpenedAt < 350) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                }
+            },
+            capture: true,
+        };
+        this._editorTab = "quick";
+        this._quickMode = "scene";
+        this._quickEntity = "";
+        this._quickOption = "";
+        // "new scene" mode: entities to capture + save them as the remote default
+        this._snapEntities = [];
+        this._snapRemember = false;
+        this._draft = "";
+        this._draftName = "";
+        this._yamlValid = true;
+        this._draftMaterialized = false;
+        this._haFormOk = false;
+        this._yamlEditorOk = false;
+        this._clearRemember = false;
+        // hand back to HA (release)
+        this._releaseOpen = false;
+        this._releaseConvert = true;
+        this._releaseBusy = false;
+        this._importSelected = new Set();
+        this._importOverwrite = false;
+        this._importBusy = false;
+        this._fetchStarted = false;
+        this._edit = new EditController(this);
+        this._enterGridEdit = () => {
+            if (!this._remote)
+                return;
+            this._gridDraft = normalizeGrid(this._remote.grid_layout, this._remote.buttons ?? []);
+            this._gridEditing = true;
+            // Z2M discovers actions lazily — pick up anything pressed since setup
+            void this._refreshActions(true);
+        };
+        this._cancelGridEdit = () => {
+            this._gridEditing = false;
+            this._gridDraft = undefined;
+            this._pickerOpen = false;
+            this._buttonSheet = undefined;
+        };
+        this._onGridPicked = (e) => {
+            const draft = this._gridDraft;
+            if (!draft || !this._remote)
+                return;
+            this._gridDraft = resizeGrid(draft, e.detail.rows, e.detail.cols, this._remote.buttons ?? []);
+            this._pickerOpen = false;
+        };
+        // ── import wizard ──────────────────────────────────────────────────
+        this._openImport = async () => {
+            this._importError = undefined;
+            this._importOverwrite = false;
+            this._importBusy = false;
+            try {
+                const scan = await this._hass.callWS({
+                    type: "remote_mapper/scan_import",
+                    entry_id: this._entryId,
+                });
+                this._importSelected = new Set(scan.proposals.flatMap((p, i) => (p.conflict ? [] : [i])));
+                this._importScan = scan;
+            }
+            catch (err) {
+                this._error = errorText(err);
+            }
+        };
+        this._enterEdit = () => {
+            this._edit.enter();
+            const actions = this._remote?.layout?.actions ?? [];
+            const layout = this._currentLayout();
+            if (layout) {
+                const byId = new Map(layout.widgets.map((w) => [w.id, w]));
+                this._edit.ensureTiles((id) => byId.get(id) ?? defaultLayout([id]).widgets[0], actions);
+            }
+        };
+    }
+    _backdropClick(close) {
+        return (e) => {
+            if (e.target !== e.currentTarget)
+                return;
+            if (Date.now() - this._modalOpenedAt < 350)
+                return;
+            close();
+        };
+    }
+    // ── HA plumbing ────────────────────────────────────────────────────
+    set hass(hass) {
+        this._hass = hass;
+        // the button sheet shows live automation state — keep it current
+        if (this._buttonSheet !== undefined)
+            this.requestUpdate();
+        if (!this._fetchStarted && this._config) {
+            this._fetchStarted = true;
+            void this._initialize();
+        }
+    }
+    setConfig(config) {
+        this._config = config;
+        this._entryId = config.entry_id;
+        this._fetchStarted = false;
+        this._cancelGridEdit();
+        if (this._hass) {
+            this._fetchStarted = true;
+            void this._initialize();
+        }
+    }
+    getCardSize() {
+        if (this._isGrid()) {
+            const grid = this._gridLayout();
+            const perRow = displayOf(this._config) === "all" ? 2 : 1;
+            return grid ? 1 + grid.rows * perRow : 3;
+        }
+        const layout = this._currentLayout();
+        return layout ? 1 + Math.ceil(layout.design_size.height / 100) : 3;
+    }
+    getGridOptions() {
+        return { columns: 12, min_columns: 6 };
+    }
+    static getConfigElement() {
+        return document.createElement("remote-mapper-card-editor");
+    }
+    static getStubConfig() {
+        return { layout: "grid", display: "assisted" };
+    }
+    connectedCallback() {
+        super.connectedCallback();
+        this._resizeObserver = new ResizeObserver((entries) => {
+            const width = entries[0]?.contentRect.width ?? 0;
+            if (width && Math.abs(width - this._hostWidth) > 0.5) {
+                this._hostWidth = width;
+            }
+        });
+        this._resizeObserver.observe(this);
+        if (this._edit.tryResume())
+            this.requestUpdate();
+        if (this._fetchStarted && !this._unsubEvents)
+            void this._subscribe();
+    }
+    disconnectedCallback() {
+        super.disconnectedCallback();
+        this._resizeObserver?.disconnect();
+        this._unsubEvents?.();
+        this._unsubEvents = undefined;
+        this._unsubActions?.();
+        this._unsubActions = undefined;
+        this._edit.detach();
+        clearTimeout(this._tipTimer);
+        clearTimeout(this._tipHideTimer);
+        this._tip = undefined;
+    }
+    async _initialize() {
+        try {
+            if (!this._entryId) {
+                const res = await this._hass.callWS({
+                    type: "remote_mapper/list_remotes",
+                });
+                if (res.remotes.length === 1) {
+                    this._entryId = res.remotes[0].entry_id;
+                }
+                else {
+                    this._remoteChoices = res.remotes;
+                    return;
+                }
+            }
+            await this._fetchRemote();
+            await this._subscribe();
+        }
+        catch (err) {
+            this._error = errorText(err);
+        }
+    }
+    async _subscribe() {
+        if (this._unsubEvents)
+            return;
+        this._unsubEvents = await this._hass.connection.subscribeEvents((event) => {
+            if (event.data.entry_id === this._entryId)
+                void this._fetchRemote();
+        }, UPDATED_EVENT);
+        // physical presses light up the same way dashboard taps do
+        this._unsubActions = await this._hass.connection.subscribeEvents((event) => {
+            if (event.data.entry_id === this._entryId)
+                this._flashAction(event.data.action_id);
+        }, ACTION_EVENT);
+    }
+    _flashAction(actionId) {
+        this._flash = actionId;
+        if (this._flashTimer !== undefined)
+            clearTimeout(this._flashTimer);
+        this._flashTimer = setTimeout(() => {
+            this._flashTimer = undefined;
+            this._flash = undefined;
+        }, 400);
+    }
+    async _fetchRemote() {
+        try {
+            this._remote = await this._hass.callWS({
+                type: "remote_mapper/get_remote",
+                entry_id: this._entryId,
+            });
+            this._error = undefined;
+        }
+        catch (err) {
+            this._error = errorText(err);
+        }
+    }
+    // ── EditHost ───────────────────────────────────────────────────────
+    config() {
+        return this._currentLayout();
+    }
+    scale() {
+        return this._transform()?.scale ?? 1;
+    }
+    slotEl(id) {
+        return this.shadowRoot?.querySelector(`[data-slot-id="${CSS.escape(id)}"]`) ?? null;
+    }
+    badgeEl() {
+        return this.shadowRoot?.querySelector(".badge") ?? null;
+    }
+    async saveWorking(widgets) {
+        const layout = this._currentLayout();
+        if (!layout)
+            return false;
+        try {
+            await this._hass.callWS({
+                type: "remote_mapper/save_layout",
+                entry_id: this._entryId,
+                card_layout: { ...deepClone(layout), widgets },
+            });
+            return true;
+        }
+        catch (err) {
+            this.notify(`Layout save failed: ${String(err)}`);
+            return false;
+        }
+    }
+    openSettings(id) {
+        void this._openEditor(id);
+    }
+    /** In-app navigation (what HA's own navigate() does — no page reload). */
+    _navigate(path) {
+        window.history.pushState(null, "", path);
+        window.dispatchEvent(new CustomEvent("location-changed", { detail: { replace: false } }));
+    }
+    _automationEditPath(slot) {
+        return slot?.materialized && slot.automation_id
+            ? `/config/automation/edit/${slot.automation_id}`
+            : undefined;
+    }
+    /**
+     * Editor for the sequence's target when it's a scene or script — HA
+     * keeps both editable at /config/{scene,script}/edit/{id}. Scenes are
+     * addressed by their config id (state attribute), scripts by object id.
+     */
+    _targetEditor(slot) {
+        // a materialized/shared slot's sequence is empty — read what runs
+        const steps = slot?.sequence?.length ? slot.sequence : (slot?.live_actions ?? []);
+        const first = steps[0];
+        if (!first)
+            return undefined;
+        const action = first.action ?? first.service;
+        let entity = first.target?.entity_id ?? first.entity_id ?? first.scene;
+        if (Array.isArray(entity))
+            entity = entity[0];
+        if (typeof entity !== "string")
+            return undefined;
+        const name = this._hass?.states?.[entity]?.attributes?.friendly_name ?? entity;
+        if (entity.startsWith("scene.") && (action === "scene.turn_on" || first.scene)) {
+            const id = this._hass?.states?.[entity]?.attributes?.id;
+            if (typeof id !== "string")
+                return undefined; // yaml scene without id
+            return { icon: "mdi:palette", title: `Edit scene: ${name}`, path: `/config/scene/edit/${id}` };
+        }
+        if (entity.startsWith("script.") && (action === "script.turn_on" || action === entity)) {
+            return {
+                icon: "mdi:script-text",
+                title: `Edit script: ${name}`,
+                path: `/config/script/edit/${entity.slice("script.".length)}`,
+            };
+        }
+        if (typeof action === "string" && action.startsWith("script.") && action !== "script.turn_on") {
+            const objectId = action.slice("script.".length);
+            const scriptName = this._hass?.states?.[action]?.attributes?.friendly_name ?? objectId;
+            return {
+                icon: "mdi:script-text",
+                title: `Edit script: ${scriptName}`,
+                path: `/config/script/edit/${objectId}`,
+            };
+        }
+        return undefined;
+    }
+    /** Originals an imported slot came from (still in HA, disabled). */
+    _importedSources(slot) {
+        const from = slot?.imported_from;
+        if (!from)
+            return [];
+        const list = from.sources?.length ? from.sources : [from];
+        return list.filter((s) => !!s.config_id);
+    }
+    notify(message) {
+        // native HA toast (DDC layout-persistence pattern)
+        window.dispatchEvent(new CustomEvent("hass-notification", { detail: { message } }));
+    }
+    // ── layout helpers ─────────────────────────────────────────────────
+    _currentLayout() {
+        if (!this._remote)
+            return undefined;
+        const actions = this._remote.layout?.actions ?? [];
+        const stored = this._remote.card_layout;
+        const base = stored && Array.isArray(stored.widgets) && stored.design_size
+            ? stored
+            : defaultLayout(actions);
+        // tiles for actions probed after the layout was saved
+        const have = new Set(base.widgets.map((w) => w.id));
+        const missing = actions.filter((a) => !have.has(a));
+        if (!missing.length)
+            return { ...base, canvas_id: this._entryId };
+        const extra = defaultLayout(missing).widgets.map((w, i) => ({
+            ...w,
+            y: base.design_size.height + TILE_GAP + Math.floor(i / 3) * (TILE_H + TILE_GAP),
+        }));
+        return {
+            ...base,
+            canvas_id: this._entryId,
+            design_size: {
+                width: base.design_size.width,
+                height: base.design_size.height +
+                    (Math.floor((extra.length - 1) / 3) + 1) * (TILE_H + TILE_GAP) +
+                    TILE_GAP,
+            },
+            widgets: [...base.widgets, ...extra],
+        };
+    }
+    _transform() {
+        const layout = this._currentLayout();
+        if (!layout)
+            return undefined;
+        const width = this._hostWidth || this.getBoundingClientRect().width || 300;
+        return computeTransform(layout.design_size, width);
+    }
+    _renderTitle() {
+        if (this._config?.show_title === false)
+            return b `<span class="title"></span>`;
+        return b `<span class="title">${this._config?.title || this._remote?.title}</span>`;
+    }
+    // ── grid layout (plan 04) ──────────────────────────────────────────
+    _isGrid() {
+        return layoutOf(this._config) === "grid";
+    }
+    /** Draft while editing, else the stored layout normalized to the buttons. */
+    _gridLayout() {
+        if (!this._remote)
+            return undefined;
+        if (this._gridEditing && this._gridDraft)
+            return this._gridDraft;
+        return normalizeGrid(this._remote.grid_layout, this._remote.buttons ?? []);
+    }
+    _slotViews() {
+        const out = {};
+        if (!this._remote)
+            return out;
+        const stale = new Set(this._remote.stale_actions ?? []);
+        for (const button of this._remote.buttons ?? []) {
+            for (const a of button.actions) {
+                const slot = this._remote.slots[a.action_id];
+                out[a.action_id] = {
+                    assigned: !!slot,
+                    archived: !!slot?.archived || this._automationState(slot) === "off",
+                    summary: this._slotSummary(slot),
+                    error: slot?.branch_missing
+                        ? "The automation has no branch for this event any more — edit the slot to re-add it"
+                        : (slot?.last_error ?? null),
+                    stale: stale.has(a.action_id),
+                };
+            }
+        }
+        return out;
+    }
+    /** Re-probe the source; quiet=true only toasts when something changed. */
+    async _refreshActions(quiet = false) {
+        try {
+            const res = await this._hass.callWS({ type: "remote_mapper/refresh_actions", entry_id: this._entryId });
+            if (res.added.length) {
+                this.notify(`Found new actions: ${res.added.join(", ")}`);
+                if (this._gridEditing && this._remote) {
+                    // fold them into the draft so they show up in this edit session
+                    await this._fetchRemote();
+                    this._gridDraft = normalizeGrid(this._gridDraft, this._remote.buttons ?? []);
+                }
+            }
+            else if (!quiet) {
+                this.notify(res.probed
+                    ? "No new actions — press each button once (all press types), then refresh again"
+                    : "This source can't enumerate actions");
+            }
+        }
+        catch (err) {
+            this.notify(`Refresh failed: ${String(err)}`);
+        }
+    }
+    async _saveGridEdit() {
+        const draft = this._gridDraft;
+        if (!draft) {
+            this._cancelGridEdit();
+            return;
+        }
+        try {
+            await this._hass.callWS({
+                type: "remote_mapper/save_layout",
+                entry_id: this._entryId,
+                grid_layout: trimLabels(draft),
+            });
+            this._cancelGridEdit();
+        }
+        catch (err) {
+            this.notify(`Layout save failed: ${String(err)}`);
+        }
+    }
+    // ── slot interactions ──────────────────────────────────────────────
+    async _runSlot(actionId) {
+        const slot = this._remote?.slots[actionId];
+        if (!slot || slot.archived)
+            return;
+        this._flashAction(actionId);
+        try {
+            await this._hass.callWS({
+                type: "remote_mapper/run_slot",
+                entry_id: this._entryId,
+                action_id: actionId,
+            });
+        }
+        catch (err) {
+            this._error = errorText(err);
+        }
+    }
+    _isLinked(slot) {
+        return !!slot?.materialized && !!slot.automation_id && slot.owned === false;
+    }
+    /** Live state of a materialized/linked slot's automation ("on"/"off"). */
+    _automationState(slot) {
+        const entity = slot?.automation_entity_id;
+        return entity ? this._hass?.states?.[entity]?.state : undefined;
+    }
+    /** User name if set, else the automation's name, else inferred (naming.ts). */
+    _slotSummary(slot) {
+        if (!slot)
+            return "unassigned";
+        if (slot.name)
+            return slot.name;
+        if (slot.materialized && slot.branch_missing)
+            return "no branch";
+        if (slot.materialized && slot.shared_automation) {
+            // one branch of the shared automation: its alias says nothing
+            return inferName(slot.live_actions ?? [], this._hass) || "empty branch";
+        }
+        if (slot.materialized) {
+            const entity = slot.automation_entity_id;
+            const friendly = entity
+                ? this._hass?.states?.[entity]?.attributes?.friendly_name
+                : undefined;
+            return typeof friendly === "string" && friendly ? friendly : "automation";
+        }
+        return inferName(slot.sequence ?? [], this._hass) || "empty";
+    }
+    // ── slot editor modal ──────────────────────────────────────────────
+    async _openEditor(actionId) {
+        const slot = this._remote?.slots[actionId];
+        const sequence = (slot?.sequence ?? []);
+        const quick = inferQuick(sequence);
+        this._editingAction = actionId;
+        this._modalOpenedAt = Date.now();
+        this._quickMode = quick.mode === "custom" ? "scene" : quick.mode;
+        this._quickEntity = quick.entity;
+        if (this._isLinked(slot)) {
+            this._quickMode = "link";
+            this._quickEntity = slot?.automation_entity_id ?? "";
+        }
+        this._quickOption = quick.option;
+        this._snapEntities = [...(this._remote?.snapshot_entities ?? [])];
+        this._snapRemember = false;
+        this._editorTab = quick.mode === "custom" && sequence.length ? "yaml" : "quick";
+        this._draft = JSON.stringify(sequence, null, 2);
+        this._draftName = slot?.name ?? "";
+        this._yamlValue = sequence;
+        this._yamlValid = true;
+        this._draftError = undefined;
+        this._draftMaterialized = slot?.materialized ?? false;
+        this._editingLive = undefined;
+        void ensureHaForm().then((ok) => {
+            this._haFormOk = ok;
+        });
+        void ensureYamlEditor().then((ok) => {
+            this._yamlEditorOk = ok;
+        });
+        if (slot?.materialized) {
+            // Automation is canonical — fetch its current actions so a
+            // dematerialize save folds the live version back in.
+            void this._hass.callWS({
+                type: "remote_mapper/get_slot",
+                entry_id: this._entryId,
+                action_id: actionId,
+            }).then((res) => {
+                if (this._editingAction === actionId && res.live) {
+                    this._editingLive = res.live;
+                    this._yamlValue = res.live.actions ?? [];
+                    this._draft = JSON.stringify(res.live.actions ?? [], null, 2);
+                    this._editorTab = "yaml";
+                }
+            });
+        }
+    }
+    _closeEditor() {
+        this._editingAction = undefined;
+        this._draftError = undefined;
+        this._editingLive = undefined;
+        this._clearArtifacts = undefined;
+    }
+    /** "Create new" modes: make the thing, bind it, and (automations) go edit it. */
+    async _createNew() {
+        const name = this._draftName.trim() || null;
+        try {
+            if (this._quickMode === "new_scene") {
+                if (!this._snapEntities.length) {
+                    this._draftError = "Pick at least one entity to capture";
+                    return;
+                }
+                await this._hass.callWS({
+                    type: "remote_mapper/create_snapshot",
+                    entry_id: this._entryId,
+                    action_id: this._editingAction,
+                    entities: this._snapEntities,
+                    remember_entities: this._snapRemember,
+                    ...(name ? { name } : {}),
+                });
+                this._closeEditor();
+                return;
+            }
+            const res = await this._hass.callWS({
+                type: "remote_mapper/create_automation",
+                entry_id: this._entryId,
+                action_id: this._editingAction,
+                scope: this._quickMode === "new_automation" ? "button" : "remote",
+                name,
+            });
+            this._closeEditor();
+            // the body is theirs to write — hand them HA's editor right away
+            this._navigate(res.edit_url);
+        }
+        catch (err) {
+            this._draftError = err.message ?? String(err);
+        }
+    }
+    async _saveDraft() {
+        if (this._editorTab === "quick" && CREATE_MODES.has(this._quickMode)) {
+            await this._createNew();
+            return;
+        }
+        const msg = {
+            type: "remote_mapper/save_slot",
+            entry_id: this._entryId,
+            action_id: this._editingAction,
+            materialized: this._draftMaterialized,
+            name: this._draftName.trim() || null,
+        };
+        if (this._editorTab === "quick" && this._quickMode === "link") {
+            if (!this._quickEntity) {
+                this._draftError = "Pick an automation first";
+                return;
+            }
+            // Link: no sequence, no materialize toggle — the automation is canonical
+            delete msg.materialized;
+            msg.link_entity_id = this._quickEntity;
+        }
+        else if (this._editorTab === "quick") {
+            if (!this._quickEntity) {
+                this._draftError = "Pick an entity first";
+                return;
+            }
+            if (this._quickMode === "wled_preset" && !this._quickOption) {
+                this._draftError = "Pick a preset first";
+                return;
+            }
+            msg.sequence = quickSequence(this._quickMode, this._quickEntity, this._quickOption);
+        }
+        else if (this._yamlEditorOk) {
+            if (!this._yamlValid) {
+                this._draftError = "YAML is not valid";
+                return;
+            }
+            msg.sequence = this._yamlValue ?? [];
+        }
+        else {
+            msg.sequence_yaml = this._draft;
+        }
+        try {
+            await this._hass.callWS(msg);
+            this._closeEditor();
+        }
+        catch (err) {
+            this._draftError = err.message ?? String(err);
+        }
+    }
+    async _clearSlot(decision) {
+        const res = await this._hass.callWS({
+            type: "remote_mapper/clear_slot",
+            entry_id: this._entryId,
+            action_id: this._editingAction,
+            ...(decision ? { decision, remember: this._clearRemember } : {}),
+        });
+        if (res.needs_decision) {
+            this._clearRemember = false;
+            this._clearArtifacts = res.artifacts;
+            return;
+        }
+        this._clearArtifacts = undefined;
+        this._closeEditor();
+    }
+    async _snapshot(reSnapshot) {
+        try {
+            await this._hass.callWS({
+                type: "remote_mapper/create_snapshot",
+                entry_id: this._entryId,
+                action_id: this._editingAction,
+                re_snapshot: reSnapshot,
+            });
+            this._closeEditor();
+        }
+        catch (err) {
+            this._draftError = err.message ?? String(err);
+        }
+    }
+    async _toggleArchived() {
+        const slot = this._remote?.slots[this._editingAction];
+        if (!slot)
+            return;
+        await this._hass.callWS({
+            type: "remote_mapper/archive_slot",
+            entry_id: this._entryId,
+            action_id: this._editingAction,
+            archived: !slot.archived,
+        });
+        this._closeEditor();
+    }
+    // ── hand back to HA ────────────────────────────────────────────────
+    /** What the release will do, counted from the current slots. */
+    _releasePlan() {
+        let imported = 0;
+        let linked = 0;
+        let materialized = 0;
+        let built = 0;
+        for (const slot of Object.values(this._remote?.slots ?? {})) {
+            if (slot.imported_from)
+                imported++;
+            else if (this._isLinked(slot))
+                linked++;
+            else if (slot.materialized)
+                materialized++;
+            else if (slot.sequence?.length && !slot.archived)
+                built++;
+        }
+        return { imported, linked, materialized, built };
+    }
+    async _release() {
+        this._releaseBusy = true;
+        try {
+            const res = await this._hass.callWS({
+                type: "remote_mapper/release_remote",
+                entry_id: this._entryId,
+                convert_remaining: this._releaseConvert,
+            });
+            this._releaseOpen = false;
+            this._cancelGridEdit();
+            this._edit.cancel();
+            this.notify(`Handed back: ${res.reenabled.length} original(s) re-enabled, ` +
+                `${res.converted.length} converted, ${res.kept.length} kept, ` +
+                `${res.dropped.length} dropped.`);
+            this._unsubEvents?.();
+            this._unsubEvents = undefined;
+            this._unsubActions?.();
+            this._unsubActions = undefined;
+            this._remote = undefined;
+            this._error =
+                "This remote was handed back to Home Assistant and removed from Remote " +
+                    "Mapper. Delete this card, or pick another remote in the card editor.";
+        }
+        catch (err) {
+            this.notify(`Hand back failed: ${err.message ?? String(err)}`);
+        }
+        finally {
+            this._releaseBusy = false;
+        }
+    }
+    _renderRelease() {
+        const plan = this._releasePlan();
+        const close = () => {
+            this._releaseOpen = false;
+        };
+        return b `
+      <div class="modal-backdrop" @click=${this._backdropClick(close)}>
+        <div class="modal" @click=${(e) => e.stopPropagation()}>
           <h3>Hand "${this._remote?.title}" back to Home Assistant</h3>
           <p class="hint">
             Removes this remote from Remote Mapper and leaves Home Assistant the
@@ -565,15 +3348,15 @@ function t(t,e,i,s){var o,r=arguments.length,n=r<3?e:null===s?s=Object.getOwnPro
           </p>
           <ul class="release-list">
             <li>
-              <b>${t.imported}</b> imported event(s): the original
+              <b>${plan.imported}</b> imported event(s): the original
               automation(s) are <b>re-enabled</b>, the mapping goes away.
             </li>
             <li>
-              <b>${t.linked}</b> linked event(s): the native automation is
+              <b>${plan.linked}</b> linked event(s): the native automation is
               <b>left untouched</b>.
             </li>
             <li>
-              <b>${t.materialized}</b> automation-backed event(s): the
+              <b>${plan.materialized}</b> automation-backed event(s): the
               automation is <b>kept</b>, renamed to a plain alias.
             </li>
             <li>
@@ -581,9 +3364,11 @@ function t(t,e,i,s){var o,r=arguments.length,n=r<3?e:null===s?s=Object.getOwnPro
                 <input
                   type="checkbox"
                   .checked=${this._releaseConvert}
-                  @change=${t=>{this._releaseConvert=t.target.checked}}
+                  @change=${(e) => {
+            this._releaseConvert = e.target.checked;
+        }}
                 />
-                <b>${t.built}</b> event(s) built in the card: <b>convert</b> to
+                <b>${plan.built}</b> event(s) built in the card: <b>convert</b> to
                 plain automations so the buttons keep working (unticked: dropped).
               </label>
             </li>
@@ -594,100 +3379,178 @@ function t(t,e,i,s){var o,r=arguments.length,n=r<3?e:null===s?s=Object.getOwnPro
             <button class="danger" ?disabled=${this._releaseBusy} @click=${this._release}>
               Hand back
             </button>
-            <button @click=${e}>Cancel</button>
+            <button @click=${close}>Cancel</button>
           </div>
         </div>
       </div>
-    `}_closeImport(){this._importScan=void 0}async _applyImport(){const t=this._importScan.proposals.filter((t,e)=>this._importSelected.has(e));if(t.length){this._importBusy=!0;try{await this._hass.callWS({type:"remote_mapper/apply_import",entry_id:this._entryId,proposals:t,overwrite:this._importOverwrite}),this._closeImport()}catch(t){this._importError=t.message??String(t)}finally{this._importBusy=!1}}else this._closeImport()}render(){if(this._error)return j`<ha-card header="Remote Mapper">
+    `;
+    }
+    _closeImport() {
+        this._importScan = undefined;
+    }
+    async _applyImport() {
+        const scan = this._importScan;
+        const proposals = scan.proposals.filter((_, i) => this._importSelected.has(i));
+        if (!proposals.length) {
+            this._closeImport();
+            return;
+        }
+        this._importBusy = true;
+        try {
+            await this._hass.callWS({
+                type: "remote_mapper/apply_import",
+                entry_id: this._entryId,
+                proposals,
+                overwrite: this._importOverwrite,
+            });
+            this._closeImport();
+        }
+        catch (err) {
+            this._importError = err.message ?? String(err);
+        }
+        finally {
+            this._importBusy = false;
+        }
+    }
+    // ── render ─────────────────────────────────────────────────────────
+    render() {
+        if (this._error) {
+            return b `<ha-card header="Remote Mapper">
         <div class="content error">${this._error}</div>
-      </ha-card>`;if(this._remoteChoices)return j`<ha-card header="Remote Mapper">
+      </ha-card>`;
+        }
+        if (this._remoteChoices) {
+            return b `<ha-card header="Remote Mapper">
         <div class="content">
-          ${0===this._remoteChoices.length?j`<p class="hint">
+          ${this._remoteChoices.length === 0
+                ? b `<p class="hint">
                   No remote is set up yet. Add one — pick the device (Zigbee2MQTT,
                   ZHA, Matter, MQTT…), press its buttons once — and this card
                   fills in by itself.
                 </p>
                 <div class="buttons">
-                  <button @click=${()=>this._navigate("/_my_redirect/config_flow_start?domain=remote_mapper")}>
+                  <button @click=${() => this._navigate(ADD_REMOTE_PATH)}>
                     Add a remote
                   </button>
-                </div>`:j`<p class="hint">
+                </div>`
+                : b `<p class="hint">
                   Several remotes exist — pick one in the card editor (the
                   <b>Remote</b> dropdown), or set <code>entry_id</code> in YAML:
                 </p>
                 <ul>
-                  ${this._remoteChoices.map(t=>j`<li>${t.title}: <code>${t.entry_id}</code></li>`)}
+                  ${this._remoteChoices.map((r) => b `<li>${r.title}: <code>${r.entry_id}</code></li>`)}
                 </ul>`}
         </div>
-      </ha-card>`;if(!this._remote)return j`<ha-card header="Remote Mapper">
+      </ha-card>`;
+        }
+        if (!this._remote) {
+            return b `<ha-card header="Remote Mapper">
         <div class="content">Loading…</div>
-      </ha-card>`;if(this._isGrid())return this._renderGridCard();const t=this._edit.active;return j`
+      </ha-card>`;
+        }
+        if (this._isGrid())
+            return this._renderGridCard();
+        const editing = this._edit.active;
+        return b `
       <ha-card>
         <div class="header">
           ${this._renderTitle()}
           <span class="header-buttons">
-            ${t?j`
-                  ${this._iconButton("mdi:refresh","Look for new actions (press the buttons first)",()=>{this._refreshActions()})}
-                  ${this._iconButton("mdi:import","Import existing automations",this._openImport)}
-                  ${this._iconButton("mdi:export","Hand this remote back to HA…",()=>{this._releaseOpen=!0})}
-                  ${this._iconButton("mdi:undo","Undo",()=>this._edit.undo(),{disabled:!this._edit.canUndo})}
-                  ${this._iconButton("mdi:close","Cancel (Esc)",()=>this._edit.cancel())}
-                  ${this._iconButton("mdi:check","Done — save layout",()=>{this._edit.done()},{active:!0})}
-                `:this._iconButton("mdi:pencil","Edit layout & slots",this._enterEdit)}
+            ${editing
+            ? b `
+                  ${this._iconButton("mdi:refresh", "Look for new actions (press the buttons first)", () => void this._refreshActions())}
+                  ${this._iconButton("mdi:import", "Import existing automations", this._openImport)}
+                  ${this._iconButton("mdi:export", "Hand this remote back to HA…", () => {
+                this._releaseOpen = true;
+            })}
+                  ${this._iconButton("mdi:undo", "Undo", () => this._edit.undo(), {
+                disabled: !this._edit.canUndo,
+            })}
+                  ${this._iconButton("mdi:close", "Cancel (Esc)", () => this._edit.cancel())}
+                  ${this._iconButton("mdi:check", "Done — save layout", () => void this._edit.done(), {
+                active: true,
+            })}
+                `
+            : this._iconButton("mdi:pencil", "Edit layout & slots", this._enterEdit)}
           </span>
         </div>
         ${this._renderTip()}
-        ${this._renderCanvas(t)}
-        ${void 0!==this._editingAction?this._renderEditor():Y}
-        ${this._importScan?this._renderImport():Y}
-        ${this._releaseOpen?this._renderRelease():Y}
+        ${this._renderCanvas(editing)}
+        ${this._editingAction !== undefined ? this._renderEditor() : A}
+        ${this._importScan ? this._renderImport() : A}
+        ${this._releaseOpen ? this._renderRelease() : A}
       </ha-card>
-    `}_renderGridCard(){const t=this._remote,e=this._gridEditing,i=this._gridLayout(),s=t.buttons??[];return j`
+    `;
+    }
+    _renderGridCard() {
+        const remote = this._remote;
+        const editing = this._gridEditing;
+        const layout = this._gridLayout();
+        const buttons = remote.buttons ?? [];
+        return b `
       <ha-card>
         <div class="header">
           ${this._renderTitle()}
           <span class="header-buttons">
-            ${e?j`
-                  ${this._iconButton("mdi:view-grid-plus-outline","Grid shape (rows × columns)",()=>{this._pickerOpen=!this._pickerOpen},{active:this._pickerOpen})}
-                  ${this._iconButton("mdi:refresh","Look for new actions (press the buttons first)",()=>{this._refreshActions()})}
-                  ${this._iconButton("mdi:import","Import existing automations",this._openImport)}
-                  ${this._iconButton("mdi:export","Hand this remote back to HA…",()=>{this._releaseOpen=!0})}
-                  ${this._iconButton("mdi:close","Cancel",this._cancelGridEdit)}
-                  ${this._iconButton("mdi:check","Done — save layout",()=>{this._saveGridEdit()},{active:!0})}
-                `:this._iconButton("mdi:pencil","Edit layout & slots",this._enterGridEdit)}
+            ${editing
+            ? b `
+                  ${this._iconButton("mdi:view-grid-plus-outline", "Grid shape (rows × columns)", () => {
+                this._pickerOpen = !this._pickerOpen;
+            }, { active: this._pickerOpen })}
+                  ${this._iconButton("mdi:refresh", "Look for new actions (press the buttons first)", () => void this._refreshActions())}
+                  ${this._iconButton("mdi:import", "Import existing automations", this._openImport)}
+                  ${this._iconButton("mdi:export", "Hand this remote back to HA…", () => {
+                this._releaseOpen = true;
+            })}
+                  ${this._iconButton("mdi:close", "Cancel", this._cancelGridEdit)}
+                  ${this._iconButton("mdi:check", "Done — save layout", () => void this._saveGridEdit(), {
+                active: true,
+            })}
+                `
+            : this._iconButton("mdi:pencil", "Edit layout & slots", this._enterGridEdit)}
           </span>
         </div>
         ${this._renderTip()}
-        ${e&&this._pickerOpen?j`<div class="picker-dock">
+        ${editing && this._pickerOpen
+            ? b `<div class="picker-dock">
               <remote-mapper-grid-picker
-                .rows=${i.rows}
-                .cols=${i.cols}
-                .minCells=${s.length}
+                .rows=${layout.rows}
+                .cols=${layout.cols}
+                .minCells=${buttons.length}
                 @grid-picked=${this._onGridPicked}
               ></remote-mapper-grid-picker>
-            </div>`:Y}
-        ${e?j`<p class="hint grid-hint">
-              Drag a button onto another cell to swap · tap a button to
-              rename it or edit its events
-            </p>`:Y}
-        ${0===s.length?Y:j`
+            </div>`
+            : A}
+        ${editing
+            ? b `<p class="hint grid-hint">· Tap a button to rename it or edit its events</p>
+            <p class="hint grid-hint">· Drag a button onto another cell to swap</p>`
+            : A}
+        ${buttons.length === 0
+            ? A // an empty grid is just blank space; the hint below says what to do
+            : b `
           <remote-mapper-grid
-            style=${function(t){const e=[],i=(t,i)=>{"string"==typeof i&&i.trim()&&e.push(`${t}:${i.trim()}`)};i("--rm-button-bg",t?.button_color),i("--rm-accent",t?.accent_color),i("--rm-text",t?.text_color);const s=t?.button_opacity;return"number"==typeof s&&s>0&&s<1&&e.push(`--rm-opacity:${s}`),e.join(";")}(this._config)}
-            .buttons=${s}
-            .layout=${i}
+            style=${styleVarsOf(this._config)}
+            .buttons=${buttons}
+            .layout=${layout}
             .slots=${this._slotViews()}
-            .display=${xt(this._config)}
-            .assistedTrigger=${At(this._config)}
-            .chipsLayout=${Et(this._config)}
-            .editing=${e}
+            .display=${displayOf(this._config)}
+            .assistedTrigger=${assistedTriggerOf(this._config)}
+            .chipsLayout=${chipsLayoutOf(this._config)}
+            .editing=${editing}
             .flash=${this._flash}
-            @run-action=${t=>{this._runSlot(t.detail.actionId)}}
-            @edit-action=${t=>{this._openEditor(t.detail.actionId)}}
-            @open-button=${t=>{this._buttonSheet=t.detail.buttonId,this._modalOpenedAt=Date.now()}}
-            @layout-changed=${t=>{this._gridDraft=t.detail.layout}}
+            @run-action=${(e) => void this._runSlot(e.detail.actionId)}
+            @edit-action=${(e) => void this._openEditor(e.detail.actionId)}
+            @open-button=${(e) => {
+                this._buttonSheet = e.detail.buttonId;
+                this._modalOpenedAt = Date.now();
+            }}
+            @layout-changed=${(e) => {
+                this._gridDraft = e.detail.layout;
+            }}
           ></remote-mapper-grid>
             `}
-        ${0===s.length?j`<div class="grid-hint">
+        ${buttons.length === 0
+            ? b `<div class="grid-hint">
               <p class="hint">
                 No buttons known yet. Press each button on the remote once (every
                 gesture you want: single, double, hold), then look again — the
@@ -695,185 +3558,397 @@ function t(t,e,i,s){var o,r=arguments.length,n=r<3?e:null===s?s=Object.getOwnPro
                 open edit mode.
               </p>
               <div class="buttons">
-                <button @click=${()=>{this._refreshActions()}}>Look for buttons now</button>
+                <button @click=${() => void this._refreshActions()}>Look for buttons now</button>
               </div>
-            </div>`:Y}
-        ${void 0!==this._buttonSheet?this._renderButtonSheet():Y}
-        ${void 0!==this._editingAction?this._renderEditor():Y}
-        ${this._importScan?this._renderImport():Y}
-        ${this._releaseOpen?this._renderRelease():Y}
+            </div>`
+            : A}
+        ${this._buttonSheet !== undefined ? this._renderButtonSheet() : A}
+        ${this._editingAction !== undefined ? this._renderEditor() : A}
+        ${this._importScan ? this._renderImport() : A}
+        ${this._releaseOpen ? this._renderRelease() : A}
       </ha-card>
-    `}_iconButton(t,e,i,s={}){const o=()=>{void 0!==this._tipTimer&&(clearTimeout(this._tipTimer),this._tipTimer=void 0)},r=()=>{o(),this._tip&&this._hideTipIn(1500)};return j`<ha-icon-button
-      class=${s.active?"active":""}
-      .label=${e}
-      title=${e}
-      ?disabled=${s.disabled}
-      @pointerdown=${t=>{if("mouse"===t.pointerType)return;o(),this._hideTipIn(0),this._tipShown=!1;const i=t.currentTarget;this._tipTimer=setTimeout(()=>{this._tipTimer=void 0,this._tipShown=!0,this._tip=function(t,e,i){const s=e.bottom+6;return(e.left+e.right)/2>i/2?{text:t,top:s,right:Math.max(8,i-e.right)}:{text:t,top:s,left:Math.max(8,e.left)}}(e,i.getBoundingClientRect(),window.innerWidth),this._hideTipIn(4e3)},450)}}
-      @pointerup=${r}
-      @pointercancel=${r}
-      @pointerleave=${r}
-      @contextmenu=${t=>{this._tipShown&&t.preventDefault()}}
-      @click=${t=>{if(this._tipShown)return t.stopPropagation(),void(this._tipShown=!1);i.call(this,t)}}
+    `;
+    }
+    /**
+     * HA-native 48px icon button (mdi icon name) — same control HA's own
+     * cards use. Hover shows the native title; a long press (touch) shows
+     * the same text in a bubble and swallows the tap.
+     */
+    _iconButton(icon, title, onClick, opts = {}) {
+        const clearTimer = () => {
+            if (this._tipTimer !== undefined) {
+                clearTimeout(this._tipTimer);
+                this._tipTimer = undefined;
+            }
+        };
+        // finger lifted (or the browser took the gesture): linger, then go
+        const release = () => {
+            clearTimer();
+            if (this._tip)
+                this._hideTipIn(1500);
+        };
+        return b `<ha-icon-button
+      class=${opts.active ? "active" : ""}
+      .label=${title}
+      title=${title}
+      ?disabled=${opts.disabled}
+      @pointerdown=${(e) => {
+            if (e.pointerType === "mouse")
+                return;
+            clearTimer();
+            this._hideTipIn(0);
+            this._tipShown = false;
+            const anchor = e.currentTarget;
+            this._tipTimer = setTimeout(() => {
+                this._tipTimer = undefined;
+                this._tipShown = true;
+                this._tip = tipAnchor(title, anchor.getBoundingClientRect(), window.innerWidth);
+                // backstop in case no pointerup/cancel ever reaches us
+                this._hideTipIn(4000);
+            }, 450);
+        }}
+      @pointerup=${release}
+      @pointercancel=${release}
+      @pointerleave=${release}
+      @contextmenu=${(e) => {
+            if (this._tipShown)
+                e.preventDefault();
+        }}
+      @click=${(e) => {
+            if (this._tipShown) {
+                // the long press was a "what is this?" — not a command
+                e.stopPropagation();
+                this._tipShown = false;
+                return;
+            }
+            // handlers may be plain methods — keep `this` bound to the card
+            onClick.call(this, e);
+        }}
     >
-      <ha-icon icon=${t}></ha-icon>
-    </ha-icon-button>`}_hideTipIn(t){clearTimeout(this._tipHideTimer),this._tipHideTimer=void 0,t<=0?this._tip=void 0:this._tipHideTimer=setTimeout(()=>{this._tipHideTimer=void 0,this._tip=void 0},t)}_renderTip(){const t=this._tip;if(!t)return Y;const e=void 0!==t.right?`right:${t.right}px`:`left:${t.left}px`;return j`<div class="tip" role="tooltip" style="top:${t.top}px;${e}">${t.text}</div>`}_renderButtonSheet(){const t=this._remote,e=this._gridLayout(),i=(t.buttons??[]).find(t=>t.id===this._buttonSheet);if(!i)return j``;const s=this._slotViews(),o=()=>{this._buttonSheet=void 0};return j`
-      <div class="modal-backdrop" @click=${this._backdropClick(o)}>
+      <ha-icon icon=${icon}></ha-icon>
+    </ha-icon-button>`;
+    }
+    /** (Re)schedule the long-press bubble to disappear; 0 hides it now. */
+    _hideTipIn(ms) {
+        clearTimeout(this._tipHideTimer);
+        this._tipHideTimer = undefined;
+        if (ms <= 0) {
+            this._tip = undefined;
+            return;
+        }
+        this._tipHideTimer = setTimeout(() => {
+            this._tipHideTimer = undefined;
+            this._tip = undefined;
+        }, ms);
+    }
+    _renderTip() {
+        const tip = this._tip;
+        if (!tip)
+            return A;
+        const side = tip.right !== undefined ? `right:${tip.right}px` : `left:${tip.left}px`;
+        return b `<div class="tip" role="tooltip" style="top:${tip.top}px;${side}">${tip.text}</div>`;
+    }
+    /** One button's events: rename (edit mode), run, or open the slot editor. */
+    _renderButtonSheet() {
+        const remote = this._remote;
+        const layout = this._gridLayout();
+        const button = (remote.buttons ?? []).find((b) => b.id === this._buttonSheet);
+        if (!button)
+            return b ``;
+        const views = this._slotViews();
+        const close = () => {
+            this._buttonSheet = undefined;
+        };
+        return b `
+      <div class="modal-backdrop" @click=${this._backdropClick(close)}>
         <div class="modal" @click=${this._ghostGuard}>
           <h3>
-            ${Nt(i,e)}
-            <span class="hint">(${i.id})</span>
+            ${buttonLabel(button, layout)}
+            <span class="hint">(${button.id})</span>
           </h3>
-          ${this._gridEditing?j`<label class="hint row">
+          ${this._gridEditing
+            ? b `<label class="hint row">
                 Label
                 <input
                   class="label-input"
                   type="text"
-                  .value=${e.buttons[i.id]?.label??""}
-                  placeholder=${i.id}
-                  @input=${t=>{this._gridDraft&&(this._gridDraft=function(t,e,i){const s=t.buttons[e];if(!s)return t;const{label:o,...r}=s;return{...t,buttons:{...t.buttons,[e]:i.trim()?{...r,label:i}:r}}}(this._gridDraft,i.id,t.target.value))}}
+                  .value=${layout.buttons[button.id]?.label ?? ""}
+                  placeholder=${button.id}
+                  @input=${(e) => {
+                if (this._gridDraft) {
+                    this._gridDraft = setButtonLabel(this._gridDraft, button.id, e.target.value);
+                }
+            }}
                 />
-              </label>`:Y}
+              </label>`
+            : A}
           <ul class="event-list">
-            ${i.actions.map(e=>{const i=s[e.action_id];return j`
-                <li class=${i?.assigned?"on":""}>
+            ${button.actions.map((a) => {
+            const view = views[a.action_id];
+            return b `
+                <li class=${view?.assigned ? "on" : ""}>
                   <span class="ev-main">
-                    <span class="ev-icon" title=${Dt[e.kind]}
-                      >${Lt[e.kind]}</span
+                    <span class="ev-icon" title=${KIND_TITLE[a.kind]}
+                      >${KIND_ICON[a.kind]}</span
                     >
-                    <span class="ev-name">${e.event}</span>
-                    <span class="ev-summary">${i?.summary??"unassigned"}</span>
+                    <span class="ev-name">${a.event}</span>
+                    <span class="ev-summary">${view?.summary ?? "unassigned"}</span>
                   </span>
                   <span class="ev-actions">
-                  ${this._iconButton("mdi:play","Run now",()=>{this._runSlot(e.action_id)},{disabled:!i?.assigned||!!i.archived})}
-                  ${(()=>{const i=this._targetEditor(t.slots[e.action_id]);return i?this._iconButton(i.icon,i.title,()=>this._navigate(i.path)):Y})()}
-                  ${(()=>{const i=t.slots[e.action_id],s=this._automationEditPath(i),o=[];if(s){const t="off"===this._automationState(i),e=this._isLinked(i),r=i?.shared_automation?"Remote automation (this event's branch)":e?"Linked automation":"Automation";o.push(this._iconButton(t?"mdi:robot-off":"mdi:robot",`${r}${t?" (DISABLED)":""} — open in HA's editor`,()=>this._navigate(s),{active:!t&&(e||!!i?.shared_automation)}))}return o.push(...this._importedSources(i).map(t=>{const e=!!t.entity_id&&"on"===this._hass?.states?.[t.entity_id]?.state,i=t.entity_id??t.config_id;return this._iconButton(e?"mdi:robot":"mdi:robot-off",e?`Imported original is ENABLED — it also runs on this press: ${i}`:`Open the imported original (disabled): ${i}`,()=>this._navigate(`/config/automation/edit/${t.config_id}`),{active:e})})),o})()}
-                  ${this._iconButton("mdi:pencil","Edit",()=>{this._openEditor(e.action_id)})}
+                  ${this._iconButton("mdi:play", "Run now", () => void this._runSlot(a.action_id), {
+                disabled: !view?.assigned || !!view.archived,
+            })}
+                  ${(() => {
+                const target = this._targetEditor(remote.slots[a.action_id]);
+                return target
+                    ? this._iconButton(target.icon, target.title, () => this._navigate(target.path))
+                    : A;
+            })()}
+                  ${(() => {
+                // chips, fixed order: the slot's own automation (own,
+                // shared or linked), then every imported original —
+                // all at once, so a multi-source event keeps its trail
+                const slot = remote.slots[a.action_id];
+                const path = this._automationEditPath(slot);
+                const chips = [];
+                if (path) {
+                    const off = this._automationState(slot) === "off";
+                    const linked = this._isLinked(slot);
+                    const kind = slot?.shared_automation
+                        ? "Remote automation (this event's branch)"
+                        : linked
+                            ? "Linked automation"
+                            : "Automation";
+                    chips.push(this._iconButton(off ? "mdi:robot-off" : "mdi:robot", `${kind}${off ? " (DISABLED)" : ""} — open in HA's editor`, () => this._navigate(path), { active: !off && (linked || !!slot?.shared_automation) }));
+                }
+                chips.push(...this._importedSources(slot).map((src) => {
+                    // live state: an original that got re-enabled fires in
+                    // parallel with this slot on every press — say so
+                    const enabled = !!src.entity_id && this._hass?.states?.[src.entity_id]?.state === "on";
+                    const label = src.entity_id ?? src.config_id;
+                    return this._iconButton(enabled ? "mdi:robot" : "mdi:robot-off", enabled
+                        ? `Imported original is ENABLED — it also runs on this press: ${label}`
+                        : `Open the imported original (disabled): ${label}`, () => this._navigate(`/config/automation/edit/${src.config_id}`), { active: enabled });
+                }));
+                return chips;
+            })()}
+                  ${this._iconButton("mdi:pencil", "Edit", () => void this._openEditor(a.action_id))}
                   </span>
                 </li>
-              `})}
+              `;
+        })}
           </ul>
           <div class="buttons">
-            <button @click=${o}>Close</button>
+            <button @click=${close}>Close</button>
           </div>
         </div>
       </div>
-    `}_renderCanvas(t){const e=this._currentLayout(),i=this._transform(),s=t?this._edit.working:e.widgets,o=this._edit.selectedId;return j`
+    `;
+    }
+    _renderCanvas(editing) {
+        const layout = this._currentLayout();
+        const t = this._transform();
+        const widgets = editing ? this._edit.working : layout.widgets;
+        const selected = this._edit.selectedId;
+        return b `
       <div
-        class="viewport ${t?"editing":""}"
-        style="height:${i.viewportHeight}px"
-        @pointerdown=${e=>{t?this._edit.select(null):this._edit.onViewPointerDown(e)}}
-        @pointermove=${t=>this._edit.onViewPointerMove(t)}
-        @pointerup=${()=>this._edit.cancelLongPress()}
+        class="viewport ${editing ? "editing" : ""}"
+        style="height:${t.viewportHeight}px"
+        @pointerdown=${(e) => {
+            if (!editing)
+                this._edit.onViewPointerDown(e);
+            else
+                this._edit.select(null);
+        }}
+        @pointermove=${(e) => this._edit.onViewPointerMove(e)}
+        @pointerup=${() => this._edit.cancelLongPress()}
       >
         <div
           class="canvas"
-          style="width:${e.design_size.width}px;height:${e.design_size.height}px;transform:translate(${i.offsetX}px, ${i.offsetY}px) scale(${i.scale})"
+          style="width:${layout.design_size.width}px;height:${layout.design_size
+            .height}px;transform:translate(${t.offsetX}px, ${t.offsetY}px) scale(${t.scale})"
         >
-          ${s.map(e=>this._renderTile(e,t,e.id===o))}
+          ${widgets.map((w) => this._renderTile(w, editing, w.id === selected))}
         </div>
-        ${t?this._renderEditChrome():Y}
+        ${editing ? this._renderEditChrome() : A}
       </div>
-    `}_renderTile(t,e,i){const s=this._remote.slots[t.id],o=["widget-slot","tile",s?"assigned":"empty",s?.archived?"archived":"",this._flash===t.id?"flash":"",i?"selected":""].join(" ");return j`
+    `;
+    }
+    _renderTile(w, editing, selected) {
+        const slot = this._remote.slots[w.id];
+        const classes = [
+            "widget-slot",
+            "tile",
+            slot ? "assigned" : "empty",
+            slot?.archived ? "archived" : "",
+            this._flash === w.id ? "flash" : "",
+            selected ? "selected" : "",
+        ].join(" ");
+        return b `
       <div
-        class=${o}
-        data-slot-id=${t.id}
-        style="transform:translate3d(${t.x}px, ${t.y}px, 0);width:${t.w}px;height:${t.h}px;z-index:${t.z??1}"
-        @pointerdown=${i=>{e&&this._edit.onSlotPointerDown(i,t.id)}}
-        @click=${()=>{e||this._runSlot(t.id)}}
-        @dblclick=${()=>{e&&this.openSettings(t.id)}}
+        class=${classes}
+        data-slot-id=${w.id}
+        style="transform:translate3d(${w.x}px, ${w.y}px, 0);width:${w.w}px;height:${w.h}px;z-index:${w.z ?? 1}"
+        @pointerdown=${(e) => {
+            if (editing)
+                this._edit.onSlotPointerDown(e, w.id);
+        }}
+        @click=${() => {
+            if (!editing)
+                void this._runSlot(w.id);
+        }}
+        @dblclick=${() => {
+            if (editing)
+                this.openSettings(w.id);
+        }}
       >
-        <span class="action">${t.id}</span>
-        <span class="summary">${this._slotSummary(s)}</span>
-        ${s?.last_error?j`<span class="tile-badge error-badge" title=${s.last_error}
+        <span class="action">${w.id}</span>
+        <span class="summary">${this._slotSummary(slot)}</span>
+        ${slot?.last_error
+            ? b `<span class="tile-badge error-badge" title=${slot.last_error}
               >!</span
-            >`:Y}
-        ${s?.archived?j`<span class="tile-badge">archived</span>`:Y}
-        ${this._remote.stale_actions?.includes(t.id)?j`<span
+            >`
+            : A}
+        ${slot?.archived
+            ? b `<span class="tile-badge">archived</span>`
+            : A}
+        ${this._remote.stale_actions?.includes(w.id)
+            ? b `<span
               class="tile-badge warn"
               title="The source no longer reports this action (renamed upstream?)"
               >stale</span
-            >`:Y}
-        ${e&&i?j`${["nw","ne","sw","se"].map(e=>j`
+            >`
+            : A}
+        ${editing && selected
+            ? b `${["nw", "ne", "sw", "se"].map((corner) => b `
                 <span
-                  class="handle ${e}"
-                  @pointerdown=${i=>this._edit.onHandlePointerDown(i,t.id,e)}
+                  class="handle ${corner}"
+                  @pointerdown=${(e) => this._edit.onHandlePointerDown(e, w.id, corner)}
                 ></span>
-              `)}`:Y}
+              `)}`
+            : A}
       </div>
-    `}_renderEditChrome(){const t=this._edit.selected,e=this._transform(),i=this._edit.dpadSteps,s="fine"===this._edit.dpadMode?"1":i.x===i.y?`${i.x}`:`${i.x}·${i.y}`,o=(t,e)=>i=>{i.preventDefault(),i.stopPropagation(),i.currentTarget.setPointerCapture(i.pointerId),this._edit.dpadPress(t,e)},r=()=>this._edit.dpadRelease();return j`
-      ${t?this._renderChipbar(t,e):Y}
-      <div class="dpad-dock" @pointerdown=${t=>t.stopPropagation()}>
-        ${t?j`<div class="badge"></div>`:Y}
+    `;
+    }
+    _renderEditChrome() {
+        const sel = this._edit.selected;
+        const t = this._transform();
+        const steps = this._edit.dpadSteps;
+        const stepLabel = this._edit.dpadMode === "fine"
+            ? "1"
+            : steps.x === steps.y
+                ? `${steps.x}`
+                : `${steps.x}·${steps.y}`;
+        const press = (dx, dy) => (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.currentTarget.setPointerCapture(e.pointerId);
+            this._edit.dpadPress(dx, dy);
+        };
+        const release = () => this._edit.dpadRelease();
+        return b `
+      ${sel ? this._renderChipbar(sel, t) : A}
+      <div class="dpad-dock" @pointerdown=${(e) => e.stopPropagation()}>
+        ${sel ? b `<div class="badge"></div>` : A}
         <div class="dpad">
           <span></span>
-          <button ?disabled=${!t} @pointerdown=${o(0,-1)}
-            @pointerup=${r} @pointercancel=${r}
-            @lostpointercapture=${r}>▲</button>
+          <button ?disabled=${!sel} @pointerdown=${press(0, -1)}
+            @pointerup=${release} @pointercancel=${release}
+            @lostpointercapture=${release}>▲</button>
           <span></span>
-          <button ?disabled=${!t} @pointerdown=${o(-1,0)}
-            @pointerup=${r} @pointercancel=${r}
-            @lostpointercapture=${r}>◀</button>
+          <button ?disabled=${!sel} @pointerdown=${press(-1, 0)}
+            @pointerup=${release} @pointercancel=${release}
+            @lostpointercapture=${release}>◀</button>
           <button class="step" title="Toggle nudge step (1 unit ↔ grid cell)"
-            @click=${()=>this._edit.toggleDpadStep()}>${s}</button>
-          <button ?disabled=${!t} @pointerdown=${o(1,0)}
-            @pointerup=${r} @pointercancel=${r}
-            @lostpointercapture=${r}>▶</button>
+            @click=${() => this._edit.toggleDpadStep()}>${stepLabel}</button>
+          <button ?disabled=${!sel} @pointerdown=${press(1, 0)}
+            @pointerup=${release} @pointercancel=${release}
+            @lostpointercapture=${release}>▶</button>
           <span></span>
-          <button ?disabled=${!t} @pointerdown=${o(0,1)}
-            @pointerup=${r} @pointercancel=${r}
-            @lostpointercapture=${r}>▼</button>
+          <button ?disabled=${!sel} @pointerdown=${press(0, 1)}
+            @pointerup=${release} @pointercancel=${release}
+            @lostpointercapture=${release}>▼</button>
           <span></span>
         </div>
       </div>
-    `}_renderChipbar(t,e){const i=this._hostWidth||300,s=e.offsetX+(t.x+t.w/2)*e.scale,o=e.offsetY+t.y*e.scale,r=o<46,n=r?e.offsetY+(t.y+t.h)*e.scale+6:o-6,a=Math.min(Math.max(s,110),Math.max(110,i-110));return j`
+    `;
+    }
+    _renderChipbar(sel, t) {
+        const vw = this._hostWidth || 300;
+        const cx = t.offsetX + (sel.x + sel.w / 2) * t.scale;
+        const topPx = t.offsetY + sel.y * t.scale;
+        const flip = topPx < 46;
+        const top = flip ? t.offsetY + (sel.y + sel.h) * t.scale + 6 : topPx - 6;
+        const left = Math.min(Math.max(cx, 110), Math.max(110, vw - 110));
+        return b `
       <div
         class="chipbar"
-        style="left:${a}px;top:${n}px;transform:translate(-50%, ${r?"0":"-100%"})"
-        @pointerdown=${t=>t.stopPropagation()}
+        style="left:${left}px;top:${top}px;transform:translate(-50%, ${flip
+            ? "0"
+            : "-100%"})"
+        @pointerdown=${(e) => e.stopPropagation()}
       >
-        <button title="Slot settings" @click=${()=>this.openSettings(t.id)}>
+        <button title="Slot settings" @click=${() => this.openSettings(sel.id)}>
           ⚙
         </button>
-        <button title="Send backward" @click=${()=>this._edit.zOp("backward")}>
+        <button title="Send backward" @click=${() => this._edit.zOp("backward")}>
           ↓
         </button>
-        <button title="Bring forward" @click=${()=>this._edit.zOp("forward")}>
+        <button title="Bring forward" @click=${() => this._edit.zOp("forward")}>
           ↑
         </button>
       </div>
-    `}_renderEditor(){const t=this._remote.slots[this._editingAction];return j`
+    `;
+    }
+    _renderEditor() {
+        const slot = this._remote.slots[this._editingAction];
+        return b `
       <div class="modal-backdrop" @click=${this._backdropClick(this._closeEditor)}>
         <div class="modal" @click=${this._ghostGuard}>
           <h3>${this._editingAction}</h3>
-          ${this._editingLive?j`<p class="hint">
-                ${!1===this._editingLive.owned?"Linked to":"Backed by"}
+          ${this._editingLive
+            ? b `<p class="hint">
+                ${this._editingLive.owned === false ? "Linked to" : "Backed by"}
                 <b>${this._editingLive.alias}</b>
-                ${"off"===this._editingLive.state?j`<span class="warn">(disabled)</span>`:Y}
+                ${this._editingLive.state === "off" ? b `<span class="warn">(disabled)</span>` : A}
                 —
                 <button
                   class="link"
-                  @click=${()=>this._navigate(this._editingLive.edit_url)}
+                  @click=${() => this._navigate(this._editingLive.edit_url)}
                 >
                   open in HA's automation editor
                 </button>.
-                ${this._editingLive.branch_missing?j`<span class="warn">It has no branch for this event any more.</span>
-                      Pick "Add this button to the remote automation" below to re-add one.`:this._editingLive.branch?'This event is one branch of it. Unticking "automation" below moves the branch\'s actions into this card and removes the branch; the other buttons keep theirs.':!1===this._editingLive.owned?"It stays native and enabled; edit it there. Unticking the box below copies its actions into this card and disables it (hand-back re-enables it).":'Unticking "automation" below deletes it on Save and moves its actions into this card. Cancel keeps things as they are.'}
-              </p>`:Y}
+                ${this._editingLive.branch_missing
+                ? b `<span class="warn">It has no branch for this event any more.</span>
+                      Pick "Add this button to the remote automation" below to re-add one.`
+                : this._editingLive.branch
+                    ? 'This event is one branch of it. Unticking "automation" below moves the branch\'s actions into this card and removes the branch; the other buttons keep theirs.'
+                    : this._editingLive.owned === false
+                        ? "It stays native and enabled; edit it there. Unticking the box below copies its actions into this card and disables it (hand-back re-enables it)."
+                        : 'Unticking "automation" below deletes it on Save and moves its actions into this card. Cancel keeps things as they are.'}
+              </p>`
+            : A}
           <div class="tabs">
             <button
-              class=${"quick"===this._editorTab?"on":""}
-              @click=${()=>{this._editorTab="quick"}}
+              class=${this._editorTab === "quick" ? "on" : ""}
+              @click=${() => {
+            this._editorTab = "quick";
+        }}
             >
               Quick
             </button>
             <button
-              class=${"yaml"===this._editorTab?"on":""}
-              @click=${()=>{this._editorTab="yaml"}}
+              class=${this._editorTab === "yaml" ? "on" : ""}
+              @click=${() => {
+            this._editorTab = "yaml";
+        }}
             >
               YAML
             </button>
           </div>
-          ${"quick"===this._editorTab?this._renderQuickTab():this._renderYamlTab()}
+          ${this._editorTab === "quick"
+            ? this._renderQuickTab()
+            : this._renderYamlTab()}
           <label class="hint row">
             Name
             <input
@@ -881,146 +3956,392 @@ function t(t,e,i,s){var o,r=arguments.length,n=r<3?e:null===s?s=Object.getOwnPro
               type="text"
               .value=${this._draftName}
               placeholder=${this._autoNamePlaceholder()}
-              @input=${t=>{this._draftName=t.target.value}}
+              @input=${(e) => {
+            this._draftName = e.target.value;
+        }}
             />
           </label>
-          ${"quick"===this._editorTab&&fe.has(this._quickMode)?Y:j`<label class="hint row">
+          ${this._editorTab === "quick" && CREATE_MODES.has(this._quickMode)
+            ? A
+            : b `<label class="hint row">
                 <input
                   type="checkbox"
                   .checked=${this._draftMaterialized}
-                  @change=${t=>{this._draftMaterialized=t.target.checked}}
+                  @change=${(e) => {
+                this._draftMaterialized = e.target.checked;
+            }}
                 />
-                ${this._editingLive?.branch?"Keep as a branch of the remote automation (untick to move it into the card)":!1===this._editingLive?.owned?"Keep linked to the automation (untick to absorb into the card)":"Create as automation (editable/traceable in HA)"}
+                ${this._editingLive?.branch
+                ? "Keep as a branch of the remote automation (untick to move it into the card)"
+                : this._editingLive?.owned === false
+                    ? "Keep linked to the automation (untick to absorb into the card)"
+                    : "Create as automation (editable/traceable in HA)"}
               </label>`}
-          ${this._draftError?j`<p class="error">${this._draftError}</p>`:Y}
+          ${this._draftError
+            ? b `<p class="error">${this._draftError}</p>`
+            : A}
           <div class="buttons">
             <button @click=${this._saveDraft}>
-              ${"quick"===this._editorTab&&"new_scene"===this._quickMode?"📸 Capture":"quick"===this._editorTab&&fe.has(this._quickMode)?"Create & open in HA":"Save"}
+              ${this._editorTab === "quick" && this._quickMode === "new_scene"
+            ? "📸 Capture"
+            : this._editorTab === "quick" && CREATE_MODES.has(this._quickMode)
+                ? "Create & open in HA"
+                : "Save"}
             </button>
             <button @click=${this._closeEditor}>Cancel</button>
-            ${t?.scene_id?j`<button
+            ${slot?.scene_id
+            ? b `<button
                   title="Same scene, same entities, new states"
-                  @click=${()=>this._snapshot(!0)}
+                  @click=${() => this._snapshot(true)}
                 >
                   Re-snapshot
-                </button>`:Y}
-            ${t?j`
-                  <button class="danger" @click=${()=>this._clearSlot()}>
+                </button>`
+            : A}
+            ${slot
+            ? b `
+                  <button class="danger" @click=${() => this._clearSlot()}>
                     Clear
                   </button>
                   <button @click=${this._toggleArchived}>
-                    ${t.archived?"Unarchive":"Archive"}
+                    ${slot.archived ? "Unarchive" : "Archive"}
                   </button>
-                `:Y}
+                `
+            : A}
           </div>
-          ${this._clearArtifacts?this._renderClearDialog():Y}
+          ${this._clearArtifacts ? this._renderClearDialog() : A}
         </div>
       </div>
-    `}_autoNamePlaceholder(){let t=[];if("quick"===this._editorTab&&fe.has(this._quickMode))return"new_scene"===this._quickMode?`Auto: ${this._remote?.title??"Remote"} ${this._editingAction??""}`:"Auto (from the automation)";if("quick"===this._editorTab&&"link"===this._quickMode){const t=this._quickEntity?this._hass?.states?.[this._quickEntity]?.attributes?.friendly_name:void 0;return"string"==typeof t&&t?`Auto: ${t}`:"Auto (the automation's name)"}if("quick"===this._editorTab&&this._quickEntity)t=ye(this._quickMode,this._quickEntity,this._quickOption);else if(this._yamlEditorOk)t=this._yamlValue??[];else try{t=JSON.parse(this._draft||"[]")}catch{t=[]}const e=me(t,this._hass);return e?`Auto: ${e}`:"Auto (from the action)"}_renderQuickTab(){if(!this._haFormOk)return j`<p class="hint">
+    `;
+    }
+    /** What the name will be if left empty — inferred from the current draft. */
+    _autoNamePlaceholder() {
+        let sequence = [];
+        if (this._editorTab === "quick" && CREATE_MODES.has(this._quickMode)) {
+            return this._quickMode === "new_scene"
+                ? `Auto: ${this._remote?.title ?? "Remote"} ${this._editingAction ?? ""}`
+                : "Auto (from the automation)";
+        }
+        if (this._editorTab === "quick" && this._quickMode === "link") {
+            const friendly = this._quickEntity
+                ? this._hass?.states?.[this._quickEntity]?.attributes?.friendly_name
+                : undefined;
+            return typeof friendly === "string" && friendly
+                ? `Auto: ${friendly}`
+                : "Auto (the automation's name)";
+        }
+        if (this._editorTab === "quick" && this._quickEntity) {
+            sequence = quickSequence(this._quickMode, this._quickEntity, this._quickOption);
+        }
+        else if (this._yamlEditorOk) {
+            sequence = this._yamlValue ?? [];
+        }
+        else {
+            try {
+                sequence = JSON.parse(this._draft || "[]");
+            }
+            catch {
+                sequence = [];
+            }
+        }
+        const auto = inferName(sequence, this._hass);
+        return auto ? `Auto: ${auto}` : "Auto (from the action)";
+    }
+    _renderQuickTab() {
+        if (!this._haFormOk) {
+            return b `<p class="hint">
         Loading HA editor components… If this persists, use the YAML tab.
-      </p>`;const t=this._remote?.slots[this._editingAction??""],e=!!this._remote?.remote_automation,i=[{value:"new_scene",label:"＋ Scene from current state"},{value:"new_automation",label:"＋ Automation for this button (fill in HA)"}];e?t?.shared_automation&&!t.branch_missing||i.push({value:"new_remote_automation",label:"＋ Add this button to the remote automation"}):i.push({value:"new_remote_automation",label:"＋ Automation for the whole remote (one branch per event)"});const s=[{name:"mode",selector:{select:{mode:"dropdown",options:[...i,{value:"scene",label:"Activate scene"},{value:"toggle",label:"Toggle entity"},{value:"script",label:"Run script"},{value:"wled_preset",label:"Set WLED preset"},{value:"link",label:"Link existing automation (stays native)"}]}}}];let o;if("new_scene"===this._quickMode?(s.push({name:"entities",selector:{entity:{multiple:!0}}}),s.push({name:"remember",selector:{boolean:{}}}),o="Set the room the way you like it first. Capture stores the current state of these entities as a scene bound to this event; Re-snapshot later updates it in place."):"new_automation"===this._quickMode?o="Creates an automation with this event as its trigger and no actions, then opens HA's editor so you can fill it in. The card shows what you put there.":"new_remote_automation"===this._quickMode&&(o=e?"Appends a trigger and an empty branch for this event to the remote's automation, then opens it in HA's editor.":"Creates one automation for this remote: a trigger per event and a choose block with one branch per event (the blueprint look). Buttons you already built in the card move into their branch; buttons with their own automation stay as they are."),"link"===this._quickMode)s.push({name:"entity",selector:{entity:{domain:"automation"}}});else if("wled_preset"===this._quickMode){s.push({name:"entity",selector:{entity:{domain:"select",integration:"wled"}}});const t=this._quickEntity?this._hass?.states?.[this._quickEntity]:void 0,e=t?.attributes?.options??[];s.push({name:"option",selector:e.length?{select:{mode:"dropdown",custom_value:!0,options:e}}:{text:{}}})}else if(!fe.has(this._quickMode)){const t="scene"===this._quickMode?"scene":"script"===this._quickMode?"script":void 0;s.push({name:"entity",selector:{entity:t?{domain:t}:{}}})}const r={mode:"Action",option:"Preset",entities:"Entities to capture",remember:"Remember these as this remote's default",entity:"link"===this._quickMode?"Automation":"Entity"};return j`
+      </p>`;
+        }
+        const slot = this._remote?.slots[this._editingAction ?? ""];
+        const hasShared = !!this._remote?.remote_automation;
+        // "Create new" first: an empty button is usually a new thing, not a bind.
+        // The whole-remote option turns into "add this button" once it exists,
+        // and disappears for a slot that already is a (present) branch of it.
+        const createOptions = [
+            { value: "new_scene", label: "＋ Scene from current state" },
+            { value: "new_automation", label: "＋ Automation for this button (fill in HA)" },
+        ];
+        if (!hasShared) {
+            createOptions.push({
+                value: "new_remote_automation",
+                label: "＋ Automation for the whole remote (one branch per event)",
+            });
+        }
+        else if (!slot?.shared_automation || slot.branch_missing) {
+            createOptions.push({
+                value: "new_remote_automation",
+                label: "＋ Add this button to the remote automation",
+            });
+        }
+        const schema = [
+            {
+                name: "mode",
+                selector: {
+                    select: {
+                        mode: "dropdown",
+                        options: [
+                            ...createOptions,
+                            { value: "scene", label: "Activate scene" },
+                            { value: "toggle", label: "Toggle entity" },
+                            { value: "script", label: "Run script" },
+                            { value: "wled_preset", label: "Set WLED preset" },
+                            { value: "link", label: "Link existing automation (stays native)" },
+                        ],
+                    },
+                },
+            },
+        ];
+        let createHint;
+        if (this._quickMode === "new_scene") {
+            schema.push({ name: "entities", selector: { entity: { multiple: true } } });
+            schema.push({ name: "remember", selector: { boolean: {} } });
+            createHint =
+                "Set the room the way you like it first. Capture stores the current state of these entities as a scene bound to this event; Re-snapshot later updates it in place.";
+        }
+        else if (this._quickMode === "new_automation") {
+            createHint =
+                "Creates an automation with this event as its trigger and no actions, then opens HA's editor so you can fill it in. The card shows what you put there.";
+        }
+        else if (this._quickMode === "new_remote_automation") {
+            createHint = hasShared
+                ? "Appends a trigger and an empty branch for this event to the remote's automation, then opens it in HA's editor."
+                : "Creates one automation for this remote: a trigger per event and a choose block with one branch per event (the blueprint look). Buttons you already built in the card move into their branch; buttons with their own automation stay as they are.";
+        }
+        if (this._quickMode === "link") {
+            schema.push({
+                name: "entity",
+                selector: { entity: { domain: "automation" } },
+            });
+        }
+        else if (this._quickMode === "wled_preset") {
+            // WLED exposes presets as a select.*_preset entity; picking one is a
+            // select.select_option call. Populate the preset list from the chosen
+            // entity's `options` attribute, falling back to free text.
+            schema.push({
+                name: "entity",
+                selector: { entity: { domain: "select", integration: "wled" } },
+            });
+            const stateObj = this._quickEntity
+                ? this._hass?.states?.[this._quickEntity]
+                : undefined;
+            const options = stateObj?.attributes?.options ?? [];
+            schema.push({
+                name: "option",
+                selector: options.length
+                    ? { select: { mode: "dropdown", custom_value: true, options } }
+                    : { text: {} },
+            });
+        }
+        else if (!CREATE_MODES.has(this._quickMode)) {
+            const domain = this._quickMode === "scene"
+                ? "scene"
+                : this._quickMode === "script"
+                    ? "script"
+                    : undefined;
+            schema.push({
+                name: "entity",
+                selector: { entity: domain ? { domain } : {} },
+            });
+        }
+        const labels = {
+            mode: "Action",
+            option: "Preset",
+            entities: "Entities to capture",
+            remember: "Remember these as this remote's default",
+            entity: this._quickMode === "link" ? "Automation" : "Entity",
+        };
+        return b `
       <ha-form
         .hass=${this._hass}
-        .data=${{mode:this._quickMode,entity:this._quickEntity,option:this._quickOption,entities:this._snapEntities,remember:this._snapRemember}}
-        .schema=${s}
-        .computeLabel=${t=>r[t.name]??t.name}
-        @value-changed=${t=>{const e=t.detail.value;e.mode!==this._quickMode?(this._quickMode=e.mode,this._quickEntity="",this._quickOption=""):fe.has(this._quickMode)?(this._snapEntities=e.entities??[],this._snapRemember=!!e.remember):e.entity!==this._quickEntity?(this._quickEntity=e.entity??"",this._quickOption=""):(this._quickEntity=e.entity??"",this._quickOption=e.option??"")}}
+        .data=${{
+            mode: this._quickMode,
+            entity: this._quickEntity,
+            option: this._quickOption,
+            entities: this._snapEntities,
+            remember: this._snapRemember,
+        }}
+        .schema=${schema}
+        .computeLabel=${(s) => labels[s.name] ?? s.name}
+        @value-changed=${(e) => {
+            const value = e.detail.value;
+            if (value.mode !== this._quickMode) {
+                this._quickMode = value.mode;
+                this._quickEntity = "";
+                this._quickOption = "";
+            }
+            else if (CREATE_MODES.has(this._quickMode)) {
+                this._snapEntities = value.entities ?? [];
+                this._snapRemember = !!value.remember;
+            }
+            else if (value.entity !== this._quickEntity) {
+                // Entity changed → its preset list differs, drop the old option.
+                this._quickEntity = value.entity ?? "";
+                this._quickOption = "";
+            }
+            else {
+                this._quickEntity = value.entity ?? "";
+                this._quickOption = value.option ?? "";
+            }
+        }}
       ></ha-form>
-      ${o?j`<p class="hint">${o}</p>`:Y}
-    `}_renderYamlTab(){return this._yamlEditorOk?j`
+      ${createHint ? b `<p class="hint">${createHint}</p>` : A}
+    `;
+    }
+    _renderYamlTab() {
+        if (this._yamlEditorOk) {
+            return b `
         <ha-yaml-editor
           .hass=${this._hass}
-          .defaultValue=${this._yamlValue??[]}
-          @value-changed=${t=>{const e=t.detail;this._yamlValid=!1!==e.isValid,this._yamlValid&&(this._yamlValue=e.value??[])}}
+          .defaultValue=${this._yamlValue ?? []}
+          @value-changed=${(e) => {
+                const detail = e.detail;
+                this._yamlValid = detail.isValid !== false;
+                if (this._yamlValid) {
+                    this._yamlValue = (detail.value ?? []);
+                }
+            }}
         ></ha-yaml-editor>
-        ${this._yamlValid?Y:j`<p class="error">Invalid YAML</p>`}
-      `:j`
+        ${this._yamlValid ? A : b `<p class="error">Invalid YAML</p>`}
+      `;
+        }
+        return b `
       <p class="hint">Sequence (YAML or JSON) — same as automation actions.</p>
       <textarea
         .value=${this._draft}
         spellcheck="false"
-        @input=${t=>{this._draft=t.target.value}}
+        @input=${(e) => {
+            this._draft = e.target.value;
+        }}
       ></textarea>
-    `}_renderClearDialog(){const t=this._clearArtifacts,e=[];return t.scene&&e.push(`scene ${t.scene.entity_id??""}`),t.automation&&e.push("its automation"),j`
+    `;
+    }
+    _renderClearDialog() {
+        const artifacts = this._clearArtifacts;
+        const parts = [];
+        if (artifacts.scene) {
+            parts.push(`scene ${artifacts.scene.entity_id ?? ""}`);
+        }
+        if (artifacts.automation)
+            parts.push("its automation");
+        return b `
       <div class="decision">
-        <p><b>Also delete ${e.join(" and ")}?</b></p>
+        <p><b>Also delete ${parts.join(" and ")}?</b></p>
         <label class="hint">
           <input
             type="checkbox"
             .checked=${this._clearRemember}
-            @change=${t=>{this._clearRemember=t.target.checked}}
+            @change=${(e) => {
+            this._clearRemember = e.target.checked;
+        }}
           />
           Remember my choice
         </label>
         <div class="buttons">
-          <button class="danger" @click=${()=>this._clearSlot("delete")}>
+          <button class="danger" @click=${() => this._clearSlot("delete")}>
             Delete
           </button>
-          <button @click=${()=>this._clearSlot("keep")}>Keep</button>
+          <button @click=${() => this._clearSlot("keep")}>Keep</button>
           <button
-            @click=${()=>{this._clearArtifacts=void 0}}
+            @click=${() => {
+            this._clearArtifacts = undefined;
+        }}
           >
             Cancel
           </button>
         </div>
       </div>
-    `}_renderImport(){const t=this._importScan;return j`
+    `;
+    }
+    _renderImport() {
+        const scan = this._importScan;
+        return b `
       <div class="modal-backdrop" @click=${this._closeImport}>
-        <div class="modal" @click=${t=>t.stopPropagation()}>
+        <div class="modal" @click=${(e) => e.stopPropagation()}>
           <h3>Import automations</h3>
-          ${0===t.proposals.length?j`<p class="hint">No importable automations found.</p>`:j`
+          ${scan.proposals.length === 0
+            ? b `<p class="hint">No importable automations found.</p>`
+            : b `
                 <p class="hint">
                   <b>Link</b> keeps the automation native and enabled — the card
                   shows it and opens it in HA's editor. <b>Absorb</b> copies its
                   actions into the card and disables it (never deletes).
                 </p>
                 <ul class="import-list">
-                  ${t.proposals.map((e,i)=>j`
+                  ${scan.proposals.map((p, i) => b `
                       <li>
                         <label>
                           <input
                             type="checkbox"
                             .checked=${this._importSelected.has(i)}
-                            @change=${t=>{const e=new Set(this._importSelected);t.target.checked?e.add(i):e.delete(i),this._importSelected=e}}
+                            @change=${(e) => {
+                const next = new Set(this._importSelected);
+                if (e.target.checked) {
+                    next.add(i);
+                }
+                else {
+                    next.delete(i);
+                }
+                this._importSelected = next;
+            }}
                           />
-                          <b>${e.action_id}</b> ← ${e.alias}
-                          ${e.linkable?j`<select
+                          <b>${p.action_id}</b> ← ${p.alias}
+                          ${p.linkable
+                ? b `<select
                                 class="mode"
-                                .value=${e.mode??"link"}
-                                @click=${t=>t.stopPropagation()}
-                                @change=${e=>{const s=e.target.value,o=t.proposals.map((t,e)=>e===i?{...t,mode:s}:t);this._importScan={...t,proposals:o}}}
+                                .value=${p.mode ?? "link"}
+                                @click=${(e) => e.stopPropagation()}
+                                @change=${(e) => {
+                    const mode = e.target.value;
+                    const proposals = scan.proposals.map((q, j) => j === i ? { ...q, mode } : q);
+                    this._importScan = { ...scan, proposals };
+                }}
                               >
                                 <option value="link">link (keep native)</option>
                                 <option value="absorb">absorb (copy in, disable)</option>
-                              </select>`:j`<span class="hint-inline">absorb</span>`}
-                          ${e.conflict?j`<span class="warn">(overwrites slot)</span>`:Y}
-                          ${e.mixed?j`<span class="warn"
+                              </select>`
+                : b `<span class="hint-inline">absorb</span>`}
+                          ${p.conflict
+                ? b `<span class="warn">(overwrites slot)</span>`
+                : A}
+                          ${p.mixed
+                ? b `<span class="warn"
                                 >(mixed remotes — source stays enabled)</span
-                              >`:Y}
-                          ${e.merged?j`<span class="warn"
+                              >`
+                : A}
+                          ${p.merged
+                ? b `<span class="warn"
                                 title="Home Assistant ran all of them on this press; the slot runs them one after another"
-                                >(merges ${e.sources?.length??2} automations)</span
-                              >`:Y}
+                                >(merges ${p.sources?.length ?? 2} automations)</span
+                              >`
+                : A}
                         </label>
                       </li>
                     `)}
                 </ul>
               `}
-          ${t.skipped.length?j`
+          ${scan.skipped.length
+            ? b `
                 <p class="hint">Needs manual import:</p>
                 <ul class="import-list">
-                  ${t.skipped.map(t=>j`<li>${t.alias} — <code>${t.reason}</code></li>`)}
+                  ${scan.skipped.map((s) => b `<li>${s.alias} — <code>${s.reason}</code></li>`)}
                 </ul>
-              `:Y}
-          ${t.proposals.some(t=>t.conflict)?j`<label class="hint check-row">
+              `
+            : A}
+          ${scan.proposals.some((p) => p.conflict)
+            ? b `<label class="hint check-row">
                 <input
                   type="checkbox"
                   .checked=${this._importOverwrite}
-                  @change=${t=>{this._importOverwrite=t.target.checked}}
+                  @change=${(e) => {
+                this._importOverwrite = e.target.checked;
+            }}
                 />
                 Overwrite already-assigned slots
-              </label>`:Y}
-          ${this._importError?j`<p class="error">${this._importError}</p>`:Y}
+              </label>`
+            : A}
+          ${this._importError
+            ? b `<p class="error">${this._importError}</p>`
+            : A}
           <div class="buttons">
             <button ?disabled=${this._importBusy} @click=${this._applyImport}>
               Apply
@@ -1029,7 +4350,10 @@ function t(t,e,i,s){var o,r=arguments.length,n=r<3?e:null===s?s=Object.getOwnPro
           </div>
         </div>
       </div>
-    `}};be.styles=n`
+    `;
+    }
+};
+RemoteMapperCard.styles = i$3 `
     /* Header mirrors ha-card's .card-header: 24px title, 48px icon buttons */
     .header {
       display: flex;
@@ -1271,8 +4595,11 @@ function t(t,e,i,s){var o,r=arguments.length,n=r<3?e:null===s?s=Object.getOwnPro
       padding: 0 var(--ha-space-4, 16px) var(--ha-space-2, 8px);
     }
     .grid-hint {
-      padding: 0 var(--ha-space-4, 16px) var(--ha-space-2, 8px);
-      margin: 0;
+      padding: 0 var(--ha-space-4, 16px);
+      margin: 0 0 4px;
+    }
+    .grid-hint:last-child {
+      margin-bottom: 0;
     }
     .event-list {
       list-style: none;
@@ -1518,4 +4845,126 @@ function t(t,e,i,s){var o,r=arguments.length,n=r<3?e:null===s?s=Object.getOwnPro
       color: var(--error-color, #db4437);
       border-color: var(--error-color, #db4437);
     }
-  `,t([ut()],be.prototype,"_remote",void 0),t([ut()],be.prototype,"_remoteChoices",void 0),t([ut()],be.prototype,"_error",void 0),t([ut()],be.prototype,"_flash",void 0),t([ut()],be.prototype,"_hostWidth",void 0),t([ut()],be.prototype,"_gridEditing",void 0),t([ut()],be.prototype,"_gridDraft",void 0),t([ut()],be.prototype,"_pickerOpen",void 0),t([ut()],be.prototype,"_buttonSheet",void 0),t([ut()],be.prototype,"_tip",void 0),t([ut()],be.prototype,"_editingAction",void 0),t([ut()],be.prototype,"_editorTab",void 0),t([ut()],be.prototype,"_quickMode",void 0),t([ut()],be.prototype,"_quickEntity",void 0),t([ut()],be.prototype,"_quickOption",void 0),t([ut()],be.prototype,"_snapEntities",void 0),t([ut()],be.prototype,"_snapRemember",void 0),t([ut()],be.prototype,"_draft",void 0),t([ut()],be.prototype,"_draftName",void 0),t([ut()],be.prototype,"_yamlValue",void 0),t([ut()],be.prototype,"_yamlValid",void 0),t([ut()],be.prototype,"_draftError",void 0),t([ut()],be.prototype,"_draftMaterialized",void 0),t([ut()],be.prototype,"_editingLive",void 0),t([ut()],be.prototype,"_haFormOk",void 0),t([ut()],be.prototype,"_yamlEditorOk",void 0),t([ut()],be.prototype,"_clearArtifacts",void 0),t([ut()],be.prototype,"_clearRemember",void 0),t([ut()],be.prototype,"_releaseOpen",void 0),t([ut()],be.prototype,"_releaseConvert",void 0),t([ut()],be.prototype,"_releaseBusy",void 0),t([ut()],be.prototype,"_importScan",void 0),t([ut()],be.prototype,"_importSelected",void 0),t([ut()],be.prototype,"_importOverwrite",void 0),t([ut()],be.prototype,"_importBusy",void 0),t([ut()],be.prototype,"_importError",void 0),be=t([dt(_e)],be),window.customCards=window.customCards||[],window.customCards.push({type:_e,name:"Remote Mapper Card",description:"Map physical remote buttons to actions on a canvas layout.",preview:!1}),console.info("%c REMOTE-MAPPER-CARD %c grid ","color: white; background: #3f51b5; font-weight: 700;","color: #3f51b5; background: white; font-weight: 700;");export{be as RemoteMapperCard};
+  `;
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_remote", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_remoteChoices", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_error", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_flash", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_hostWidth", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_gridEditing", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_gridDraft", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_pickerOpen", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_buttonSheet", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_tip", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_editingAction", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_editorTab", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_quickMode", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_quickEntity", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_quickOption", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_snapEntities", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_snapRemember", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_draft", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_draftName", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_yamlValue", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_yamlValid", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_draftError", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_draftMaterialized", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_editingLive", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_haFormOk", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_yamlEditorOk", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_clearArtifacts", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_clearRemember", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_releaseOpen", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_releaseConvert", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_releaseBusy", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_importScan", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_importSelected", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_importOverwrite", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_importBusy", void 0);
+__decorate([
+    r()
+], RemoteMapperCard.prototype, "_importError", void 0);
+RemoteMapperCard = __decorate([
+    t(CARD_TAG)
+], RemoteMapperCard);
+window.customCards = window.customCards || [];
+window.customCards.push({
+    type: CARD_TAG,
+    name: "Remote Mapper Card",
+    description: "Map physical remote buttons to actions on a canvas layout.",
+    preview: false,
+});
+console.info(`%c REMOTE-MAPPER-CARD %c grid `, "color: white; background: #3f51b5; font-weight: 700;", "color: #3f51b5; background: white; font-weight: 700;");
+
+export { RemoteMapperCard };
+//# sourceMappingURL=remote-mapper-card.js.map

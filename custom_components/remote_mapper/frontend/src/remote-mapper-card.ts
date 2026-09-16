@@ -1236,10 +1236,8 @@ export class RemoteMapperCard extends LitElement implements EditHost {
             </div>`
           : nothing}
         ${editing
-          ? html`<p class="hint grid-hint">
-              Drag a button onto another cell to swap · tap a button to
-              rename it or edit its events
-            </p>`
+          ? html`<p class="hint grid-hint">· Tap a button to rename it or edit its events</p>
+            <p class="hint grid-hint">· Drag a button onto another cell to swap</p>`
           : nothing}
         ${buttons.length === 0
           ? nothing // an empty grid is just blank space; the hint below says what to do
@@ -2364,8 +2362,11 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       padding: 0 var(--ha-space-4, 16px) var(--ha-space-2, 8px);
     }
     .grid-hint {
-      padding: 0 var(--ha-space-4, 16px) var(--ha-space-2, 8px);
-      margin: 0;
+      padding: 0 var(--ha-space-4, 16px);
+      margin: 0 0 4px;
+    }
+    .grid-hint:last-child {
+      margin-bottom: 0;
     }
     .event-list {
       list-style: none;
