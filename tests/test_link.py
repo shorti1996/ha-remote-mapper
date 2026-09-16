@@ -275,3 +275,30 @@ async def test_absorb_mode_still_available(hass, hass_ws_client, remote_device) 
     assert res["result"]["applied"] == ["1_single"]
     assert res["result"]["linked"] == []
     assert hass.states.get("automation.pilot_1_single").state == "off"
+
+
+async def test_link_keeps_import_trail(hass, hass_ws_client, remote_device) -> None:
+    """Linking a slot that was absorbed earlier keeps imported_from (chips stay)."""
+    entry = await _setup(hass, remote_device)
+    store = hass.data[DOMAIN]["store"]
+    from custom_components.remote_mapper.store import default_slot
+
+    slot = default_slot()
+    slot["sequence"] = SEQ_ORIG
+    slot["imported_from"] = {"entity_id": "automation.old", "config_id": "old"}
+    store.async_set_slot(entry.entry_id, "1_double", slot)
+    client = await hass_ws_client(hass)
+
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/save_slot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_double",
+            "link_entity_id": "automation.pilot_1_single",
+        },
+    )
+    assert res["success"], res
+    slot = store.get_slot(entry.entry_id, "1_double")
+    assert slot["automation_id"] == "orig_1"
+    assert slot["imported_from"]["config_id"] == "old"

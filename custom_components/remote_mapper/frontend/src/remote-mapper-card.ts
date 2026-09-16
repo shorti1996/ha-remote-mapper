@@ -86,8 +86,14 @@ interface SlotRecord {
   automation_id: string | null;
   /** false = linked to a native automation we did not create. */
   owned?: boolean;
+  /** true = one branch of the remote's shared automation (plan 06). */
+  shared_automation?: boolean;
   /** Set by get_remote for materialized/linked slots. */
   automation_entity_id?: string | null;
+  /** What actually runs: the automation's actions, or this event's branch. */
+  live_actions?: unknown[];
+  /** Shared/imported "Shape A" automation has no branch for this event. */
+  branch_missing?: boolean;
   archived: boolean;
   last_run: string | null;
   last_error: string | null;
@@ -102,6 +108,10 @@ interface RemoteData {
   grid_layout?: GridLayout | null;
   slots: Record<string, SlotRecord>;
   stale_actions?: string[];
+  /** The remote's shared automation, once created. */
+  remote_automation?: { config_id: string; entity_id: string | null; edit_url: string } | null;
+  /** Default entity set for snapshots (remote options). */
+  snapshot_entities?: string[];
 }
 
 interface RemoteListItem {
@@ -138,10 +148,29 @@ interface LiveAutomation {
   actions: unknown[];
   edit_url: string;
   owned?: boolean;
+  /** actions are this event's branch of a single-choose automation */
+  branch?: boolean;
+  branch_missing?: boolean;
   state?: string | null;
 }
 
-type QuickMode = "scene" | "toggle" | "script" | "wled_preset" | "link" | "custom";
+type QuickMode =
+  | "scene"
+  | "toggle"
+  | "script"
+  | "wled_preset"
+  | "link"
+  | "custom"
+  // "Create new" group (plan 06): nothing to bind yet, Save creates it
+  | "new_scene"
+  | "new_automation"
+  | "new_remote_automation";
+
+const CREATE_MODES: ReadonlySet<QuickMode> = new Set([
+  "new_scene",
+  "new_automation",
+  "new_remote_automation",
+]);
 
 declare global {
   interface Window {
@@ -265,6 +294,9 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   @state() private _quickMode: QuickMode = "scene";
   @state() private _quickEntity = "";
   @state() private _quickOption = "";
+  // "new scene" mode: entities to capture + save them as the remote default
+  @state() private _snapEntities: string[] = [];
+  @state() private _snapRemember = false;
   @state() private _draft = "";
   @state() private _draftName = "";
   @state() private _yamlValue?: unknown[];
@@ -486,7 +518,9 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   private _targetEditor(
     slot: SlotRecord | undefined
   ): { icon: string; title: string; path: string } | undefined {
-    const first = slot?.sequence?.[0] as Record<string, any> | undefined;
+    // a materialized/shared slot's sequence is empty — read what runs
+    const steps = slot?.sequence?.length ? slot.sequence : (slot?.live_actions ?? []);
+    const first = steps[0] as Record<string, any> | undefined;
     if (!first) return undefined;
     const action = first.action ?? first.service;
     let entity = first.target?.entity_id ?? first.entity_id ?? first.scene;
@@ -600,7 +634,9 @@ export class RemoteMapperCard extends LitElement implements EditHost {
           assigned: !!slot,
           archived: !!slot?.archived || this._automationState(slot) === "off",
           summary: this._slotSummary(slot),
-          error: slot?.last_error ?? null,
+          error: slot?.branch_missing
+            ? "The automation has no branch for this event any more — edit the slot to re-add it"
+            : (slot?.last_error ?? null),
           stale: stale.has(a.action_id),
         };
       }
@@ -714,6 +750,11 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   private _slotSummary(slot: SlotRecord | undefined): string {
     if (!slot) return "unassigned";
     if (slot.name) return slot.name;
+    if (slot.materialized && slot.branch_missing) return "no branch";
+    if (slot.materialized && slot.shared_automation) {
+      // one branch of the shared automation: its alias says nothing
+      return inferName(slot.live_actions ?? [], this._hass) || "empty branch";
+    }
     if (slot.materialized) {
       const entity = slot.automation_entity_id;
       const friendly = entity
@@ -739,6 +780,8 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       this._quickEntity = slot?.automation_entity_id ?? "";
     }
     this._quickOption = quick.option;
+    this._snapEntities = [...(this._remote?.snapshot_entities ?? [])];
+    this._snapRemember = false;
     this._editorTab = quick.mode === "custom" && sequence.length ? "yaml" : "quick";
     this._draft = JSON.stringify(sequence, null, 2);
     this._draftName = slot?.name ?? "";
@@ -780,7 +823,46 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     this._clearArtifacts = undefined;
   }
 
+  /** "Create new" modes: make the thing, bind it, and (automations) go edit it. */
+  private async _createNew(): Promise<void> {
+    const name = this._draftName.trim() || null;
+    try {
+      if (this._quickMode === "new_scene") {
+        if (!this._snapEntities.length) {
+          this._draftError = "Pick at least one entity to capture";
+          return;
+        }
+        await this._hass!.callWS({
+          type: "remote_mapper/create_snapshot",
+          entry_id: this._entryId,
+          action_id: this._editingAction,
+          entities: this._snapEntities,
+          remember_entities: this._snapRemember,
+          ...(name ? { name } : {}),
+        });
+        this._closeEditor();
+        return;
+      }
+      const res = await this._hass!.callWS<{ edit_url: string }>({
+        type: "remote_mapper/create_automation",
+        entry_id: this._entryId,
+        action_id: this._editingAction,
+        scope: this._quickMode === "new_automation" ? "button" : "remote",
+        name,
+      });
+      this._closeEditor();
+      // the body is theirs to write — hand them HA's editor right away
+      this._navigate(res.edit_url);
+    } catch (err) {
+      this._draftError = (err as { message?: string }).message ?? String(err);
+    }
+  }
+
   private async _saveDraft(): Promise<void> {
+    if (this._editorTab === "quick" && CREATE_MODES.has(this._quickMode)) {
+      await this._createNew();
+      return;
+    }
     const msg: Record<string, unknown> = {
       type: "remote_mapper/save_slot",
       entry_id: this._entryId,
@@ -1327,19 +1409,30 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                       : nothing;
                   })()}
                   ${(() => {
+                    // chips, fixed order: the slot's own automation (own,
+                    // shared or linked), then every imported original —
+                    // all at once, so a multi-source event keeps its trail
                     const slot = remote.slots[a.action_id];
                     const path = this._automationEditPath(slot);
+                    const chips: TemplateResult[] = [];
                     if (path) {
                       const off = this._automationState(slot) === "off";
                       const linked = this._isLinked(slot);
-                      return this._iconButton(
-                        off ? "mdi:robot-off" : "mdi:robot",
-                        `${linked ? "Linked automation" : "Automation"}${off ? " (DISABLED)" : ""} — open in HA's editor`,
-                        () => this._navigate(path),
-                        { active: linked && !off }
+                      const kind = slot?.shared_automation
+                        ? "Remote automation (this event's branch)"
+                        : linked
+                          ? "Linked automation"
+                          : "Automation";
+                      chips.push(
+                        this._iconButton(
+                          off ? "mdi:robot-off" : "mdi:robot",
+                          `${kind}${off ? " (DISABLED)" : ""} — open in HA's editor`,
+                          () => this._navigate(path),
+                          { active: !off && (linked || !!slot?.shared_automation) }
+                        )
                       );
                     }
-                    return this._importedSources(slot).map((src) => {
+                    chips.push(...this._importedSources(slot).map((src) => {
                       // live state: an original that got re-enabled fires in
                       // parallel with this slot on every press — say so
                       const enabled =
@@ -1353,7 +1446,8 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                         () => this._navigate(`/config/automation/edit/${src.config_id}`),
                         { active: enabled }
                       );
-                    });
+                    }));
+                    return chips;
                   })()}
                   ${this._iconButton("mdi:pencil", "Edit", () => void this._openEditor(a.action_id))}
                   </span>
@@ -1562,9 +1656,14 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                 >
                   open in HA's automation editor
                 </button>.
-                ${this._editingLive.owned === false
-                  ? "It stays native and enabled; edit it there. Unticking the box below copies its actions into this card and disables it (hand-back re-enables it)."
-                  : 'Unticking "automation" below deletes it on Save and moves its actions into this card. Cancel keeps things as they are.'}
+                ${this._editingLive.branch_missing
+                  ? html`<span class="warn">It has no branch for this event any more.</span>
+                      Pick "Add this button to the remote automation" below to re-add one.`
+                  : this._editingLive.branch
+                    ? 'This event is one branch of it. Unticking "automation" below moves the branch\'s actions into this card and removes the branch; the other buttons keep theirs.'
+                    : this._editingLive.owned === false
+                      ? "It stays native and enabled; edit it there. Unticking the box below copies its actions into this card and disables it (hand-back re-enables it)."
+                      : 'Unticking "automation" below deletes it on Save and moves its actions into this card. Cancel keeps things as they are.'}
               </p>`
             : nothing}
           <div class="tabs">
@@ -1600,30 +1699,34 @@ export class RemoteMapperCard extends LitElement implements EditHost {
               }}
             />
           </label>
-          <label class="hint row">
-            <input
-              type="checkbox"
-              .checked=${this._draftMaterialized}
-              @change=${(e: Event) => {
-                this._draftMaterialized = (e.target as HTMLInputElement).checked;
-              }}
-            />
-            ${this._editingLive?.owned === false
-              ? "Keep linked to the automation (untick to absorb into the card)"
-              : "Create as automation (editable/traceable in HA)"}
-          </label>
+          ${this._editorTab === "quick" && CREATE_MODES.has(this._quickMode)
+            ? nothing
+            : html`<label class="hint row">
+                <input
+                  type="checkbox"
+                  .checked=${this._draftMaterialized}
+                  @change=${(e: Event) => {
+                    this._draftMaterialized = (e.target as HTMLInputElement).checked;
+                  }}
+                />
+                ${this._editingLive?.branch
+                  ? "Keep as a branch of the remote automation (untick to move it into the card)"
+                  : this._editingLive?.owned === false
+                    ? "Keep linked to the automation (untick to absorb into the card)"
+                    : "Create as automation (editable/traceable in HA)"}
+              </label>`}
           ${this._draftError
             ? html`<p class="error">${this._draftError}</p>`
             : nothing}
           <div class="buttons">
-            <button @click=${this._saveDraft}>Save</button>
-            <button @click=${this._closeEditor}>Cancel</button>
-            <button
-              title="Capture the current room state as a scene on this button"
-              @click=${() => this._snapshot(false)}
-            >
-              📸 Snapshot
+            <button @click=${this._saveDraft}>
+              ${this._editorTab === "quick" && this._quickMode === "new_scene"
+                ? "📸 Capture"
+                : this._editorTab === "quick" && CREATE_MODES.has(this._quickMode)
+                  ? "Create & open in HA"
+                  : "Save"}
             </button>
+            <button @click=${this._closeEditor}>Cancel</button>
             ${slot?.scene_id
               ? html`<button
                   title="Same scene, same entities, new states"
@@ -1652,6 +1755,11 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   /** What the name will be if left empty — inferred from the current draft. */
   private _autoNamePlaceholder(): string {
     let sequence: unknown[] = [];
+    if (this._editorTab === "quick" && CREATE_MODES.has(this._quickMode)) {
+      return this._quickMode === "new_scene"
+        ? `Auto: ${this._remote?.title ?? "Remote"} ${this._editingAction ?? ""}`
+        : "Auto (from the automation)";
+    }
     if (this._editorTab === "quick" && this._quickMode === "link") {
       const friendly = this._quickEntity
         ? this._hass?.states?.[this._quickEntity]?.attributes?.friendly_name
@@ -1681,6 +1789,26 @@ export class RemoteMapperCard extends LitElement implements EditHost {
         Loading HA editor components… If this persists, use the YAML tab.
       </p>`;
     }
+    const slot = this._remote?.slots[this._editingAction ?? ""];
+    const hasShared = !!this._remote?.remote_automation;
+    // "Create new" first: an empty button is usually a new thing, not a bind.
+    // The whole-remote option turns into "add this button" once it exists,
+    // and disappears for a slot that already is a (present) branch of it.
+    const createOptions: Array<{ value: QuickMode; label: string }> = [
+      { value: "new_scene", label: "＋ Scene from current state" },
+      { value: "new_automation", label: "＋ Automation for this button (fill in HA)" },
+    ];
+    if (!hasShared) {
+      createOptions.push({
+        value: "new_remote_automation",
+        label: "＋ Automation for the whole remote (one branch per event)",
+      });
+    } else if (!slot?.shared_automation || slot.branch_missing) {
+      createOptions.push({
+        value: "new_remote_automation",
+        label: "＋ Add this button to the remote automation",
+      });
+    }
     const schema: Array<Record<string, unknown>> = [
       {
         name: "mode",
@@ -1688,6 +1816,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
           select: {
             mode: "dropdown",
             options: [
+              ...createOptions,
               { value: "scene", label: "Activate scene" },
               { value: "toggle", label: "Toggle entity" },
               { value: "script", label: "Run script" },
@@ -1698,6 +1827,20 @@ export class RemoteMapperCard extends LitElement implements EditHost {
         },
       },
     ];
+    let createHint: string | undefined;
+    if (this._quickMode === "new_scene") {
+      schema.push({ name: "entities", selector: { entity: { multiple: true } } });
+      schema.push({ name: "remember", selector: { boolean: {} } });
+      createHint =
+        "Set the room the way you like it first. Capture stores the current state of these entities as a scene bound to this event; Re-snapshot later updates it in place.";
+    } else if (this._quickMode === "new_automation") {
+      createHint =
+        "Creates an automation with this event as its trigger and no actions, then opens HA's editor so you can fill it in. The card shows what you put there.";
+    } else if (this._quickMode === "new_remote_automation") {
+      createHint = hasShared
+        ? "Appends a trigger and an empty branch for this event to the remote's automation, then opens it in HA's editor."
+        : "Creates one automation for this remote: a trigger per event and a choose block with one branch per event (the blueprint look). Buttons you already built in the card move into their branch; buttons with their own automation stay as they are.";
+    }
     if (this._quickMode === "link") {
       schema.push({
         name: "entity",
@@ -1721,7 +1864,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
           ? { select: { mode: "dropdown", custom_value: true, options } }
           : { text: {} },
       });
-    } else {
+    } else if (!CREATE_MODES.has(this._quickMode)) {
       const domain =
         this._quickMode === "scene"
           ? "scene"
@@ -1733,6 +1876,13 @@ export class RemoteMapperCard extends LitElement implements EditHost {
         selector: { entity: domain ? { domain } : {} },
       });
     }
+    const labels: Record<string, string> = {
+      mode: "Action",
+      option: "Preset",
+      entities: "Entities to capture",
+      remember: "Remember these as this remote's default",
+      entity: this._quickMode === "link" ? "Automation" : "Entity",
+    };
     return html`
       <ha-form
         .hass=${this._hass}
@@ -1740,26 +1890,26 @@ export class RemoteMapperCard extends LitElement implements EditHost {
           mode: this._quickMode,
           entity: this._quickEntity,
           option: this._quickOption,
+          entities: this._snapEntities,
+          remember: this._snapRemember,
         }}
         .schema=${schema}
-        .computeLabel=${(s: { name: string }) =>
-          s.name === "mode"
-            ? "Action"
-            : s.name === "option"
-              ? "Preset"
-              : this._quickMode === "link"
-                ? "Automation"
-                : "Entity"}
+        .computeLabel=${(s: { name: string }) => labels[s.name] ?? s.name}
         @value-changed=${(e: CustomEvent) => {
           const value = e.detail.value as {
             mode: QuickMode;
             entity: string;
             option?: string;
+            entities?: string[];
+            remember?: boolean;
           };
           if (value.mode !== this._quickMode) {
             this._quickMode = value.mode;
             this._quickEntity = "";
             this._quickOption = "";
+          } else if (CREATE_MODES.has(this._quickMode)) {
+            this._snapEntities = value.entities ?? [];
+            this._snapRemember = !!value.remember;
           } else if (value.entity !== this._quickEntity) {
             // Entity changed → its preset list differs, drop the old option.
             this._quickEntity = value.entity ?? "";
@@ -1770,6 +1920,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
           }
         }}
       ></ha-form>
+      ${createHint ? html`<p class="hint">${createHint}</p>` : nothing}
     `;
   }
 

@@ -65,11 +65,13 @@ def collect_artifacts(
             "scene_id": scene_id,
             "entity_id": scene_entity_id(hass, scene_id),
         }
-    # linked (owned=False) automations are not ours to delete
+    # linked (owned=False) automations are not ours to delete; a shared
+    # (per-remote) automation loses just this slot's branch — no question
     if (
         slot.get("materialized")
         and slot.get("automation_id")
         and slot.get("owned", True)
+        and not slot.get("shared_automation")
     ):
         artifacts["automation"] = {"automation_id": slot["automation_id"]}
     return artifacts
@@ -129,3 +131,10 @@ async def async_cleanup_entry(
         if decision == DECISION_DELETE:
             await get_scene_config_store(hass).async_delete(scene_id)
         store.async_drop_owned_scene(scene_id)
+    if decision == DECISION_DELETE:
+        from .materializer import _get_config_store
+        from .remote_automation import remote_automation_config_id
+
+        await _get_config_store(hass).async_delete(
+            remote_automation_config_id(entry.entry_id)
+        )

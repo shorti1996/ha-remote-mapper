@@ -86,14 +86,21 @@ async def async_release_remote(
     }
     summary["reenabled"] = await async_reenable_imported(hass, store, entry.entry_id)
 
+    unmanaged: dict[str, bool] = {}  # shared automation: unmanage once
     for action_id, slot in list(remote.get("slots", {}).items()):
-        if imported_sources(slot):
+        if imported_sources(slot) and not slot.get("materialized"):
             continue  # originals are back — the slot just goes away
         plain_alias = f"{entry.title} · {slot.get('name') or action_id}"
         if slot.get("materialized") and slot.get("automation_id"):
+            config_id = slot["automation_id"]
             if not slot.get("owned", True):
                 summary["kept"].append(action_id)  # linked: not ours, untouched
-            elif await async_unmanage(hass, slot["automation_id"], plain_alias):
+                continue
+            if slot.get("shared_automation"):
+                plain_alias = entry.title
+            if config_id not in unmanaged:
+                unmanaged[config_id] = await async_unmanage(hass, config_id, plain_alias)
+            if unmanaged[config_id]:
                 summary["kept"].append(action_id)
             else:
                 summary["dropped"].append(action_id)

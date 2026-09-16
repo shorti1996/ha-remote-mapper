@@ -231,7 +231,8 @@ async def async_link(
     slot["owned"] = False
     slot["sequence"] = []
     slot["scene_id"] = None
-    slot.pop("imported_from", None)
+    slot["shared_automation"] = False
+    # imported_from is kept on purpose: the originals' chips stay visible
     store.async_set_slot(entry_id, action_id, slot)
 
 
@@ -290,9 +291,16 @@ async def async_unmanage(hass: HomeAssistant, config_id: str, alias: str) -> boo
 
 
 async def async_get_live_view(
-    hass: HomeAssistant, slot: dict[str, Any]
+    hass: HomeAssistant, slot: dict[str, Any], action_id: str | None = None
 ) -> dict[str, Any] | None:
-    """Summary of the materialized automation for the card."""
+    """Summary of the materialized automation for the card.
+
+    With ``action_id``, a single-choose automation keyed on trigger ids
+    (the remote's shared automation, or an imported "Shape A" one) is
+    narrowed to this event's branch.
+    """
+    from .remote_automation import branch_view
+
     config_id = slot.get("automation_id")
     if not config_id:
         return None
@@ -301,7 +309,7 @@ async def async_get_live_view(
         return None
     entity_id = automation_entity_id(hass, config_id)
     state = hass.states.get(entity_id) if entity_id else None
-    return {
+    view = {
         "config_id": config_id,
         "entity_id": entity_id,
         "alias": raw.get("alias"),
@@ -309,7 +317,14 @@ async def async_get_live_view(
         "edit_url": EDIT_URL.format(config_id),
         "owned": slot.get("owned", True),
         "state": state.state if state else None,
+        "branch": False,
+        "branch_missing": False,
     }
+    if action_id is not None and (branch := branch_view(raw, action_id)) is not None:
+        view["actions"] = branch["actions"]
+        view["branch"] = True
+        view["branch_missing"] = branch["branch_missing"]
+    return view
 
 
 async def async_dematerialize(

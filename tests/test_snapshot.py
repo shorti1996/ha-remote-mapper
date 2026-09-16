@@ -309,3 +309,42 @@ async def test_entry_removal_bulk_cleanup(hass, hass_ws_client, remote_device) -
     store = hass.data[DOMAIN]["store"]
     assert store.get_remote(entry.entry_id) is None
     assert store.data["owned_scenes"] == {}
+
+
+async def test_snapshot_with_explicit_entities_remembers_default(
+    hass, hass_ws_client, remote_device
+) -> None:
+    """Card-picked entities win; remember_entities writes the remote default."""
+    hass.states.async_set("light.a", "on")
+    hass.states.async_set("light.c", "off")
+    entry = await _setup(hass, remote_device, options={"snapshot_entities": ["light.a"]})
+    client = await hass_ws_client(hass)
+
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/create_snapshot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_single",
+            "entities": ["light.c"],
+            "remember_entities": True,
+        },
+    )
+    assert res["success"], res
+    assert res["result"]["entities"] == ["light.c"]
+    assert entry.options["snapshot_entities"] == ["light.c"]
+
+
+async def test_snapshot_without_entities_fails_clearly(
+    hass, hass_ws_client, remote_device
+) -> None:
+    """No default and nothing picked → error, no scene written."""
+    entry = await _setup(hass, remote_device)
+    client = await hass_ws_client(hass)
+    res = await _ws(
+        client,
+        {"type": f"{DOMAIN}/create_snapshot", "entry_id": entry.entry_id, "action_id": "1_single"},
+    )
+    assert not res["success"]
+    assert "No capturable entities" in res["error"]["message"]
+    assert _scenes_yaml(hass) == []
