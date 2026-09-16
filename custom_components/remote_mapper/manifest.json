@@ -1,22 +1,24 @@
 {
   "domain": "remote_mapper",
   "name": "Remote Mapper",
-  "version": "0.1.0",
-  "codeowners": ["@shorti1996"],
+  "after_dependencies": [
+    "lovelace",
+    "mqtt",
+    "zha"
+  ],
+  "codeowners": [
+    "@shorti1996"
+  ],
   "config_flow": true,
   "dependencies": [
     "device_automation",
     "frontend",
     "http"
   ],
-  "after_dependencies": [
-    "lovelace",
-    "mqtt",
-    "zha"
-  ],
   "documentation": "https://github.com/shorti1996/ha-remote-mapper",
-  "issue_tracker": "https://github.com/shorti1996/ha-remote-mapper/issues",
   "integration_type": "device",
   "iot_class": "local_push",
-  "requirements": []
+  "issue_tracker": "https://github.com/shorti1996/ha-remote-mapper/issues",
+  "requirements": [],
+  "version": "0.1.0"
 }

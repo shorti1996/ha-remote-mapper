@@ -58,6 +58,9 @@ device, where every button shows what it does and lets you change it.
   per button, reversible. The card is the map; HA's editors stay the
   workshop.
 
+  <!-- screenshot: a button's events with scene / automation chips -->
+  ![Every event shows where it lives: scene, automation, imported original](docs/img/sheet.png)
+
 - **Keep what you already have.** Existing automations for the remote are
   **linked**: they stay native and enabled, the card shows them by name
   with their on/off state, and one tap opens them in HA's automation
