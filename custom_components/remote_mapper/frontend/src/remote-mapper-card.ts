@@ -43,10 +43,13 @@ import {
   type ButtonModel,
   type GridLayout,
 } from "./model";
+import { errorText } from "./errors";
 import { inferName } from "./naming";
 import type { SlotView } from "./remote-grid";
 
 const CARD_TAG = "remote-mapper-card";
+/** HA's own "start a config flow" route — opens Add integration → Remote Mapper. */
+const ADD_REMOTE_PATH = "/_my_redirect/config_flow_start?domain=remote_mapper";
 const UPDATED_EVENT = "remote_mapper_updated";
 const ACTION_EVENT = "remote_mapper_action";
 
@@ -421,7 +424,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       await this._fetchRemote();
       await this._subscribe();
     } catch (err) {
-      this._error = String(err);
+      this._error = errorText(err);
     }
   }
 
@@ -457,7 +460,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       });
       this._error = undefined;
     } catch (err) {
-      this._error = String(err);
+      this._error = errorText(err);
     }
   }
 
@@ -733,7 +736,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
         action_id: actionId,
       });
     } catch (err) {
-      this._error = String(err);
+      this._error = errorText(err);
     }
   }
 
@@ -1082,7 +1085,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       );
       this._importScan = scan;
     } catch (err) {
-      this._error = String(err);
+      this._error = errorText(err);
     }
   };
 
@@ -1125,13 +1128,19 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       return html`<ha-card header="Remote Mapper">
         <div class="content">
           ${this._remoteChoices.length === 0
-            ? html`<p>
-                No remotes configured yet — add one in Settings → Devices &amp;
-                services.
-              </p>`
-            : html`<p>
-                  Several remotes exist — set <code>entry_id</code> in the card
-                  config:
+            ? html`<p class="hint">
+                  No remote is set up yet. Add one — pick the device (Zigbee2MQTT,
+                  ZHA, Matter, MQTT…), press its buttons once — and this card
+                  fills in by itself.
+                </p>
+                <div class="buttons">
+                  <button @click=${() => this._navigate(ADD_REMOTE_PATH)}>
+                    Add a remote
+                  </button>
+                </div>`
+            : html`<p class="hint">
+                  Several remotes exist — pick one in the card editor (the
+                  <b>Remote</b> dropdown), or set <code>entry_id</code> in YAML:
                 </p>
                 <ul>
                   ${this._remoteChoices.map(
@@ -1232,32 +1241,44 @@ export class RemoteMapperCard extends LitElement implements EditHost {
               rename it or edit its events
             </p>`
           : nothing}
-        <remote-mapper-grid
-          style=${styleVarsOf(this._config)}
-          .buttons=${buttons}
-          .layout=${layout}
-          .slots=${this._slotViews()}
-          .display=${displayOf(this._config)}
-          .assistedTrigger=${assistedTriggerOf(this._config)}
-          .chipsLayout=${chipsLayoutOf(this._config)}
-          .editing=${editing}
-          .flash=${this._flash}
-          @run-action=${(e: CustomEvent<{ actionId: string }>) =>
-            void this._runSlot(e.detail.actionId)}
-          @edit-action=${(e: CustomEvent<{ actionId: string }>) =>
-            void this._openEditor(e.detail.actionId)}
-          @open-button=${(e: CustomEvent<{ buttonId: string }>) => {
-            this._buttonSheet = e.detail.buttonId;
-            this._modalOpenedAt = Date.now();
-          }}
-          @layout-changed=${(e: CustomEvent<{ layout: GridLayout }>) => {
-            this._gridDraft = e.detail.layout;
-          }}
-        ></remote-mapper-grid>
         ${buttons.length === 0
-          ? html`<p class="hint grid-hint">
-              No actions known yet — press each button on the remote once.
-            </p>`
+          ? nothing // an empty grid is just blank space; the hint below says what to do
+          : html`
+          <remote-mapper-grid
+            style=${styleVarsOf(this._config)}
+            .buttons=${buttons}
+            .layout=${layout}
+            .slots=${this._slotViews()}
+            .display=${displayOf(this._config)}
+            .assistedTrigger=${assistedTriggerOf(this._config)}
+            .chipsLayout=${chipsLayoutOf(this._config)}
+            .editing=${editing}
+            .flash=${this._flash}
+            @run-action=${(e: CustomEvent<{ actionId: string }>) =>
+              void this._runSlot(e.detail.actionId)}
+            @edit-action=${(e: CustomEvent<{ actionId: string }>) =>
+              void this._openEditor(e.detail.actionId)}
+            @open-button=${(e: CustomEvent<{ buttonId: string }>) => {
+              this._buttonSheet = e.detail.buttonId;
+              this._modalOpenedAt = Date.now();
+            }}
+            @layout-changed=${(e: CustomEvent<{ layout: GridLayout }>) => {
+              this._gridDraft = e.detail.layout;
+            }}
+          ></remote-mapper-grid>
+            `}
+        ${buttons.length === 0
+          ? html`<div class="grid-hint">
+              <p class="hint">
+                No buttons known yet. Press each button on the remote once (every
+                gesture you want: single, double, hold), then look again — the
+                card also checks on every Home Assistant start and whenever you
+                open edit mode.
+              </p>
+              <div class="buttons">
+                <button @click=${() => void this._refreshActions()}>Look for buttons now</button>
+              </div>
+            </div>`
           : nothing}
         ${this._buttonSheet !== undefined ? this._renderButtonSheet() : nothing}
         ${this._editingAction !== undefined ? this._renderEditor() : nothing}

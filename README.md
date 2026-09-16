@@ -62,7 +62,8 @@ device, where every button shows what it does and lets you change it.
   any button: it becomes a native HA automation (traces, the HA editor,
   "related" search). Untick to fold it back into the card. Your choice,
   per button, reversible. The card is the map; HA's editors stay the
-  workshop.
+  workshop. Easily navigate to the automation / scene in the editor with
+  a click of a button (also supports multiple sources).
 
   <!-- screenshot: a button's events with scene / automation chips -->
   ![Every event shows where it lives: scene, automation, imported original](docs/img/sheet.png)
