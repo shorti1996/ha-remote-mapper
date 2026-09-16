@@ -1,4 +1,4 @@
-.PHONY: build dev clean test test-frontend lint format bump-version ha-up ha-down ha-logs
+.PHONY: build dev clean test test-frontend lint format bump-version release ha-up ha-down ha-logs
 
 FRONTEND := custom_components/remote_mapper/frontend
 
@@ -54,6 +54,29 @@ else
 	sed -i 's/^version = ".*"/version = "$(VERSION)"/' pyproject.toml
 	echo "$(VERSION)" > VERSION
 	@echo "Versions updated."
+endif
+
+# One-shot release: bump → rebuild card → test → commit → tag → push.
+# GitHub's release.yml then builds the zip and publishes the release
+# (HACS installs from that asset). Usage: make release VERSION=x.y.z
+GH_REMOTE ?= github
+release:
+ifndef VERSION
+	$(call require-version,release)
+else
+	@git diff --quiet && git diff --cached --quiet || { echo "Working tree not clean — commit or stash first."; exit 1; }
+	@[ "$$(git rev-parse --abbrev-ref HEAD)" = "master" ] || { echo "Release from master."; exit 1; }
+	$(MAKE) bump-version VERSION=$(VERSION)
+	uv lock
+	cd $(FRONTEND) && npm ci && npm run build
+	uv run pytest -q
+	cd $(FRONTEND) && npm test
+	git add -A
+	git diff --cached --quiet || git commit -m "chore: release v$(VERSION)"
+	git tag -a v$(VERSION) -m "v$(VERSION)"
+	git push $(GH_REMOTE) master v$(VERSION)
+	-git remote get-url origin >/dev/null 2>&1 && [ "$(GH_REMOTE)" != "origin" ] && git push origin master v$(VERSION)
+	@echo "Tag v$(VERSION) pushed — watch https://github.com/shorti1996/ha-remote-mapper/actions"
 endif
 
 ha-up:

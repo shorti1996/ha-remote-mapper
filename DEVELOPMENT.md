@@ -43,13 +43,31 @@ pinned npm git dependency.
 
 ## Release
 
+One command, from a clean `master`:
+
 ```sh
-make bump-version VERSION=x.y.z   # syncs manifest, package.json, pyproject, VERSION
-git commit ... && git tag vx.y.z && git push --tags
+make release VERSION=x.y.z
 ```
 
-The release workflow verifies tag == versions, rebuilds the card,
-fails on www/ drift, and attaches the HACS zip.
+It bumps the version in manifest, package.json, pyproject and VERSION
+(`make bump-version` alone does only that), refreshes `uv.lock`, rebuilds
+the card into `www/`, runs pytest and vitest, commits
+`chore: release vx.y.z`, tags `vx.y.z`, and pushes master + tag to the
+`github` remote (and to `origin` if that is a different remote;
+`GH_REMOTE=name` overrides).
+
+The tag push starts `.github/workflows/release.yml` on GitHub: it checks
+that the tag matches every version file, rebuilds the card and fails on
+`www/` drift, zips the integration (runtime files only) and publishes a
+GitHub release with generated notes and `remote_mapper.zip` attached.
+HACS installs from that asset (`hacs.json`: `zip_release`), so a version
+is only installable once the workflow has finished. Watch it under
+Actions; if it fails, fix, delete the tag (`git tag -d vx.y.z && git push
+github :vx.y.z`) and run `make release` again.
+
+Release notes: HACS shows the GitHub release body and adds its own
+version heading, so do not start the notes with one. Edit the generated
+notes on GitHub if the commit list needs a summary.
 
 ## Frontend tests
 
