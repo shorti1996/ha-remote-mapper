@@ -31,6 +31,10 @@ jobs:
       - uses: hacs/action@main
         with:
           category: integration
+          # PolyForm Noncommercial is not OSI-approved, which the license
+          # check requires. Custom-repository installs don't care; the
+          # HACS default store does — drop this line if that ever changes.
+          ignore: license
 
   frontend:
     runs-on: ubuntu-latest
