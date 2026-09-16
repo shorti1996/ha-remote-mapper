@@ -22,6 +22,7 @@ import { ensureHaForm, ensureYamlEditor } from "./canvas/ha-loader";
 import { computeTransform, type CanvasTransform } from "./canvas/scaling";
 import type { CanvasLayout, WidgetConfig } from "./canvas/types";
 import { deepClone } from "./canvas/util";
+import { tipAnchor, type TipAnchor } from "./gestures";
 import {
   assistedTriggerOf,
   chipsLayoutOf,
@@ -227,10 +228,15 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   @state() private _pickerOpen = false;
   @state() private _buttonSheet?: string;
 
-  // long-press tooltip for header icons on touch (PC gets the native title)
-  @state() private _tip?: string;
+  // long-press tooltip for header icons on touch (PC gets the native title).
+  // Anchored under the pressed button like a native tooltip, fixed so no
+  // dock/sheet/modal can cover it.
+  @state() private _tip?: TipAnchor;
   private _tipTimer?: ReturnType<typeof setTimeout>;
   private _tipShown = false;
+  // A long press on touch ends in contextmenu/pointercancel, not click, so
+  // the bubble can't wait for a click to go away: it hides on a timer.
+  private _tipHideTimer?: ReturnType<typeof setTimeout>;
 
   // Modals opened from pointerup get a synthetic click ~immediately after
   // (touch); the backdrop must not treat that ghost click as "close".
@@ -361,6 +367,9 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     this._unsubActions?.();
     this._unsubActions = undefined;
     this._edit.detach();
+    clearTimeout(this._tipTimer);
+    clearTimeout(this._tipHideTimer);
+    this._tip = undefined;
   }
 
   private async _initialize(): Promise<void> {
@@ -1192,6 +1201,11 @@ export class RemoteMapperCard extends LitElement implements EditHost {
         this._tipTimer = undefined;
       }
     };
+    // finger lifted (or the browser took the gesture): linger, then go
+    const release = () => {
+      clearTimer();
+      if (this._tip) this._hideTipIn(1500);
+    };
     return html`<ha-icon-button
       class=${opts.active ? "active" : ""}
       .label=${title}
@@ -1200,16 +1214,20 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       @pointerdown=${(e: PointerEvent) => {
         if (e.pointerType === "mouse") return;
         clearTimer();
+        this._hideTipIn(0);
         this._tipShown = false;
+        const anchor = e.currentTarget as HTMLElement;
         this._tipTimer = setTimeout(() => {
           this._tipTimer = undefined;
           this._tipShown = true;
-          this._tip = title;
+          this._tip = tipAnchor(title, anchor.getBoundingClientRect(), window.innerWidth);
+          // backstop in case no pointerup/cancel ever reaches us
+          this._hideTipIn(4000);
         }, 450);
       }}
-      @pointerup=${clearTimer}
-      @pointercancel=${clearTimer}
-      @pointerleave=${clearTimer}
+      @pointerup=${release}
+      @pointercancel=${release}
+      @pointerleave=${release}
       @contextmenu=${(e: Event) => {
         if (this._tipShown) e.preventDefault();
       }}
@@ -1218,9 +1236,6 @@ export class RemoteMapperCard extends LitElement implements EditHost {
           // the long press was a "what is this?" — not a command
           e.stopPropagation();
           this._tipShown = false;
-          setTimeout(() => {
-            this._tip = undefined;
-          }, 1200);
           return;
         }
         // handlers may be plain methods — keep `this` bound to the card
@@ -1231,8 +1246,25 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     </ha-icon-button>`;
   }
 
+  /** (Re)schedule the long-press bubble to disappear; 0 hides it now. */
+  private _hideTipIn(ms: number): void {
+    clearTimeout(this._tipHideTimer);
+    this._tipHideTimer = undefined;
+    if (ms <= 0) {
+      this._tip = undefined;
+      return;
+    }
+    this._tipHideTimer = setTimeout(() => {
+      this._tipHideTimer = undefined;
+      this._tip = undefined;
+    }, ms);
+  }
+
   private _renderTip(): TemplateResult | typeof nothing {
-    return this._tip ? html`<div class="tip">${this._tip}</div>` : nothing;
+    const tip = this._tip;
+    if (!tip) return nothing;
+    const side = tip.right !== undefined ? `right:${tip.right}px` : `left:${tip.left}px`;
+    return html`<div class="tip" role="tooltip" style="top:${tip.top}px;${side}">${tip.text}</div>`;
   }
 
   /** One button's events: rename (edit mode), run, or open the slot editor. */
@@ -1955,14 +1987,24 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       user-select: none;
       touch-action: manipulation;
     }
+    /* Same tokens HA's ha-tooltip uses, with fallbacks for older cores. */
     .tip {
-      margin: 0 var(--ha-space-4, 16px) var(--ha-space-2, 8px);
-      padding: var(--ha-space-2, 8px) var(--ha-space-3, 12px);
-      border-radius: var(--ha-border-radius-md, 8px);
-      background: var(--secondary-background-color, rgba(127, 127, 127, 0.2));
-      color: var(--primary-text-color);
-      font-size: var(--ha-font-size-m, 14px);
-      text-align: right;
+      position: fixed;
+      z-index: 1000;
+      max-width: min(320px, calc(100vw - 2 * var(--ha-space-2, 8px)));
+      padding: var(--ha-tooltip-padding, var(--ha-space-2, 8px));
+      border-radius: var(--ha-tooltip-border-radius, var(--ha-border-radius-md, 8px));
+      background: var(
+        --ha-tooltip-background-color,
+        var(--ha-color-surface-default, var(--secondary-background-color, #333))
+      );
+      color: var(--ha-tooltip-text-color, var(--primary-text-color));
+      font-family: var(--ha-tooltip-font-family, var(--ha-font-family-body, inherit));
+      font-size: var(--ha-tooltip-font-size, var(--ha-font-size-m, 14px));
+      font-weight: var(--ha-tooltip-font-weight, var(--ha-font-weight-medium, 500));
+      line-height: var(--ha-tooltip-line-height, var(--ha-line-height-condensed, 1.2));
+      box-shadow: var(--ha-tooltip-box-shadow, var(--ha-box-shadow-m, 0 2px 8px rgba(0, 0, 0, 0.35)));
+      pointer-events: none;
       animation: rm-tip 120ms ease-out;
     }
     @keyframes rm-tip {

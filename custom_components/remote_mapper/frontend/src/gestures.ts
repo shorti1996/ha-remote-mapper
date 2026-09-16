@@ -126,3 +126,36 @@ export class TapRecognizer {
     }
   }
 }
+
+// ── long-press tooltip placement ───────────────────────────────────
+
+/** Where to put a touch tooltip: below its button, hugging the nearer edge. */
+export interface TipAnchor {
+  text: string;
+  /** viewport px, top edge of the bubble */
+  top: number;
+  /** viewport px from the left edge — when the button sits in the left half */
+  left?: number;
+  /** viewport px from the right edge — when the button sits in the right half */
+  right?: number;
+}
+
+const TIP_GAP = 6;
+const TIP_MARGIN = 8;
+
+/**
+ * Anchor a tooltip under `rect` like a native title bubble: it hangs off
+ * the button's edge that is nearer the viewport edge, so it never runs
+ * off-screen (header icons live at the right, so they open leftwards).
+ */
+export function tipAnchor(
+  text: string,
+  rect: Pick<DOMRect, "left" | "right" | "top" | "bottom">,
+  viewportWidth: number
+): TipAnchor {
+  const top = rect.bottom + TIP_GAP;
+  const center = (rect.left + rect.right) / 2;
+  return center > viewportWidth / 2
+    ? { text, top, right: Math.max(TIP_MARGIN, viewportWidth - rect.right) }
+    : { text, top, left: Math.max(TIP_MARGIN, rect.left) };
+}

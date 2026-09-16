@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { TapRecognizer, type Gesture, type GestureCaps } from "../src/gestures";
+import { TapRecognizer, tipAnchor, type Gesture, type GestureCaps } from "../src/gestures";
 
 const down = (x = 0, y = 0) => ({ clientX: x, clientY: y }) as PointerEvent;
 const none: GestureCaps = { double: false, triple: false, hold: false };
@@ -71,5 +71,26 @@ describe("TapRecognizer", () => {
     rec.down(down(), none);
     rec.up();
     expect(out).toEqual(["single"]);
+  });
+});
+
+describe("tipAnchor", () => {
+  const r = (left: number, right: number) => ({ left, right, top: 10, bottom: 40 });
+
+  it("hangs below the button", () => {
+    expect(tipAnchor("x", r(300, 340), 400).top).toBe(46);
+  });
+
+  it("right-half buttons open leftwards, aligned to the button's right edge", () => {
+    expect(tipAnchor("x", r(300, 340), 400)).toEqual({ text: "x", top: 46, right: 60 });
+  });
+
+  it("left-half buttons align to the button's left edge", () => {
+    expect(tipAnchor("x", r(20, 60), 400)).toEqual({ text: "x", top: 46, left: 20 });
+  });
+
+  it("keeps a margin when the button touches the viewport edge", () => {
+    expect(tipAnchor("x", r(0, 40), 400).left).toBe(8);
+    expect(tipAnchor("x", r(360, 400), 400).right).toBe(8);
   });
 });
