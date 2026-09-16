@@ -101,7 +101,10 @@ needed; new actions are live immediately.
 
 ## Install
 
-1. HACS → *Custom repositories* → add this repo as **Integration** → install.
+[![Open this repository in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=shorti1996&repository=ha-remote-mapper&category=integration)
+
+1. Click the badge (it adds this repo to HACS and opens it), or HACS →
+   *Custom repositories* → add this repo as **Integration**. Install.
 2. Restart Home Assistant.
 3. *Settings → Devices & services → Add integration → Remote Mapper*, pick
    the device, press its buttons once.
