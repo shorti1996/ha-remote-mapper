@@ -27,8 +27,8 @@ mosquitto_pub -t "zigbee2mqtt/x/action" -m "1_single"
 Live smoke test against a running HA (see `ai/local-ha-testing.md`):
 `HA_TOKEN=... MQTT_HOST=... uv run python scripts/e2e_live.py`.
 UI sizing rules (HA design tokens, components, touch): the manual skill
-`skills/homeassistant-ui-development/SKILL.md`, symlinked into
-`~/.claude/skills/` so `/homeassistant-ui-development` works in any repo.
+`/homeassistant-ui-development` from the shared `claude-skills` repo
+(`/home/shared/repos/claude-skills`, symlinked into `~/.claude/skills/`).
 Browser-level checks (phone viewport, touch, screenshots):
 `HA_TOKEN=... python3 scripts/ui_local.py` — a Playwright template; the
 doc above also covers restart-vs-rebuild rules, the Chrome extension, and
