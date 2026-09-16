@@ -75,6 +75,9 @@ device, where every button shows what it does and lets you change it.
   move into the card and the original is disabled, never deleted.
   "Link existing automation" is also a quick action for any button.
 
+  <!-- screenshot: the import wizard, link/absorb per automation -->
+  ![Import: every automation for the remote found, link or absorb per row](docs/img/import.png)
+
 - **Appearance.** Colors and pad opacity in the card editor; follows your
   theme and HA's font-size setting out of the box.
 
@@ -139,6 +142,9 @@ automations that were imported, keeps automation-backed buttons as plain
 automations, converts the rest into plain automations (optional), keeps
 snapshot scenes, and removes the remote. Deleting the integration from
 *Settings → Devices & services* also re-enables imported originals.
+
+<!-- screenshot: the hand-back button in the edit header -->
+![Hand this remote back to HA](docs/img/hand-back.png)
 
 ## Good to know
 
