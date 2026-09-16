@@ -5,7 +5,8 @@ services:
       - "8123:8123"
     volumes:
       - ./ha-config:/config
-      - ../custom_components/remote_mapper:/config/custom_components/remote_mapper:ro
+      # HACS-install verification: bind mount disabled (restore for the dev loop)
+      # - ../custom_components/remote_mapper:/config/custom_components/remote_mapper:ro
     environment:
       - TZ=Europe/Warsaw
     depends_on:

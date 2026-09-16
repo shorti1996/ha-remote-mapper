@@ -13,6 +13,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 
 from .adapters import get_adapter
+from .card_resource import JSModuleRegistration
 from .const import (
     CONF_ACTIONS,
     CONF_DEVICE_ID,
@@ -22,7 +23,6 @@ from .const import (
     DOMAIN,
 )
 from .dispatcher import SlotDispatcher
-from .frontend import JSModuleRegistration
 from .store import RemoteMapperStore
 from .websocket import async_register_websocket_commands
 

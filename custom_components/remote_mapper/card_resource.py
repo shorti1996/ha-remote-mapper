@@ -1,5 +1,9 @@
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-"""JavaScript module registration for the frontend card (edm pattern)."""
+"""Lovelace resource registration for the card bundle in www/ (edm pattern).
+
+Lives at the package root on purpose: frontend/ holds only the TypeScript
+sources and is excluded from the HACS release zip (scripts/package.sh).
+"""
 
 from __future__ import annotations
 
@@ -10,15 +14,15 @@ from typing import TYPE_CHECKING
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.components.lovelace.const import LOVELACE_DATA
 
-from ..const import JSMODULES, URL_BASE
+from .const import JSMODULES, URL_BASE
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 
-# Compiled JS lives in the www/ sibling directory, not in frontend/ itself.
-_WWW_DIR = Path(__file__).parent.parent / "www"
+# Compiled JS lives in www/ next to this module.
+_WWW_DIR = Path(__file__).parent / "www"
 
 
 class JSModuleRegistration:
