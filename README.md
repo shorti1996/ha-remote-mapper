@@ -146,3 +146,8 @@ snapshot scenes, and removes the remote. Deleting the integration from
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for the dev loop, the dockerized test
 HA, and releases.
+
+## License
+
+[GPL-3.0](LICENSE). Use it, change it, ship it — derived work stays open
+under the same terms. For a different arrangement, ask the author.

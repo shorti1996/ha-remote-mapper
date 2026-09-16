@@ -1,5 +1,6 @@
 {
   "name": "Remote Mapper",
   "homeassistant": "2025.7.0",
-  "render_readme": true
+  "zip_release": true,
+  "filename": "remote_mapper.zip"
 }

@@ -40,11 +40,14 @@ jobs:
       - name: Committed build must match
         run: git diff --exit-code custom_components/remote_mapper/www
 
-      # HACS downloads the zipped integration directory from release assets
+      # HACS downloads this asset (hacs.json: zip_release + filename), so
+      # ship runtime files only — no frontend sources/tests, no caches
       - name: Zip integration
         run: |
           cd custom_components/remote_mapper
-          zip -r ../../remote_mapper.zip . -x "frontend/node_modules/*"
+          zip -r ../../remote_mapper.zip . \
+            -x "frontend/*" -x "__pycache__/*" -x "*/__pycache__/*" -x "*.pyc"
+          unzip -l ../../remote_mapper.zip
 
       - uses: softprops/action-gh-release@v2
         with:

@@ -17,3 +17,7 @@ custom_components/remote_mapper/frontend/.ts-out/
 .idea/sshConfigs.xml
 .idea/deployment.xml
 .idea/webServers.xml
+
+# IDE
+.idea/
+*.iml
