@@ -82,12 +82,18 @@ def test_payload_shape() -> None:
     """One trigger with id + one trigger-keyed branch per event, in order."""
     payload = build_remote_payload(
         "Pilot",
-        {"a": {"platform": "mqtt", "topic": "t", "payload": "a"}, "b": {"platform": "mqtt", "topic": "t", "payload": "b"}},
+        {
+            "a": {"platform": "mqtt", "topic": "t", "payload": "a"},
+            "b": {"platform": "mqtt", "topic": "t", "payload": "b"},
+        },
         {"b": SEQ},
     )
     assert [t["id"] for t in payload["triggers"]] == ["a", "b"]
     branches = payload["actions"][0]["choose"]
-    assert branches[0] == {"conditions": [{"condition": "trigger", "id": "a"}], "sequence": []}
+    assert branches[0] == {
+        "conditions": [{"condition": "trigger", "id": "a"}],
+        "sequence": [],
+    }
     assert branches[1]["sequence"] == SEQ
     assert payload["mode"] == "parallel"
     assert find_branch(payload, "b") == 1
@@ -99,7 +105,14 @@ def test_branch_resolves_after_id_rename() -> None:
     """User renamed the trigger id in HA: the intrinsic match still finds it."""
     payload = build_remote_payload(
         "Pilot",
-        {"1_single": {"platform": "device", "domain": "mqtt", "type": "action", "subtype": "1_single"}},
+        {
+            "1_single": {
+                "platform": "device",
+                "domain": "mqtt",
+                "type": "action",
+                "subtype": "1_single",
+            }
+        },
         {"1_single": SEQ},
     )
     payload["triggers"][0]["id"] = "tap"
@@ -111,7 +124,16 @@ def test_non_shape_a_is_left_alone() -> None:
     """A choose over something else than trigger ids is not our shape."""
     payload = {
         "triggers": [{"platform": "state", "entity_id": "x"}],
-        "actions": [{"choose": [{"conditions": [{"condition": "time", "after": "10:00"}], "sequence": SEQ}]}],
+        "actions": [
+            {
+                "choose": [
+                    {
+                        "conditions": [{"condition": "time", "after": "10:00"}],
+                        "sequence": SEQ,
+                    }
+                ]
+            }
+        ],
     }
     assert branch_view(payload, "0") is None
 
@@ -162,7 +184,9 @@ async def test_create_for_whole_remote(hass, hass_ws_client, remote_device) -> N
     assert [c.data["via"] for c in calls] == ["slot"]
 
     # get_remote: shared automation advertised, per-slot live branch
-    res = await _ws(client, {"type": f"{DOMAIN}/get_remote", "entry_id": entry.entry_id})
+    res = await _ws(
+        client, {"type": f"{DOMAIN}/get_remote", "entry_id": entry.entry_id}
+    )
     assert res["result"]["remote_automation"]["config_id"] == config_id
     assert res["result"]["slots"]["1_double"]["live_actions"] == SEQ
     assert res["result"]["slots"]["1_single"]["live_actions"] == []
@@ -171,13 +195,19 @@ async def test_create_for_whole_remote(hass, hass_ws_client, remote_device) -> N
     # get_slot: narrowed live view
     res = await _ws(
         client,
-        {"type": f"{DOMAIN}/get_slot", "entry_id": entry.entry_id, "action_id": "1_double"},
+        {
+            "type": f"{DOMAIN}/get_slot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_double",
+        },
     )
     assert res["result"]["live"]["branch"] is True
     assert res["result"]["live"]["actions"] == SEQ
 
 
-async def test_grow_clear_and_delete_on_last(hass, hass_ws_client, remote_device) -> None:
+async def test_grow_clear_and_delete_on_last(
+    hass, hass_ws_client, remote_device
+) -> None:
     """Add a branch after refresh; clear removes it; last clear deletes."""
     entry = await _setup(hass, remote_device)
     store = hass.data[DOMAIN]["store"]
@@ -186,7 +216,12 @@ async def test_grow_clear_and_delete_on_last(hass, hass_ws_client, remote_device
 
     res = await _ws(
         client,
-        {"type": f"{DOMAIN}/create_automation", "entry_id": entry.entry_id, "action_id": "1_single", "scope": "remote"},
+        {
+            "type": f"{DOMAIN}/create_automation",
+            "entry_id": entry.entry_id,
+            "action_id": "1_single",
+            "scope": "remote",
+        },
     )
     assert res["success"], res
 
@@ -195,7 +230,12 @@ async def test_grow_clear_and_delete_on_last(hass, hass_ws_client, remote_device
     remote["layout"]["actions"].append("1_hold")
     res = await _ws(
         client,
-        {"type": f"{DOMAIN}/create_automation", "entry_id": entry.entry_id, "action_id": "1_hold", "scope": "remote"},
+        {
+            "type": f"{DOMAIN}/create_automation",
+            "entry_id": entry.entry_id,
+            "action_id": "1_hold",
+            "scope": "remote",
+        },
     )
     assert res["success"], res
     raw = _shared(hass, entry)
@@ -206,19 +246,30 @@ async def test_grow_clear_and_delete_on_last(hass, hass_ws_client, remote_device
     # clear one: branch + trigger gone, the automation stays
     res = await _ws(
         client,
-        {"type": f"{DOMAIN}/clear_slot", "entry_id": entry.entry_id, "action_id": "1_double"},
+        {
+            "type": f"{DOMAIN}/clear_slot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_double",
+        },
     )
     assert res["success"], res
     raw = _shared(hass, entry)
     assert [t["id"] for t in raw["triggers"]] == ["1_single", "1_hold"]
-    assert [b["conditions"][0]["id"] for b in raw["actions"][0]["choose"]] == ["1_single", "1_hold"]
+    assert [b["conditions"][0]["id"] for b in raw["actions"][0]["choose"]] == [
+        "1_single",
+        "1_hold",
+    ]
     assert store.get_slot(entry.entry_id, "1_double") is None
 
     # clear the rest: the automation is deleted with its last branch
     for action_id in ("1_single", "1_hold"):
         res = await _ws(
             client,
-            {"type": f"{DOMAIN}/clear_slot", "entry_id": entry.entry_id, "action_id": action_id},
+            {
+                "type": f"{DOMAIN}/clear_slot",
+                "entry_id": entry.entry_id,
+                "action_id": action_id,
+            },
         )
         assert res["success"], res
     assert all(a["id"] != config_id for a in _yaml(hass))
@@ -231,7 +282,12 @@ async def test_branch_missing_and_readd(hass, hass_ws_client, remote_device) -> 
     config_id = remote_automation_config_id(entry.entry_id)
     await _ws(
         client,
-        {"type": f"{DOMAIN}/create_automation", "entry_id": entry.entry_id, "action_id": "1_single", "scope": "remote"},
+        {
+            "type": f"{DOMAIN}/create_automation",
+            "entry_id": entry.entry_id,
+            "action_id": "1_single",
+            "scope": "remote",
+        },
     )
 
     # external edit: drop the 1_double branch (trigger left in place)
@@ -243,22 +299,34 @@ async def test_branch_missing_and_readd(hass, hass_ws_client, remote_device) -> 
     payload["actions"][0]["choose"] = payload["actions"][0]["choose"][:1]
     await config_store.async_upsert(config_id, payload)
 
-    res = await _ws(client, {"type": f"{DOMAIN}/get_remote", "entry_id": entry.entry_id})
+    res = await _ws(
+        client, {"type": f"{DOMAIN}/get_remote", "entry_id": entry.entry_id}
+    )
     assert res["result"]["slots"]["1_double"]["branch_missing"] is True
     assert res["result"]["slots"]["1_single"]["branch_missing"] is False
 
     res = await _ws(
         client,
-        {"type": f"{DOMAIN}/create_automation", "entry_id": entry.entry_id, "action_id": "1_double", "scope": "remote"},
+        {
+            "type": f"{DOMAIN}/create_automation",
+            "entry_id": entry.entry_id,
+            "action_id": "1_double",
+            "scope": "remote",
+        },
     )
     assert res["success"], res
     raw = _shared(hass, entry)
-    assert [b["conditions"][0]["id"] for b in raw["actions"][0]["choose"]] == ["1_single", "1_double"]
+    assert [b["conditions"][0]["id"] for b in raw["actions"][0]["choose"]] == [
+        "1_single",
+        "1_double",
+    ]
     # the trigger was still there — not duplicated
     assert [t["id"] for t in raw["triggers"]] == ["1_single", "1_double"]
 
 
-async def test_save_edits_branch_and_untick_detaches(hass, hass_ws_client, remote_device) -> None:
+async def test_save_edits_branch_and_untick_detaches(
+    hass, hass_ws_client, remote_device
+) -> None:
     """YAML save on a shared slot edits its branch; unticking pulls it back."""
     entry = await _setup(hass, remote_device)
     store = hass.data[DOMAIN]["store"]
@@ -266,7 +334,12 @@ async def test_save_edits_branch_and_untick_detaches(hass, hass_ws_client, remot
     config_id = remote_automation_config_id(entry.entry_id)
     await _ws(
         client,
-        {"type": f"{DOMAIN}/create_automation", "entry_id": entry.entry_id, "action_id": "1_single", "scope": "remote"},
+        {
+            "type": f"{DOMAIN}/create_automation",
+            "entry_id": entry.entry_id,
+            "action_id": "1_single",
+            "scope": "remote",
+        },
     )
 
     res = await _ws(
@@ -306,7 +379,9 @@ async def test_save_edits_branch_and_untick_detaches(hass, hass_ws_client, remot
     assert [t["id"] for t in raw["triggers"]] == ["1_double"]
 
 
-async def test_button_scope_creates_empty_shell(hass, hass_ws_client, remote_device) -> None:
+async def test_button_scope_creates_empty_shell(
+    hass, hass_ws_client, remote_device
+) -> None:
     """Scope=button: own automation with the trigger and no actions."""
     entry = await _setup(hass, remote_device)
     store = hass.data[DOMAIN]["store"]
@@ -335,24 +410,40 @@ async def test_button_scope_creates_empty_shell(hass, hass_ws_client, remote_dev
     # a second call on the same event is refused, nothing duplicated
     res = await _ws(
         client,
-        {"type": f"{DOMAIN}/create_automation", "entry_id": entry.entry_id, "action_id": "1_single", "scope": "button"},
+        {
+            "type": f"{DOMAIN}/create_automation",
+            "entry_id": entry.entry_id,
+            "action_id": "1_single",
+            "scope": "button",
+        },
     )
     assert not res["success"]
 
 
-async def test_release_unmanages_shared_once(hass, hass_ws_client, remote_device) -> None:
+async def test_release_unmanages_shared_once(
+    hass, hass_ws_client, remote_device
+) -> None:
     """Hand-back strips our prefix from the shared automation exactly once."""
     entry = await _setup(hass, remote_device)
     client = await hass_ws_client(hass)
     config_id = remote_automation_config_id(entry.entry_id)
     await _ws(
         client,
-        {"type": f"{DOMAIN}/create_automation", "entry_id": entry.entry_id, "action_id": "1_single", "scope": "remote"},
+        {
+            "type": f"{DOMAIN}/create_automation",
+            "entry_id": entry.entry_id,
+            "action_id": "1_single",
+            "scope": "remote",
+        },
     )
 
     res = await _ws(
         client,
-        {"type": f"{DOMAIN}/release_remote", "entry_id": entry.entry_id, "convert_remaining": True},
+        {
+            "type": f"{DOMAIN}/release_remote",
+            "entry_id": entry.entry_id,
+            "convert_remaining": True,
+        },
     )
     assert res["success"], res
     assert sorted(res["result"]["kept"]) == ["1_double", "1_single"]
@@ -361,7 +452,9 @@ async def test_release_unmanages_shared_once(hass, hass_ws_client, remote_device
     assert len(raw["actions"][0]["choose"]) == 2
 
 
-async def test_snapshot_on_shared_slot_lands_in_branch(hass, hass_ws_client, remote_device) -> None:
+async def test_snapshot_on_shared_slot_lands_in_branch(
+    hass, hass_ws_client, remote_device
+) -> None:
     """Scene from current state on a branch slot: the branch calls the scene."""
     from homeassistant.util.yaml import load_yaml as _load_yaml
 
@@ -385,7 +478,12 @@ async def test_snapshot_on_shared_slot_lands_in_branch(hass, hass_ws_client, rem
             client = await hass_ws_client(hass)
             await _ws(
                 client,
-                {"type": f"{DOMAIN}/create_automation", "entry_id": entry.entry_id, "action_id": "1_single", "scope": "remote"},
+                {
+                    "type": f"{DOMAIN}/create_automation",
+                    "entry_id": entry.entry_id,
+                    "action_id": "1_single",
+                    "scope": "remote",
+                },
             )
             res = await _ws(
                 client,

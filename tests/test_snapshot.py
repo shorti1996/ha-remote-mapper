@@ -317,7 +317,9 @@ async def test_snapshot_with_explicit_entities_remembers_default(
     """Card-picked entities win; remember_entities writes the remote default."""
     hass.states.async_set("light.a", "on")
     hass.states.async_set("light.c", "off")
-    entry = await _setup(hass, remote_device, options={"snapshot_entities": ["light.a"]})
+    entry = await _setup(
+        hass, remote_device, options={"snapshot_entities": ["light.a"]}
+    )
     client = await hass_ws_client(hass)
 
     res = await _ws(
@@ -343,7 +345,11 @@ async def test_snapshot_without_entities_fails_clearly(
     client = await hass_ws_client(hass)
     res = await _ws(
         client,
-        {"type": f"{DOMAIN}/create_snapshot", "entry_id": entry.entry_id, "action_id": "1_single"},
+        {
+            "type": f"{DOMAIN}/create_snapshot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_single",
+        },
     )
     assert not res["success"]
     assert "No capturable entities" in res["error"]["message"]

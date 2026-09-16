@@ -54,7 +54,9 @@ def _as_list(value: Any) -> list[Any]:
 def _normalized(raw: dict[str, Any]) -> dict[str, Any]:
     """Payload with plural keys and no id — safe to mutate and upsert."""
     payload = {k: v for k, v in raw.items() if k != "id"}
-    payload["triggers"] = _as_list(payload.pop("triggers", payload.pop("trigger", None)))
+    payload["triggers"] = _as_list(
+        payload.pop("triggers", payload.pop("trigger", None))
+    )
     payload["conditions"] = _as_list(
         payload.pop("conditions", payload.pop("condition", None))
     )
@@ -135,7 +137,9 @@ def build_remote_payload(
             "edits here are canonical. Clearing a button in the remote card "
             "removes its branch."
         ),
-        "triggers": [{**trigger, "id": action_id} for action_id, trigger in triggers.items()],
+        "triggers": [
+            {**trigger, "id": action_id} for action_id, trigger in triggers.items()
+        ],
         "conditions": [],
         "actions": [
             {
@@ -156,7 +160,9 @@ def find_branch(payload: dict[str, Any], action_id: str) -> int | None:
     choose = _choose_step(payload)
     if choose is None:
         return None
-    ids = _trigger_ids_for(_as_list(payload.get("triggers", payload.get("trigger"))), action_id)
+    ids = _trigger_ids_for(
+        _as_list(payload.get("triggers", payload.get("trigger"))), action_id
+    )
     if not ids:
         return None
     for index, option in enumerate(_as_list(choose.get("choose"))):
@@ -202,7 +208,9 @@ def _link_slot(
 
 async def async_exists(hass: HomeAssistant, entry_id: str) -> dict[str, Any] | None:
     """Raw config of the remote's shared automation, if it exists."""
-    return await _get_config_store(hass).async_get(remote_automation_config_id(entry_id))
+    return await _get_config_store(hass).async_get(
+        remote_automation_config_id(entry_id)
+    )
 
 
 async def async_create_remote_automation(
@@ -281,7 +289,10 @@ async def async_add_branch(
             )
             payload["triggers"].append({**trigger, "id": action_id})
             branch_id = action_id
-        choose["choose"] = [*_as_list(choose.get("choose")), build_branch(branch_id, sequence)]
+        choose["choose"] = [
+            *_as_list(choose.get("choose")),
+            build_branch(branch_id, sequence),
+        ]
         await _get_config_store(hass).async_upsert(config_id, payload)
 
     _link_slot(store, entry_id, action_id, config_id)
@@ -329,7 +340,9 @@ async def async_remove_branch(
         del options[index]
         choose["choose"] = options
     payload["triggers"] = [
-        t for t in payload["triggers"] if not (isinstance(t, dict) and str(t.get("id")) in ids)
+        t
+        for t in payload["triggers"]
+        if not (isinstance(t, dict) and str(t.get("id")) in ids)
     ]
     remaining = _as_list(choose.get("choose")) if choose is not None else None
     if choose is not None and not remaining:

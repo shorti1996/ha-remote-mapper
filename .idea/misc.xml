@@ -1,8 +1,0 @@
-<project version="4">
-  <component name="Black">
-    <option name="sdkName" value="uv (ha-remote-mapper)" />
-  </component>
-  <component name="ProjectRootManager" version="2" languageLevel="JDK_26" project-jdk-name="uv (ha-remote-mapper)" project-jdk-type="Python SDK">
-    <output url="file://$PROJECT_DIR$/out" />
-  </component>
-</project>

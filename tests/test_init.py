@@ -71,8 +71,10 @@ async def _setup_device_remote(hass, device_id: str) -> MockConfigEntry:
     return entry
 
 
-async def test_stale_source_device_link_is_dropped(hass, remote_device, device_registry) -> None:
-    """Pre-1744afd remotes tagged the physical device with our entry: untag it, keep it."""
+async def test_stale_source_device_link_is_dropped(
+    hass, remote_device, device_registry
+) -> None:
+    """Pre-1744afd remotes tagged the physical device with our entry: untag, keep."""
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="Test Remote",
@@ -85,7 +87,9 @@ async def test_stale_source_device_link_is_dropped(hass, remote_device, device_r
     )
     entry.add_to_hass(hass)
     # simulate the old model: the physical (MQTT) device also carries our entry
-    device_registry.async_update_device(remote_device, add_config_entry_id=entry.entry_id)
+    device_registry.async_update_device(
+        remote_device, add_config_entry_id=entry.entry_id
+    )
     before = device_registry.async_get(remote_device)
     assert entry.entry_id in before.config_entries
     others = before.config_entries - {entry.entry_id}
@@ -105,7 +109,9 @@ async def test_stale_source_device_link_is_dropped(hass, remote_device, device_r
     assert ours.via_device_id == remote_device
 
 
-async def test_source_device_owned_only_by_us_is_kept(hass, remote_device, device_registry) -> None:
+async def test_source_device_owned_only_by_us_is_kept(
+    hass, remote_device, device_registry
+) -> None:
     """Guard: never remove the last config entry — that would delete the device."""
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -120,8 +126,12 @@ async def test_source_device_owned_only_by_us_is_kept(hass, remote_device, devic
     entry.add_to_hass(hass)
     # old model link, then the MQTT entry lets go: ours is the last owner
     mqtt_entry_id = hass.config_entries.async_entries("mqtt")[0].entry_id
-    device_registry.async_update_device(remote_device, add_config_entry_id=entry.entry_id)
-    device_registry.async_update_device(remote_device, remove_config_entry_id=mqtt_entry_id)
+    device_registry.async_update_device(
+        remote_device, add_config_entry_id=entry.entry_id
+    )
+    device_registry.async_update_device(
+        remote_device, remove_config_entry_id=mqtt_entry_id
+    )
     assert device_registry.async_get(remote_device).config_entries == {entry.entry_id}
 
     assert await hass.config_entries.async_setup(entry.entry_id)

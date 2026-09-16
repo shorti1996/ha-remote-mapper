@@ -99,7 +99,9 @@ async def async_release_remote(
             if slot.get("shared_automation"):
                 plain_alias = entry.title
             if config_id not in unmanaged:
-                unmanaged[config_id] = await async_unmanage(hass, config_id, plain_alias)
+                unmanaged[config_id] = await async_unmanage(
+                    hass, config_id, plain_alias
+                )
             if unmanaged[config_id]:
                 summary["kept"].append(action_id)
             else:
