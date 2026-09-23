@@ -2693,11 +2693,13 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       align-items: center;
       gap: var(--ha-space-2, 8px);
       padding: var(--ha-space-2, 8px) var(--ha-space-4, 16px);
-      font-size: var(--ha-font-size-s, 12px);
+      font-size: var(--ha-font-size-m, 14px);
+      line-height: var(--ha-line-height-normal, 1.6);
       background: var(--warning-color, #ffa600);
       color: var(--text-primary-color, #fff);
     }
     .stale button {
+      min-height: var(--ha-space-9, 36px);
       padding: var(--ha-space-1, 4px) var(--ha-space-3, 12px);
       border: 1px solid currentColor;
       border-radius: var(--ha-border-radius-md, 8px);
