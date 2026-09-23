@@ -3,9 +3,9 @@
 Notable changes per release. Unreleased entries collect on `master` and
 move under a version heading when `make release VERSION=x.y.z` runs.
 
-## Unreleased
+## 0.1.4 — 2026-09-23
 
-Since v0.1.3. Python changed, so restart Home Assistant after updating.
+Python changed, so restart Home Assistant after updating.
 
 ### Fixed
 
