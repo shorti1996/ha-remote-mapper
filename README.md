@@ -52,8 +52,9 @@ device, where every button shows what it does and lets you change it.
   YAML tab takes the full automation action syntax (`if`, `choose`,
   templates).
 
-  <!-- screenshot: the slot editor, Quick tab -->
-  ![Assign an action](docs/img/assign.png)
+  [![Assign an action: tap a button's event, pick Toggle entity, pick the light, save](docs/demo/03-assign-action.gif)](docs/demo/full/03-assign-action.gif)
+
+  [Full-size recording](docs/demo/full/03-assign-action.gif)
 
 - **📸 Scene from current state.** Set the room the way you like it, pick
   *Scene from current state* on a button, tick the entities: their current
@@ -126,12 +127,25 @@ needed; new actions are live immediately.
 2. Restart Home Assistant.
 3. *Settings → Devices & services → Add integration → Remote Mapper*, pick
    the device, press its buttons once.
-4. Edit a dashboard → *Add card* → **Remote Mapper Card**. With one remote
-   nothing needs configuring.
+4. Edit a dashboard → *Add card* → *By card* tab → **Remote Mapper Card**
+   (it is not listed under *By entity*). With one remote nothing needs
+   configuring.
 
 The card ships with the integration; no separate frontend install. (YAML
 dashboards: add the resource
 `/hacsfiles/remote_mapper/remote-mapper-card.js` as a module.)
+
+## Guides
+
+Step-by-step, each with a short screen recording:
+
+| Guide | Covers |
+|---|---|
+| [Getting started](docs/guides/getting-started.md) | add a remote, add the card, assign the first action |
+| [Layout and looks](docs/guides/layout-and-looks.md) | grid and canvas layouts, swapping buttons, display modes, colours |
+| [Scenes](docs/guides/scenes.md) | capture the room's current state as a scene, re-snapshot it later |
+| [Automations](docs/guides/automations.md) | turn a button into a native HA automation, or build one for the whole remote |
+| [Existing automations](docs/guides/existing-automations.md) | link or absorb what you already have, re-import, hand the remote back |
 
 ## Card options
 
