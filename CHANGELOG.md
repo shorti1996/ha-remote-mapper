@@ -3,6 +3,19 @@
 Notable changes per release. Unreleased entries collect on `master` and
 move under a version heading when `make release VERSION=x.y.z` runs.
 
+## Unreleased
+
+### Fixed
+
+- **Remotes that name the press first get one pad per button.** Aqara
+  double rockers and wall switches (`single_left`, `hold_both`), the Sonoff
+  SNZB-01M (`single_button_1`) and the Hue Tap (`press_1`), 48 Z2M remotes
+  in all, showed every action as its own pad: the WXKG15LM had 12 pads
+  instead of *left*, *right* and *both*. Actions already assigned keep
+  working; the pads of these remotes lose their saved position and label
+  once. Also recognised: `pressed`, `held`, `released`, `longpress`,
+  `many` (Aqara, five or more presses) and `tripple` (LeTV).
+
 ## 0.1.5 — 2026-09-24
 
 ### Fixed

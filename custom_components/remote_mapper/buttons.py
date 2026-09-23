@@ -10,6 +10,8 @@ Grouping is per source:
 - everything else (device_trigger, z2m_mqtt, mqtt_generic): Zigbee2MQTT
   vocabulary ``{button}_{event}`` — split at the last suffix that is a
   known event token, two-token suffixes (``press_release``) tried first.
+  Ids with no event suffix are tried event-first, ``{event}_{button}``
+  (Aqara ``single_left``, Sonoff ``single_button_1``, Hue Tap ``press_1``).
   A bare event token (``single``) is a single-button device.
 
 ``kind`` classifies events for the card's gesture mapping and icons.
@@ -50,6 +52,7 @@ _KIND_BY_EVENT: Final[dict[str, str]] = {
     "single": KIND_SINGLE,
     "click": KIND_SINGLE,
     "press": KIND_SINGLE,
+    "pressed": KIND_SINGLE,
     "short": KIND_SINGLE,
     "short_press": KIND_SINGLE,
     "single_press": KIND_SINGLE,
@@ -58,21 +61,28 @@ _KIND_BY_EVENT: Final[dict[str, str]] = {
     "double": KIND_DOUBLE,
     "double_press": KIND_DOUBLE,
     "double_click": KIND_DOUBLE,
+    "double_pressed": KIND_DOUBLE,
     "multi_press_2": KIND_DOUBLE,
     "triple": KIND_TRIPLE,
+    "tripple": KIND_TRIPLE,  # Z2M's spelling for the LeTV 8-key remote
     "triple_press": KIND_TRIPLE,
     "triple_click": KIND_TRIPLE,
     "multi_press_3": KIND_TRIPLE,
     "hold": KIND_HOLD,
+    "held": KIND_HOLD,
     "long": KIND_HOLD,
+    "longpress": KIND_HOLD,
     "long_press": KIND_HOLD,
     "long_click": KIND_HOLD,
     "release": KIND_RELEASE,
+    "released": KIND_RELEASE,
     "long_release": KIND_RELEASE,
+    "longpress_release": KIND_RELEASE,
     "hold_release": KIND_RELEASE,
     "press_release": KIND_RELEASE,
     "quadruple": KIND_OTHER,
     "quintuple": KIND_OTHER,
+    "many": KIND_OTHER,  # Aqara: five or more presses
     "quadruple_press": KIND_OTHER,
     "quintuple_press": KIND_OTHER,
     "multi_press_4": KIND_OTHER,
@@ -97,9 +107,11 @@ def natural_key(value: str) -> tuple[Any, ...]:
 def split_z2m_action(action_id: str) -> tuple[str, str]:
     """``{button}_{event}`` → (button, event) using the known event tokens.
 
-    Two-token suffixes win over one-token ones (``on_press_release`` →
-    ``on`` / ``press_release``). A bare event token means a single-button
-    device. No known suffix → the whole id is the button, event ``press``.
+    Two-token events win over one-token ones (``on_press_release`` →
+    ``on`` / ``press_release``). With no event suffix, an event prefix
+    splits the other way (``single_left`` → ``left`` / ``single``). A bare
+    event token means a single-button device. No known event → the whole
+    id is the button, event ``press``.
     """
     if action_id in _KIND_BY_EVENT:
         return SINGLE_BUTTON_ID, action_id
@@ -109,6 +121,11 @@ def split_z2m_action(action_id: str) -> tuple[str, str]:
             suffix = "_".join(parts[-take:])
             if suffix in _KIND_BY_EVENT:
                 return "_".join(parts[:-take]), suffix
+    for take in (2, 1):
+        if len(parts) > take:
+            prefix = "_".join(parts[:take])
+            if prefix in _KIND_BY_EVENT:
+                return "_".join(parts[take:]), prefix
     return action_id, DEFAULT_EVENT
 
 

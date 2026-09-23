@@ -83,6 +83,67 @@ def test_bare_events_are_one_button() -> None:
     ]
 
 
+def test_z2m_event_first_aqara_double_rocker() -> None:
+    """Aqara WXKG15LM names actions ``{event}_{button}``: three buttons."""
+    buttons = group_buttons(
+        "device_trigger",
+        [
+            f"{event}_{button}"
+            for event in ("single", "double", "triple", "hold")
+            for button in ("left", "right", "both")
+        ],
+    )
+    assert _ids(buttons) == ["both", "left", "right"]
+    assert _events(buttons[1]) == [
+        ("single", "single"),
+        ("double", "double"),
+        ("triple", "triple"),
+        ("hold", "hold"),
+    ]
+    assert buttons[1]["actions"][0]["action_id"] == "single_left"
+
+
+def test_z2m_event_first_multi_token_buttons() -> None:
+    """Sonoff SNZB-01M, Hue Tap, Aqara QBKG03LM: the rest is the button."""
+    assert split_z2m_action("single_button_1") == ("button_1", "single")
+    assert split_z2m_action("long_button_4") == ("button_4", "long")
+    assert split_z2m_action("press_1_and_2") == ("1_and_2", "press")
+    assert split_z2m_action("hold_release_left") == ("left", "hold_release")
+
+
+def test_z2m_event_suffix_wins_over_prefix() -> None:
+    """Aqara QBKG25LM mixes both orders; each id still lands on its button."""
+    buttons = group_buttons(
+        "device_trigger",
+        ["left_single", "left_double", "single_left_center", "double_left_center"],
+    )
+    assert _ids(buttons) == ["left", "left_center"]
+    assert [a["action_id"] for a in buttons[0]["actions"]] == [
+        "left_single",
+        "left_double",
+    ]
+
+
+def test_z2m_vendor_event_words() -> None:
+    """Event words from Z2M device definitions beyond the common ones."""
+    assert split_z2m_action("tripple_up") == ("up", "tripple")
+    assert split_z2m_action("button_top_left_longpress") == (
+        "button_top_left",
+        "longpress",
+    )
+    assert split_z2m_action("button_top_left_longpress_release") == (
+        "button_top_left",
+        "longpress_release",
+    )
+    assert event_kind("tripple") == "triple"
+    assert event_kind("held") == "hold"
+    assert event_kind("released") == "release"
+    buttons = group_buttons("device_trigger", ["single", "double", "many"])
+    assert _ids(buttons) == ["button"]
+    candeo = group_buttons("device_trigger", ["double_pressed", "held", "released"])
+    assert _ids(candeo) == ["button"]
+
+
 def test_unknown_suffix_is_its_own_button() -> None:
     """Nothing is hidden: unparseable ids become buttons with a press event."""
     buttons = group_buttons("mqtt_generic", ["shake", "rotate_left"])

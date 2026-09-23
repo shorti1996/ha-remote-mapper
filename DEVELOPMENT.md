@@ -36,6 +36,13 @@ Browser-level checks (phone viewport, touch, screenshots):
 doc above also covers restart-vs-rebuild rules, the Chrome extension, and
 the production rsync.
 
+`tests/fixtures/z2m_actions.json` holds the action list of every Z2M device
+definition with a literal one (417 at zigbee-herdsman-converters
+`cde6edc`, 2026-09-22) and the buttons each groups into;
+`tests/test_z2m_catalog.py` checks the parser against it. Refresh it from
+upstream, or re-group it after a parser change, with
+`scripts/z2m_actions.py` (steps in its docstring).
+
 The card's canvas engine is vendored from the in-house widget-canvas
 repo (`frontend/src/canvas/`, provenance headers in each file); once that
 repo tags a release exporting `src/lib.ts`, the copies collapse into a
