@@ -18,6 +18,14 @@ import { customElement, state } from "lit/decorators.js";
 import "./card-editor";
 import "./grid-picker";
 import "./remote-grid";
+
+/**
+ * Grid edit drafts keyed by entry id. HA's card editor calls setConfig on
+ * every form change and rebuilds the preview on Save, which would
+ * otherwise drop an unticked draft; the module instance outlives the
+ * element, so a recreated card resumes the edit session instead.
+ */
+const gridDrafts = new Map<string, GridLayout>();
 import { EditController, type EditHost } from "./canvas/edit-controller";
 import { ensureHaForm, ensureYamlEditor } from "./canvas/ha-loader";
 import { computeTransform, type CanvasTransform } from "./canvas/scaling";
@@ -350,10 +358,13 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   }
 
   public setConfig(config: RemoteMapperCardConfig): void {
+    // Only a different remote invalidates an in-progress grid edit
+    if (this._config && config.entry_id !== this._config.entry_id) {
+      this._cancelGridEdit();
+    }
     this._config = config;
     this._entryId = config.entry_id;
     this._fetchStarted = false;
-    this._cancelGridEdit();
     if (this._hass) {
       this._fetchStarted = true;
       void this._initialize();
@@ -422,6 +433,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
         }
       }
       await this._fetchRemote();
+      this._resumeGridEdit();
       await this._subscribe();
     } catch (err) {
       this._error = errorText(err);
@@ -650,9 +662,8 @@ export class RemoteMapperCard extends LitElement implements EditHost {
 
   private _enterGridEdit = (): void => {
     if (!this._remote) return;
-    this._gridDraft = normalizeGrid(
-      this._remote.grid_layout,
-      this._remote.buttons ?? []
+    this._setGridDraft(
+      normalizeGrid(this._remote.grid_layout, this._remote.buttons ?? [])
     );
     this._gridEditing = true;
     // Z2M discovers actions lazily — pick up anything pressed since setup
@@ -672,7 +683,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
         if (this._gridEditing && this._remote) {
           // fold them into the draft so they show up in this edit session
           await this._fetchRemote();
-          this._gridDraft = normalizeGrid(this._gridDraft, this._remote.buttons ?? []);
+          this._setGridDraft(normalizeGrid(this._gridDraft, this._remote.buttons ?? []));
         }
       } else if (!quiet) {
         this.notify(
@@ -689,9 +700,24 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   private _cancelGridEdit = (): void => {
     this._gridEditing = false;
     this._gridDraft = undefined;
+    if (this._entryId) gridDrafts.delete(this._entryId);
     this._pickerOpen = false;
     this._buttonSheet = undefined;
   };
+
+  /** Every draft change lands in the registry so a rebuilt card can resume. */
+  private _setGridDraft(draft: GridLayout): void {
+    this._gridDraft = draft;
+    if (this._entryId) gridDrafts.set(this._entryId, draft);
+  }
+
+  /** Pick up a draft an earlier instance of this card left unticked. */
+  private _resumeGridEdit(): void {
+    const draft = this._entryId ? gridDrafts.get(this._entryId) : undefined;
+    if (!draft || !this._remote || this._gridEditing) return;
+    this._gridDraft = normalizeGrid(draft, this._remote.buttons ?? []);
+    this._gridEditing = true;
+  }
 
   private async _saveGridEdit(): Promise<void> {
     const draft = this._gridDraft;
@@ -714,11 +740,8 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   private _onGridPicked = (e: CustomEvent<{ rows: number; cols: number }>): void => {
     const draft = this._gridDraft;
     if (!draft || !this._remote) return;
-    this._gridDraft = resizeGrid(
-      draft,
-      e.detail.rows,
-      e.detail.cols,
-      this._remote.buttons ?? []
+    this._setGridDraft(
+      resizeGrid(draft, e.detail.rows, e.detail.cols, this._remote.buttons ?? [])
     );
     this._pickerOpen = false;
   };
@@ -1295,7 +1318,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
               this._modalOpenedAt = Date.now();
             }}
             @layout-changed=${(e: CustomEvent<{ layout: GridLayout }>) => {
-              this._gridDraft = e.detail.layout;
+              this._setGridDraft(e.detail.layout);
             }}
           ></remote-mapper-grid>
             `}
@@ -1430,10 +1453,12 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                   placeholder=${button.id}
                   @input=${(e: Event) => {
                     if (this._gridDraft) {
-                      this._gridDraft = setButtonLabel(
-                        this._gridDraft,
-                        button.id,
-                        (e.target as HTMLInputElement).value
+                      this._setGridDraft(
+                        setButtonLabel(
+                          this._gridDraft,
+                          button.id,
+                          (e.target as HTMLInputElement).value
+                        )
                       );
                     }
                   }}
