@@ -43,6 +43,38 @@ async def test_lovelace_resource_registered(hass) -> None:
     assert f"{URL_BASE}/remote-mapper-card.js?v={INTEGRATION_VERSION}" in urls
 
 
+async def test_reload_notification_on_new_or_changed_resource(hass) -> None:
+    """A new or re-versioned card resource raises a reload notification once."""
+    from homeassistant.components.persistent_notification import (
+        _async_get_or_create_notifications,
+    )
+
+    from custom_components.remote_mapper.card_resource import JSModuleRegistration
+    from custom_components.remote_mapper.const import RELOAD_NOTIFICATION_ID
+
+    await _setup_entry(hass)
+    notifications = _async_get_or_create_notifications(hass)
+    assert RELOAD_NOTIFICATION_ID in notifications
+
+    # dismissed + same version registered again → stays quiet
+    notifications.pop(RELOAD_NOTIFICATION_ID)
+    registrar = JSModuleRegistration(hass)
+    assert await registrar._async_register_modules() is False
+    assert RELOAD_NOTIFICATION_ID not in notifications
+
+    # an old version on record → updated + notified again
+    resources = hass.data[LOVELACE_DATA].resources
+    item = next(iter(resources.async_items()))
+    await resources.async_update_item(
+        item["id"],
+        {"res_type": "module", "url": f"{URL_BASE}/remote-mapper-card.js?v=0.0.1"},
+    )
+    await registrar.async_register()
+    assert RELOAD_NOTIFICATION_ID in notifications
+    urls = [i["url"] for i in resources.async_items()]
+    assert f"{URL_BASE}/remote-mapper-card.js?v={INTEGRATION_VERSION}" in urls
+
+
 async def test_ws_ping(hass, hass_ws_client) -> None:
     """Hello-world WS command answers with the integration version."""
     await _setup_entry(hass)

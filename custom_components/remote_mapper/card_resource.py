@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.components.lovelace.const import LOVELACE_DATA
 
-from .const import JSMODULES, URL_BASE
+from .const import INTEGRATION_VERSION, JSMODULES, RELOAD_NOTIFICATION_ID, URL_BASE
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -34,11 +34,31 @@ class JSModuleRegistration:
         self.lovelace = hass.data.get(LOVELACE_DATA)
 
     async def async_register(self) -> None:
-        """Register static path and Lovelace resources (storage mode only)."""
+        """Register static path and Lovelace resources (storage mode only).
+
+        A new or re-versioned resource only reaches a browser after a full
+        reload (HA caches the module), so that case raises a persistent
+        notification the way HACS prompts after a dashboard-plugin update.
+        """
         await self._async_register_static_path()
         if self.lovelace and self.lovelace.resource_mode == "storage":
             await self._async_load_resources()
-            await self._async_register_modules()
+            if await self._async_register_modules():
+                self._async_notify_reload()
+
+    def _async_notify_reload(self) -> None:
+        from homeassistant.components import persistent_notification
+
+        persistent_notification.async_create(
+            self.hass,
+            f"The Remote Mapper card was installed or updated to "
+            f"v{INTEGRATION_VERSION}. Open dashboards keep the old card until "
+            "the browser reloads: press "
+            "Ctrl+Shift+R (Cmd+Shift+R on Mac), or in the mobile app use "
+            "Settings → Companion app → Reset frontend cache.",
+            title="Remote Mapper: reload your browser",
+            notification_id=RELOAD_NOTIFICATION_ID,
+        )
 
     async def _async_register_static_path(self) -> None:
         """Serve www/ at URL_BASE."""
@@ -56,9 +76,13 @@ class JSModuleRegistration:
             await self.lovelace.resources.async_load()
             self.lovelace.resources.loaded = True
 
-    async def _async_register_modules(self) -> None:
-        """Add or update JS modules in Lovelace resources."""
+    async def _async_register_modules(self) -> bool:
+        """Add or update JS modules in Lovelace resources.
+
+        Returns True when a resource was created or its version changed.
+        """
         existing = list(self.lovelace.resources.async_items())
+        changed = False
 
         for module in JSMODULES:
             url = f"{URL_BASE}/{module['filename']}"
@@ -78,6 +102,7 @@ class JSModuleRegistration:
                             resource["id"],
                             {"res_type": "module", "url": versioned_url},
                         )
+                        changed = True
                     break
 
             if not registered:
@@ -89,6 +114,8 @@ class JSModuleRegistration:
                 await self.lovelace.resources.async_create_item(
                     {"res_type": "module", "url": versioned_url}
                 )
+                changed = True
+        return changed
 
     async def async_unregister(self) -> None:
         """Remove this integration's Lovelace resources (uninstall cleanup)."""

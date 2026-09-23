@@ -193,6 +193,8 @@ async def ws_get_remote(
             "stale_actions": remote.get("stale_actions", []),
             "remote_automation": shared,
             "snapshot_entities": list(entry.options.get(CONF_SNAPSHOT_ENTITIES, [])),
+            # The card compares this with its own build to offer a reload
+            "version": INTEGRATION_VERSION,
         },
     )
 

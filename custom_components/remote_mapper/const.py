@@ -23,6 +23,9 @@ JSMODULES: Final[list[dict[str, str]]] = [
     },
 ]
 
+# Persistent notification raised when the card resource is (re)registered.
+RELOAD_NOTIFICATION_ID: Final = f"{DOMAIN}_reload_browser"
+
 # Prefixes stamped onto materialized automations/scenes (M4+).
 # Orphan detection is a substring check on these — keep stable across versions.
 AUTOMATION_ALIAS_PREFIX: Final = f"[{DOMAIN}]"

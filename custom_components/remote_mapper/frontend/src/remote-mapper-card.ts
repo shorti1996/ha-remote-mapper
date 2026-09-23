@@ -26,6 +26,9 @@ import "./remote-grid";
  * element, so a recreated card resumes the edit session instead.
  */
 const gridDrafts = new Map<string, GridLayout>();
+
+/** Replaced by rollup with package.json's version; unbuilt source keeps the marker. */
+const CARD_VERSION = "__CARD_VERSION__";
 import { EditController, type EditHost } from "./canvas/edit-controller";
 import { ensureHaForm, ensureYamlEditor } from "./canvas/ha-loader";
 import { computeTransform, type CanvasTransform } from "./canvas/scaling";
@@ -124,6 +127,8 @@ interface RemoteData {
   remote_automation?: { config_id: string; entity_id: string | null; edit_url: string } | null;
   /** Default entity set for snapshots (remote options). */
   snapshot_entities?: string[];
+  /** Integration version; newer than CARD_VERSION = this tab runs a stale bundle. */
+  version?: string;
 }
 
 interface RemoteListItem {
@@ -1218,6 +1223,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     const editing = this._edit.active;
     return html`
       <ha-card>
+        ${this._renderStaleBundle()}
         <div class="header">
           ${this._renderTitle()}
           <span class="header-buttons">
@@ -1255,6 +1261,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     const buttons = remote.buttons ?? [];
     return html`
       <ha-card>
+        ${this._renderStaleBundle()}
         <div class="header">
           ${this._renderTitle()}
           <span class="header-buttons">
@@ -1827,6 +1834,25 @@ export class RemoteMapperCard extends LitElement implements EditHost {
           </div>
           ${this._clearArtifacts ? this._renderClearDialog() : nothing}
         </div>
+      </div>
+    `;
+  }
+
+  /**
+   * HA caches custom resources until a full reload, so after an update the
+   * backend can be newer than the card running in this tab. Same purpose
+   * as HACS's "reload your browser" prompt, shown where it matters.
+   */
+  private _renderStaleBundle(): TemplateResult | typeof nothing {
+    const backend = this._remote?.version;
+    if (!backend || CARD_VERSION.startsWith("__") || backend === CARD_VERSION) {
+      return nothing;
+    }
+    return html`
+      <div class="stale">
+        Remote Mapper was updated to v${backend}; this tab still runs the
+        v${CARD_VERSION} card.
+        <button @click=${() => window.location.reload()}>Reload</button>
       </div>
     `;
   }
@@ -2595,6 +2621,25 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     .error {
       color: var(--error-color, #db4437);
     }
+    .stale {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--ha-space-2, 8px);
+      padding: var(--ha-space-2, 8px) var(--ha-space-4, 16px);
+      font-size: var(--ha-font-size-s, 12px);
+      background: var(--warning-color, #ffa600);
+      color: var(--text-primary-color, #fff);
+    }
+    .stale button {
+      padding: var(--ha-space-1, 4px) var(--ha-space-3, 12px);
+      border: 1px solid currentColor;
+      border-radius: var(--ha-border-radius-md, 8px);
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+    }
     .hint {
       margin: 0 0 var(--ha-space-2, 8px);
       font-size: var(--ha-font-size-m, 14px);
@@ -2683,7 +2728,7 @@ window.customCards.push({
 });
 
 console.info(
-  `%c REMOTE-MAPPER-CARD %c grid `,
+  `%c REMOTE-MAPPER-CARD %c ${CARD_VERSION} `,
   "color: white; background: #3f51b5; font-weight: 700;",
   "color: #3f51b5; background: white; font-weight: 700;"
 );
