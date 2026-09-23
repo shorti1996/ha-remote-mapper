@@ -242,11 +242,13 @@ async def async_absorb_link(
     store: RemoteMapperStore,
     entry_id: str,
     action_id: str,
+    sequence: list[Any] | None = None,
 ) -> None:
     """Unlink: copy the automation's actions into the slot, disable it.
 
     Same footprint as an absorbing import — the original is disabled
     (never deleted) and remembered in imported_from for hand-back.
+    ``sequence`` (already validated) replaces the live actions when given.
     """
     slot = store.get_slot(entry_id, action_id)
     if not is_linked(slot):
@@ -256,7 +258,11 @@ async def async_absorb_link(
     if raw is None:
         raise HomeAssistantError(f"Automation {config_id} no longer exists")
     entity_id = automation_entity_id(hass, config_id)
-    slot["sequence"] = list(raw.get("actions", raw.get("action", [])) or [])
+    slot["sequence"] = (
+        list(sequence)
+        if sequence is not None
+        else list(raw.get("actions", raw.get("action", [])) or [])
+    )
     slot["materialized"] = False
     slot["automation_id"] = None
     slot["owned"] = True

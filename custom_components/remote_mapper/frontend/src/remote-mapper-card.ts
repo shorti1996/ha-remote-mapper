@@ -814,9 +814,21 @@ export class RemoteMapperCard extends LitElement implements EditHost {
           this._editingLive = res.live;
           this._yamlValue = res.live.actions ?? [];
           this._draft = JSON.stringify(res.live.actions ?? [], null, 2);
-          this._editorTab = "yaml";
+          // Linked slots open on the Quick tab's "Link existing" chip so a
+          // plain Save keeps the link; owned/shared ones edit the live YAML.
+          if (!this._isLinked(slot)) this._editorTab = "yaml";
         }
       });
+    }
+  }
+
+  /** Textarea fallback: JSON parse of the draft, null when it isn't JSON. */
+  private _parseDraftOrNull(): unknown[] | null {
+    try {
+      const parsed: unknown = JSON.parse(this._draft);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
     }
   }
 
@@ -882,6 +894,24 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       // Link: no sequence, no materialize toggle — the automation is canonical
       delete msg.materialized;
       msg.link_entity_id = this._quickEntity;
+    } else if (
+      this._isLinked(this._remote?.slots[this._editingAction ?? ""]) &&
+      this._draftMaterialized
+    ) {
+      // Linked + "keep linked" ticked: the native automation is canonical.
+      // A new sequence here would replace the link with a fresh owned
+      // automation, so refuse unless the actions are untouched.
+      const live = JSON.stringify(this._editingLive?.actions ?? []);
+      const draft = this._yamlEditorOk
+        ? JSON.stringify(this._yamlValue ?? [])
+        : JSON.stringify(this._parseDraftOrNull() ?? null);
+      if (this._editorTab === "quick" || draft !== live) {
+        this._draftError =
+          "This event is linked to a native automation. Edit its actions in HA, " +
+          "or untick \"Keep linked\" to absorb your changes into the card.";
+        return;
+      }
+      // Nothing but the name changed — save that without touching the link
     } else if (this._editorTab === "quick") {
       if (!this._quickEntity) {
         this._draftError = "Pick an entity first";
@@ -949,13 +979,17 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   private async _toggleArchived(): Promise<void> {
     const slot = this._remote?.slots[this._editingAction!];
     if (!slot) return;
-    await this._hass!.callWS({
-      type: "remote_mapper/archive_slot",
-      entry_id: this._entryId,
-      action_id: this._editingAction,
-      archived: !slot.archived,
-    });
-    this._closeEditor();
+    try {
+      await this._hass!.callWS({
+        type: "remote_mapper/archive_slot",
+        entry_id: this._entryId,
+        action_id: this._editingAction,
+        archived: !slot.archived,
+      });
+      this._closeEditor();
+    } catch (err) {
+      this._draftError = (err as { message?: string }).message ?? String(err);
+    }
   }
 
   // ── hand back to HA ────────────────────────────────────────────────

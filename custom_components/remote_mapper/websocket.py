@@ -329,10 +329,38 @@ async def ws_save_slot(
         )
         return
 
+    if is_linked(slot) and target_materialized:
+        # Still linked: the native automation is canonical and edited in
+        # HA. Only the name is ours to change — a sequence here would
+        # otherwise fall through to async_materialize and silently replace
+        # the link with a freshly created owned automation.
+        if "sequence" in msg or "sequence_yaml" in msg:
+            connection.send_error(
+                msg["id"],
+                ERR_INVALID_SEQUENCE,
+                "This event is linked to a native automation; edit its actions "
+                "in HA, or untick the link to absorb them into the card",
+            )
+            return
+        if "name" in msg:
+            slot["name"] = (msg["name"] or "").strip() or None
+            store.async_set_slot(msg["entry_id"], msg["action_id"], slot)
+        _fire_updated(hass, msg["entry_id"], "slot_saved")
+        connection.send_result(
+            msg["id"], {"slot": store.get_slot(msg["entry_id"], msg["action_id"])}
+        )
+        return
+
     if is_linked(slot) and not target_materialized:
-        # Unlink = absorb: actions into the card, original disabled
+        # Unlink = absorb: actions into the card, original disabled. An
+        # edited sequence (YAML tab) wins over the automation's live one.
         try:
-            await async_absorb_link(hass, store, msg["entry_id"], msg["action_id"])
+            sequence = None
+            if "sequence" in msg or "sequence_yaml" in msg:
+                sequence = await _validated_sequence(hass, msg)
+            await async_absorb_link(
+                hass, store, msg["entry_id"], msg["action_id"], sequence
+            )
         except Exception as err:
             connection.send_error(msg["id"], ERR_INVALID_SEQUENCE, str(err))
             return
@@ -615,12 +643,39 @@ async def ws_create_automation(
 async def ws_archive_slot(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
 ) -> None:
-    """Archive (soft-disable) or unarchive a slot."""
+    """Archive (soft-disable) or unarchive a slot.
+
+    An automation-backed slot runs through its automation, not the
+    dispatcher, so the flag alone would leave the button firing while
+    the tile says "archived": its automation is switched off/on too.
+    A branch of the shared per-remote automation can't be disabled on
+    its own without silencing every other button — refused.
+    """
+    from .materializer import AUTOMATION_DOMAIN, automation_entity_id
+    from .remote_automation import is_shared
+
     store = _store(hass)
     slot = store.get_slot(msg["entry_id"], msg["action_id"])
     if slot is None:
         connection.send_error(msg["id"], ERR_NOT_FOUND, "Slot is empty")
         return
+    if is_shared(slot):
+        connection.send_error(
+            msg["id"],
+            ERR_INVALID_SEQUENCE,
+            "This event is one branch of the remote automation; disable it in "
+            "HA or move the branch into the card first",
+        )
+        return
+    if slot.get("materialized") and slot.get("automation_id"):
+        entity_id = automation_entity_id(hass, slot["automation_id"])
+        if entity_id:
+            await hass.services.async_call(
+                AUTOMATION_DOMAIN,
+                "turn_off" if msg["archived"] else "turn_on",
+                {"entity_id": entity_id},
+                blocking=True,
+            )
     slot["archived"] = msg["archived"]
     store.async_set_slot(msg["entry_id"], msg["action_id"], slot)
     _fire_updated(hass, msg["entry_id"], "slot_archived")

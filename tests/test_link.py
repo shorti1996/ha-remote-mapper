@@ -257,6 +257,134 @@ async def test_link_existing_and_absorb(hass, hass_ws_client, remote_device) -> 
     assert hass.states.get("automation.pilot_1_single").state == "on"
 
 
+async def test_linked_slot_keeps_link_on_save(
+    hass, hass_ws_client, remote_device
+) -> None:
+    """Saving a linked slot with the link kept never creates an owned automation.
+
+    A sequence is refused (the native automation is edited in HA); a
+    name-only save goes through and leaves the link untouched.
+    """
+    entry = await _setup(hass, remote_device)
+    client = await hass_ws_client(hass)
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/save_slot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_double",
+            "link_entity_id": "automation.pilot_1_single",
+        },
+    )
+    assert res["success"], res
+
+    # YAML-tab save with "keep linked" ticked → refused, nothing changes
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/save_slot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_double",
+            "materialized": True,
+            "sequence": SEQ_ORIG,
+            "name": "Renamed",
+        },
+    )
+    assert not res["success"]
+    slot = hass.data[DOMAIN]["store"].get_slot(entry.entry_id, "1_double")
+    assert slot["automation_id"] == "orig_1"
+    assert slot["owned"] is False
+    assert slot["name"] is None
+    assert [a["id"] for a in _yaml(hass)] == ["orig_1"]  # no new automation
+
+    # name-only save keeps the link
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/save_slot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_double",
+            "materialized": True,
+            "name": "Renamed",
+        },
+    )
+    assert res["success"], res
+    slot = res["result"]["slot"]
+    assert slot["name"] == "Renamed"
+    assert slot["automation_id"] == "orig_1"
+    assert slot["owned"] is False
+    assert slot["materialized"] is True
+    assert [a["id"] for a in _yaml(hass)] == ["orig_1"]
+    assert hass.states.get("automation.pilot_1_single").state == "on"
+
+
+async def test_absorb_link_with_edited_sequence(
+    hass, hass_ws_client, remote_device
+) -> None:
+    """Untick + edited YAML: the edit lands in the card, not the live actions."""
+    entry = await _setup(hass, remote_device)
+    client = await hass_ws_client(hass)
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/save_slot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_double",
+            "link_entity_id": "automation.pilot_1_single",
+        },
+    )
+    assert res["success"], res
+    edited = [{"action": "test.automation", "data": {"via": "edited"}}]
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/save_slot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_double",
+            "materialized": False,
+            "sequence": edited,
+        },
+    )
+    assert res["success"], res
+    slot = res["result"]["slot"]
+    assert slot["materialized"] is False
+    assert slot["sequence"] == edited
+    assert slot["imported_from"]["config_id"] == "orig_1"
+    assert hass.states.get("automation.pilot_1_single").state == "off"
+
+
+async def test_archive_linked_slot_toggles_automation(
+    hass, hass_ws_client, remote_device
+) -> None:
+    """Archive on a linked slot switches the native automation off, unarchive on."""
+    entry = await _setup(hass, remote_device)
+    client = await hass_ws_client(hass)
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/save_slot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_double",
+            "link_entity_id": "automation.pilot_1_single",
+        },
+    )
+    assert res["success"], res
+    for archived, state in ((True, "off"), (False, "on")):
+        res = await _ws(
+            client,
+            {
+                "type": f"{DOMAIN}/archive_slot",
+                "entry_id": entry.entry_id,
+                "action_id": "1_double",
+                "archived": archived,
+            },
+        )
+        assert res["success"], res
+        assert res["result"]["slot"]["archived"] is archived
+        assert res["result"]["slot"]["automation_id"] == "orig_1"
+        assert hass.states.get("automation.pilot_1_single").state == state
+
+
 async def test_absorb_mode_still_available(hass, hass_ws_client, remote_device) -> None:
     """mode=absorb keeps the old behavior: copied into the card, original off."""
     entry = await _setup(hass, remote_device)
