@@ -80,6 +80,8 @@ interface HassConnection {
 interface HomeAssistant {
   callWS<T>(msg: Record<string, unknown>): Promise<T>;
   connection: HassConnection;
+  /** False while HA's websocket is down (restart); flips back on reconnect. */
+  connected?: boolean;
   states?: Record<string, { state?: string; attributes?: Record<string, unknown> }>;
   areas?: Record<string, { name?: string }>;
   devices?: Record<string, { name?: string | null; name_by_user?: string | null }>;
@@ -353,7 +355,12 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   // ── HA plumbing ────────────────────────────────────────────────────
 
   public set hass(hass: HomeAssistant) {
+    // Back from an HA restart: the backend may be newer (version banner)
+    // and the store may have moved on — refresh instead of trusting the
+    // pre-restart fetch.
+    const reconnected = this._hass?.connected === false && hass.connected === true;
     this._hass = hass;
+    if (reconnected && this._fetchStarted && this._remote) void this._fetchRemote();
     // the button sheet shows live automation state — keep it current
     if (this._buttonSheet !== undefined) this.requestUpdate();
     if (!this._fetchStarted && this._config) {
