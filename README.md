@@ -82,6 +82,18 @@ device, where every button shows what it does and lets you change it.
   <!-- screenshots: the three modes side by side -->
   ![Replica / all visible / assisted](docs/img/modes.png)
 
+- **Keep what you already have.** Existing automations for the remote are
+  **linked**: they stay native and enabled, the card shows them by name
+  with their on/off state, and one tap opens them in HA's automation
+  editor (scenes and scripts they use get their own edit buttons). Prefer
+  the card as the single place? Choose **absorb** instead: the actions
+  move into the card and the original is disabled, never deleted.
+  "Link existing automation" is also a quick action for any button.
+
+  [![Import: every automation for the remote found and linked; the pads fill in with their names, one tap opens each in HA's editor](docs/demo/06-import-link.gif)](docs/demo/full/06-import-link.gif)
+
+  [Full-size recording](docs/demo/full/06-import-link.gif)
+
 - **Assign in seconds.** Tap an event → *Activate scene*, *Toggle entity*,
   *Run script*, *Set WLED preset*… with HA's own pickers. Need more? A
   YAML tab takes the full automation action syntax (`if`, `choose`,
@@ -109,17 +121,6 @@ device, where every button shows what it does and lets you change it.
 
   <!-- screenshot: a button's events with scene / automation chips -->
   ![Every event shows where it lives: scene, automation, imported original](docs/img/sheet.png)
-
-- **Keep what you already have.** Existing automations for the remote are
-  **linked**: they stay native and enabled, the card shows them by name
-  with their on/off state, and one tap opens them in HA's automation
-  editor (scenes and scripts they use get their own edit buttons). Prefer
-  the card as the single place? Choose **absorb** instead: the actions
-  move into the card and the original is disabled, never deleted.
-  "Link existing automation" is also a quick action for any button.
-
-  <!-- screenshot: the import wizard, link/absorb per automation -->
-  ![Import: every automation for the remote found, link or absorb per row](docs/img/import.png)
 
 - **Appearance.** Colors and pad opacity in the card editor; follows your
   theme and HA's font-size setting out of the box.
