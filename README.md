@@ -1,9 +1,18 @@
+<div align="center">
+
 # Remote Mapper for Home Assistant
 
 **Turn any Zigbee / Matter / MQTT remote into a card that looks like the
 remote — and assign what each button does right there, on the dashboard.**
 
-[Features](#what-you-get) · [Supported remotes](#supported-remotes) · [Install](#install) · [Guides](#guides) · [Card options](#card-options) · [Leaving](#leaving)
+[Features](#what-you-get) •
+[Supported remotes](#supported-remotes) •
+[Install](#install) •
+[Guides](#guides) •
+[Card options](#card-options) •
+[Leaving](#leaving)
+
+</div>
 
 🎬 **Prefer watching to reading?** The [guides](docs/guides/README.md) show
 every step as a short screen recording: adding a remote, assigning buttons,
@@ -21,8 +30,7 @@ device's quirks) is handled for you. Works with any remote Home Assistant
 can hear — Zigbee (Zigbee2MQTT, ZHA), Matter, plain MQTT, event entities —
 one card, whatever the radio.
 
-<!-- screenshot: the card (replica mode) next to the physical remote -->
-![Remote Mapper card mirroring a 6-button Zigbee remote](docs/img/hero.png)
+![Five remotes of different shapes](docs/img/hero-remotes.jpg)
 
 ## Why
 
@@ -33,6 +41,17 @@ later nobody remembers what button 4 does.
 
 Remote Mapper gives each remote **one card**, arranged like the real
 device, where every button shows what it does and lets you change it.
+
+<table>
+  <tr>
+    <th>Before: one dashboard tile per scene</th>
+    <th>After: the same scenes on one remote card</th>
+  </tr>
+  <tr>
+    <td><img src="docs/img/before-dashboard.png" width="280" alt="A dashboard with sixteen scene tiles, most names cut off"></td>
+    <td><img src="docs/img/after-card.png" width="460" alt="One Remote Mapper card: six buttons, each listing its single, double and hold scene"></td>
+  </tr>
+</table>
 
 ## What you get
 
