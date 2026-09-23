@@ -21,8 +21,9 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.exceptions import HomeAssistantError
 
-from .const import AUTOMATION_ALIAS_PREFIX, DOMAIN, MANAGED_DESCRIPTION_MARKER
+from .const import DOMAIN, MANAGED_DESCRIPTION_MARKER
 from .materializer import _get_config_store
+from .naming import managed_alias
 from .store import default_slot
 
 if TYPE_CHECKING:
@@ -132,7 +133,7 @@ def build_remote_payload(
 ) -> dict[str, Any]:
     """Shape A payload: one trigger + one branch per event, in order."""
     return {
-        "alias": f"{AUTOMATION_ALIAS_PREFIX} {title}",
+        "alias": managed_alias(title),
         "description": (
             f"{MANAGED_DESCRIPTION_MARKER} One branch per button event; "
             "edits here are canonical. Clearing a button in the remote card "
@@ -186,9 +187,57 @@ def branch_view(payload: dict[str, Any], action_id: str) -> dict[str, Any] | Non
         return None
     index = find_branch(payload, action_id)
     if index is None:
-        return {"actions": [], "branch_missing": True}
+        return {"actions": [], "branch_missing": True, "alias": None}
     option = _as_list(choose.get("choose"))[index]
-    return {"actions": _as_list(option.get("sequence")), "branch_missing": False}
+    return {
+        "actions": _as_list(option.get("sequence")),
+        "branch_missing": False,
+        # HA's "Rename" on a choose option names the branch
+        "alias": str(option.get("alias") or "").strip() or None,
+    }
+
+
+def per_remote_plan(
+    raw: dict[str, Any], action_ids: list[str], device_id: str | None
+) -> dict[str, Any] | None:
+    """What turning a per-remote automation off hands over to the card.
+
+    None for other shapes. ``events``: this remote's events that have a
+    branch. ``foreign``: a trigger belongs to another remote or device,
+    which would go silent too. ``blocked``: why the branches can't become
+    per-event copies in the card, or None.
+    """
+    if _choose_step(raw) is None:
+        return None
+    payload = _normalized(raw)
+    choose = _choose_step(payload)
+    ours = set(action_ids)
+    foreign = False
+    for trigger in payload["triggers"]:
+        if not isinstance(trigger, dict) or _intrinsic_action(trigger) not in ours:
+            foreign = True
+            break
+        platform = trigger.get("trigger", trigger.get("platform"))
+        if platform == "device" and device_id and trigger.get("device_id") != device_id:
+            foreign = True
+            break
+    blocked = None
+    if foreign:
+        blocked = "it also runs on triggers of another remote or device"
+    elif payload["conditions"]:
+        blocked = "it has conditions on the whole automation"
+    elif _as_list(choose.get("default")):  # type: ignore[union-attr]
+        blocked = "its choose has a default branch, which belongs to no single event"
+    elif any(
+        not isinstance(option, dict) or _branch_trigger_ids(option) is None
+        for option in _as_list(choose.get("choose"))  # type: ignore[union-attr]
+    ):
+        blocked = "a branch is picked by something other than the trigger"
+    return {
+        "events": [a for a in action_ids if find_branch(payload, a) is not None],
+        "foreign": foreign,
+        "blocked": blocked,
+    }
 
 
 # ── store side ────────────────────────────────────────────────────

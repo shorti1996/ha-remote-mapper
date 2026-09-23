@@ -155,7 +155,7 @@ export class RemoteMapperGrid extends LitElement {
       const kind = this.buttons
         .flatMap((b) => b.actions)
         .find((a) => a.action_id === actionId);
-      const text = `${kind ? KIND_TITLE[kind.kind] : actionId}: ${slot?.summary ?? "unassigned"}`;
+      const text = `${kind ? KIND_TITLE[kind.kind] : actionId}: ${slot?.summary ?? "not set"}`;
       this._chipTip = { action: actionId, text };
       setTimeout(() => {
         if (this._chipTip?.action === actionId) this._chipTip = undefined;
@@ -446,7 +446,7 @@ export class RemoteMapperGrid extends LitElement {
     const primary = live[0];
     return html`
       <span class="summary"
-        >${primary ? this.slots[primary.action_id].summary : "unassigned"}</span
+        >${primary ? this.slots[primary.action_id].summary : "not set"}</span
       >
       <span class="kinds">
         ${button.actions.map((a) => {
@@ -454,7 +454,7 @@ export class RemoteMapperGrid extends LitElement {
           const on = slot?.assigned && !slot.archived;
           return html`<span
             class="kind ${on ? "on" : ""} ${this.flash === a.action_id ? "flash" : ""}"
-            title="${a.event} (${KIND_TITLE[a.kind]}): ${slot?.summary ?? "unassigned"}"
+            title="${a.event} (${KIND_TITLE[a.kind]}): ${slot?.summary ?? "not set"}"
             >${KIND_ICON[a.kind]}</span
           >`;
         })}
@@ -477,7 +477,7 @@ export class RemoteMapperGrid extends LitElement {
             <button
               class=${classes}
               data-action=${a.action_id}
-              title="${a.event} (${KIND_TITLE[a.kind]}): ${slot?.summary ?? "unassigned"}"
+              title="${a.event} (${KIND_TITLE[a.kind]}): ${slot?.summary ?? "not set"}"
               @pointerdown=${(e: PointerEvent) => this._chipPressStart(e, a.action_id)}
               @pointerup=${this._chipPressEnd}
               @pointercancel=${this._chipPressEnd}
@@ -497,7 +497,7 @@ export class RemoteMapperGrid extends LitElement {
               }}
             >
               <span class="icon">${KIND_ICON[a.kind]}</span>
-              <span class="text">${slot?.summary ?? "unassigned"}</span>
+              <span class="text">${slot?.summary ?? "not set"}</span>
               ${slot?.error ? html`<span class="err" title=${slot.error}>!</span>` : nothing}
               ${slot?.stale ? html`<span class="stale" title="Source no longer reports this action">stale</span>` : nothing}
             </button>
@@ -513,7 +513,7 @@ export class RemoteMapperGrid extends LitElement {
       ? button.actions.find((a) => a.action_id === this._hoverOpt)
       : undefined;
     const status = hovered
-      ? `${KIND_TITLE[hovered.kind]}: ${this.slots[hovered.action_id]?.summary ?? "unassigned"}`
+      ? `${KIND_TITLE[hovered.kind]}: ${this.slots[hovered.action_id]?.summary ?? "not set"}`
       : this._pressActive
         ? "slide to an event, lift to run"
         : "tap an event";

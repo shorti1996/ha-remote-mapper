@@ -18,6 +18,7 @@ from homeassistant.util.yaml import parse_yaml
 
 from .buttons import group_buttons
 from .const import DOMAIN, EVENT_UPDATED, INTEGRATION_VERSION
+from .naming import remote_name
 from .store import default_slot
 
 if TYPE_CHECKING:
@@ -129,7 +130,7 @@ async def ws_list_remotes(
 ) -> None:
     """All configured remotes — used by the card when entry_id is omitted."""
     remotes = [
-        {"entry_id": entry.entry_id, "title": entry.title}
+        {"entry_id": entry.entry_id, "title": remote_name(hass, entry)}
         for entry in hass.config_entries.async_entries(DOMAIN)
     ]
     connection.send_result(msg["id"], {"remotes": remotes})
@@ -171,6 +172,9 @@ async def ws_get_remote(
             "automation_entity_id": automation_entity_id(hass, slot["automation_id"]),
             "live_actions": live["actions"] if live else [],
             "branch_missing": bool(live and live["branch_missing"]),
+            # one branch of a per-remote automation: its alias names no event
+            "branch": bool(live and live["branch"]),
+            "branch_alias": live.get("branch_alias") if live else None,
         }
     shared = None
     if await async_exists(hass, entry.entry_id) is not None:
@@ -184,7 +188,7 @@ async def ws_get_remote(
         msg["id"],
         {
             "entry_id": entry.entry_id,
-            "title": entry.title,
+            "title": remote_name(hass, entry),
             "layout": layout,
             "buttons": group_buttons(remote.get("source"), layout.get("actions", [])),
             "card_layout": remote.get("card_layout"),
@@ -223,7 +227,9 @@ async def ws_get_slot(
     slot = _store(hass).get_slot(msg["entry_id"], msg["action_id"])
     live = None
     if slot and slot.get("materialized"):
-        live = await async_get_live_view(hass, slot, msg["action_id"])
+        live = await async_get_live_view(
+            hass, slot, msg["action_id"], _store(hass), msg["entry_id"]
+        )
     connection.send_result(msg["id"], {"slot": slot, "live": live})
 
 
@@ -237,6 +243,8 @@ async def ws_get_slot(
         vol.Optional("materialized"): bool,
         # User-facing name; None/"" = auto (the card infers one from the sequence)
         vol.Optional("name"): vol.Any(str, None),
+        # The name the card inferred; only names a created automation
+        vol.Optional("auto_name"): vol.Any(str, None),
         # Link mode: point the slot at an existing native automation entity
         vol.Optional("link_entity_id"): str,
     }
@@ -356,23 +364,28 @@ async def ws_save_slot(
     if is_linked(slot) and not target_materialized:
         # Unlink = absorb: actions into the card, original disabled. An
         # edited sequence (YAML tab) wins over the automation's live one.
+        previous_name = slot.get("name")
         try:
             sequence = None
             if "sequence" in msg or "sequence_yaml" in msg:
                 sequence = await _validated_sequence(hass, msg)
-            await async_absorb_link(
+            if "name" in msg:
+                # before the absorb: an empty name falls back to the alias
+                slot["name"] = (msg["name"] or "").strip() or None
+            absorbed = await async_absorb_link(
                 hass, store, msg["entry_id"], msg["action_id"], sequence
             )
         except Exception as err:
+            slot["name"] = previous_name  # refused: nothing changes
             connection.send_error(msg["id"], ERR_INVALID_SEQUENCE, str(err))
             return
-        if "name" in msg:
-            slot = store.get_slot(msg["entry_id"], msg["action_id"])
-            slot["name"] = (msg["name"] or "").strip() or None
-            store.async_set_slot(msg["entry_id"], msg["action_id"], slot)
         _fire_updated(hass, msg["entry_id"], "slot_absorbed")
         connection.send_result(
-            msg["id"], {"slot": store.get_slot(msg["entry_id"], msg["action_id"])}
+            msg["id"],
+            {
+                "slot": store.get_slot(msg["entry_id"], msg["action_id"]),
+                "absorbed": absorbed,
+            },
         )
         return
 
@@ -413,7 +426,8 @@ async def ws_save_slot(
                     store,
                     msg["entry_id"],
                     msg["action_id"],
-                    entry.title if entry else "Remote",
+                    remote_name(hass, entry) if entry else "Remote",
+                    (msg.get("auto_name") or "").strip() or None,
                 )
             except Exception as err:
                 connection.send_error(msg["id"], ERR_INVALID_SEQUENCE, str(err))
@@ -519,7 +533,7 @@ async def ws_create_snapshot(
         hass.config_entries.async_update_entry(
             entry, options={**entry.options, CONF_SNAPSHOT_ENTITIES: list(entities)}
         )
-    name = msg.get("name") or f"{entry.title} {msg['action_id']}"
+    name = msg.get("name") or f"{remote_name(hass, entry)} {msg['action_id']}"
 
     from .materializer import async_materialize, is_linked
     from .remote_automation import async_set_branch_sequence, is_shared
@@ -553,7 +567,7 @@ async def ws_create_snapshot(
             store.async_set_slot(msg["entry_id"], msg["action_id"], slot)
         elif slot and slot.get("materialized"):
             await async_materialize(
-                hass, store, msg["entry_id"], msg["action_id"], entry.title
+                hass, store, msg["entry_id"], msg["action_id"], remote_name(hass, entry)
             )
     except Exception as err:
         connection.send_error(msg["id"], ERR_INVALID_SEQUENCE, str(err))
@@ -606,14 +620,14 @@ async def ws_create_automation(
                 raise ValueError("This event already has an automation")
             store.async_set_slot(entry_id, action_id, slot)
             config_id = await async_materialize(
-                hass, store, entry_id, action_id, entry.title
+                hass, store, entry_id, action_id, remote_name(hass, entry)
             )
         elif await async_exists(hass, entry_id) is None:
             config_id = await async_create_remote_automation(
                 hass,
                 store,
                 entry_id,
-                entry.title,
+                remote_name(hass, entry),
                 list(remote.get("layout", {}).get("actions", [])),
             )
         else:
@@ -651,13 +665,23 @@ async def ws_archive_slot(
     dispatcher, so the flag alone would leave the button firing while
     the tile says "archived": its automation is switched off/on too.
     A branch of the shared per-remote automation can't be disabled on
-    its own without silencing every other button — refused.
+    its own without silencing every other button — refused. A linked
+    automation goes off as a whole, so every event linked to it is
+    flagged with it; one that also serves another remote is refused.
     """
-    from .materializer import AUTOMATION_DOMAIN, automation_entity_id
+    from .materializer import (
+        AUTOMATION_DOMAIN,
+        _get_config_store,
+        automation_entity_id,
+        is_linked,
+        linked_events,
+        whole_automation_plan,
+    )
     from .remote_automation import is_shared
 
     store = _store(hass)
-    slot = store.get_slot(msg["entry_id"], msg["action_id"])
+    entry_id = msg["entry_id"]
+    slot = store.get_slot(entry_id, msg["action_id"])
     if slot is None:
         connection.send_error(msg["id"], ERR_NOT_FOUND, "Slot is empty")
         return
@@ -669,8 +693,27 @@ async def ws_archive_slot(
             "HA or move the branch into the card first",
         )
         return
+    events = [msg["action_id"]]
     if slot.get("materialized") and slot.get("automation_id"):
-        entity_id = automation_entity_id(hass, slot["automation_id"])
+        config_id = slot["automation_id"]
+        if is_linked(slot):
+            raw = await _get_config_store(hass).async_get(config_id) or {}
+            plan = whole_automation_plan(store, entry_id, raw)
+            if plan and plan["foreign"]:
+                connection.send_error(
+                    msg["id"],
+                    ERR_INVALID_SEQUENCE,
+                    f'"{raw.get("alias") or config_id}" also runs on triggers of '
+                    "another remote or device, which would stop too. Disable it "
+                    "in HA instead.",
+                )
+                return
+            events = list(
+                dict.fromkeys(
+                    [msg["action_id"], *linked_events(store, entry_id, config_id)]
+                )
+            )
+        entity_id = automation_entity_id(hass, config_id)
         if entity_id:
             await hass.services.async_call(
                 AUTOMATION_DOMAIN,
@@ -678,10 +721,12 @@ async def ws_archive_slot(
                 {"entity_id": entity_id},
                 blocking=True,
             )
-    slot["archived"] = msg["archived"]
-    store.async_set_slot(msg["entry_id"], msg["action_id"], slot)
-    _fire_updated(hass, msg["entry_id"], "slot_archived")
-    connection.send_result(msg["id"], {"slot": slot})
+    for event in events:
+        target = store.get_slot(entry_id, event)
+        target["archived"] = msg["archived"]
+        store.async_set_slot(entry_id, event, target)
+    _fire_updated(hass, entry_id, "slot_archived")
+    connection.send_result(msg["id"], {"slot": slot, "events": events})
 
 
 @websocket_api.websocket_command(

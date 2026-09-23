@@ -20,7 +20,13 @@ import "./grid-picker";
 import "./remote-grid";
 import { clearGridDraft, getGridDraft, setGridDraft } from "./grid-drafts";
 import { advanceTip, nextTip, skipTips, TIPS } from "./onboarding";
-import { linkedSaveBlocker } from "./slot-save";
+import {
+  absorbsOnSave,
+  disableConfirm,
+  linkedSaveBlocker,
+  type WholeAutomation,
+  wholeAbsorbConfirm,
+} from "./slot-save";
 import { bundleStatus, CARD_VERSION } from "./version";
 
 /** The reload dialog is offered once per page load, whichever card notices first. */
@@ -121,6 +127,10 @@ interface SlotRecord {
   live_actions?: unknown[];
   /** Shared/imported "Shape A" automation has no branch for this event. */
   branch_missing?: boolean;
+  /** live_actions are this event's branch of a per-remote automation. */
+  branch?: boolean;
+  /** That branch's own name (HA's "Rename" on a choose option). */
+  branch_alias?: string | null;
   archived: boolean;
   last_run: string | null;
   last_error: string | null;
@@ -181,6 +191,8 @@ interface LiveAutomation {
   branch?: boolean;
   branch_missing?: boolean;
   state?: string | null;
+  /** Linked per-remote automation: goes off as a whole (get_slot only). */
+  whole?: WholeAutomation;
 }
 
 type QuickMode =
@@ -850,13 +862,17 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     return entity ? this._hass?.states?.[entity]?.state : undefined;
   }
 
-  /** User name if set, else the automation's name, else inferred (naming.ts). */
+  /**
+   * User name if set; a linked automation's own name; else inferred from
+   * what runs (naming.ts). Automations the card created carry a
+   * "<remote> · <event> [remote_mapper]" alias, which says less than the
+   * actions do.
+   */
   private _slotSummary(slot: SlotRecord | undefined): string {
-    if (!slot) return "unassigned";
+    if (!slot) return "not set";
     if (slot.name) return slot.name;
     if (slot.materialized && slot.branch_missing) return "no branch";
     if (slot.materialized && slot.shared_automation) {
-      // one branch of the shared automation: its alias says nothing
       return inferName(slot.live_actions ?? [], this._hass) || "empty branch";
     }
     if (slot.materialized) {
@@ -864,7 +880,11 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       const friendly = entity
         ? this._hass?.states?.[entity]?.attributes?.friendly_name
         : undefined;
-      return typeof friendly === "string" && friendly ? friendly : "automation";
+      const alias = typeof friendly === "string" && friendly ? friendly : "";
+      if (slot.branch && slot.branch_alias) return slot.branch_alias;
+      // a per-remote automation's alias names every event the same
+      if (this._isLinked(slot) && alias && !slot.branch) return alias;
+      return inferName(slot.live_actions ?? [], this._hass) || alias || "automation";
     }
     return inferName(slot.sequence ?? [], this._hass) || "empty";
   }
@@ -986,7 +1006,15 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       materialized: this._draftMaterialized,
       name: this._draftName.trim() || null,
     };
-    if (this._editorTab === "quick" && this._quickMode === "link") {
+    const linkedNow = this._isLinked(this._remote?.slots[this._editingAction ?? ""]);
+    if (
+      this._editorTab === "quick" &&
+      this._quickMode === "link" &&
+      absorbsOnSave({ linked: linkedNow, keepLinked: this._draftMaterialized })
+    ) {
+      // Untick "Keep linked": materialized:false alone tells the backend to
+      // absorb the automation's live actions and disable the original.
+    } else if (this._editorTab === "quick" && this._quickMode === "link") {
       if (!this._quickEntity) {
         this._draftError = "Pick an automation first";
         return;
@@ -1034,8 +1062,26 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     } else {
       msg.sequence_yaml = this._draft;
     }
+    if (msg.materialized && Array.isArray(msg.sequence)) {
+      // names the created automation when the Name field is empty
+      msg.auto_name = inferName(msg.sequence, this._hass) || null;
+    }
+    const live = this._editingLive;
+    if (linkedNow && !this._draftMaterialized && live?.whole) {
+      // one branch can't be switched off alone: every event it runs moves
+      const dialog = wholeAbsorbConfirm(
+        live.alias ?? live.entity_id ?? "This automation",
+        live.whole.events.map((a) => this._eventName(a))
+      );
+      if (dialog && !(await this._confirm(dialog))) return;
+    }
     try {
-      await this._hass!.callWS(msg);
+      const res = await this._hass!.callWS<{ absorbed?: string[] }>(msg);
+      if ((res?.absorbed?.length ?? 0) > 1) {
+        this.notify(
+          `Moved ${res.absorbed!.length} events into the card; "${live?.alias}" is turned off.`
+        );
+      }
       this._closeEditor();
     } catch (err) {
       this._draftError = (err as { message?: string }).message ?? String(err);
@@ -1053,8 +1099,8 @@ export class RemoteMapperCard extends LitElement implements EditHost {
         "stays in HA, enabled, and keeps firing on its own trigger."
       : imported
         ? `"${name}" is emptied in this card. The original automation it was imported ` +
-          "from stays in HA (still disabled). Import can pick it up again, and Hand back " +
-          "re-enables everything at once."
+          "from stays in HA, still disabled. Importing it again as a link switches it " +
+          "back on, and so does Hand back."
         : `"${name}" is emptied in this card. Automations and scenes that existed before ` +
           "this integration are not touched; if the card created any, you are asked next.";
     const ok = await this._confirm({
@@ -1074,15 +1120,26 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       return;
     }
     const name = this._draftName.trim() || this._editingAction || "this event";
-    const ok = await this._confirm({
-      title: "Archive this event?",
-      text:
-        `"${name}" keeps its setup but stops running until you unarchive it` +
-        (slot.materialized ? "; its automation is switched off meanwhile." : ".") +
-        " Nothing is deleted.",
-      confirmText: "Archive",
-    });
+    const live = this._editingLive;
+    const linked = this._isLinked(slot) ? (live?.whole?.linked ?? []) : [];
+    const ok = await this._confirm(
+      disableConfirm(name, {
+        automation: slot.materialized,
+        alias: live?.alias ?? undefined,
+        linked: linked.map((a) => this._eventName(a)),
+      })
+    );
     if (ok) await this._toggleArchived();
+  }
+
+  /** "<button label> <event>" for an action id, as the pads show it. */
+  private _eventName(actionId: string): string {
+    const layout = this._gridLayout();
+    for (const button of this._remote?.buttons ?? []) {
+      const action = button.actions.find((a) => a.action_id === actionId);
+      if (action && layout) return `${buttonLabel(button, layout)} ${action.event}`;
+    }
+    return actionId;
   }
 
   private async _clearSlot(decision?: string): Promise<void> {
@@ -1604,7 +1661,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                       >${KIND_ICON[a.kind]}</span
                     >
                     <span class="ev-name">${a.event}</span>
-                    <span class="ev-summary">${view?.summary ?? "unassigned"}</span>
+                    <span class="ev-summary">${view?.summary ?? "not set"}</span>
                   </span>
                   <span class="ev-actions">
                   ${this._iconButton("mdi:play", "Run now", () => void this._runSlot(a.action_id), {
@@ -1707,8 +1764,9 @@ export class RemoteMapperCard extends LitElement implements EditHost {
         >
           ${widgets.map((w) => this._renderTile(w, editing, w.id === selected))}
         </div>
-        ${editing ? this._renderEditChrome() : nothing}
+        ${editing && this._edit.selected ? this._renderChipbar(this._edit.selected, t) : nothing}
       </div>
+      ${editing ? this._renderDpad() : nothing}
     `;
   }
 
@@ -1749,7 +1807,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
             >`
           : nothing}
         ${slot?.archived
-          ? html`<span class="tile-badge">archived</span>`
+          ? html`<span class="tile-badge">disabled</span>`
           : nothing}
         ${this._remote!.stale_actions?.includes(w.id)
           ? html`<span
@@ -1773,9 +1831,9 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     `;
   }
 
-  private _renderEditChrome(): TemplateResult {
+  /** Below the viewport, not over it: in a narrow card it hid the tiles. */
+  private _renderDpad(): TemplateResult {
     const sel = this._edit.selected;
-    const t = this._transform()!;
     const steps = this._edit.dpadSteps;
     const stepLabel =
       this._edit.dpadMode === "fine"
@@ -1791,7 +1849,6 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     };
     const release = () => this._edit.dpadRelease();
     return html`
-      ${sel ? this._renderChipbar(sel, t) : nothing}
       <div class="dpad-dock" @pointerdown=${(e: Event) => e.stopPropagation()}>
         ${sel ? html`<div class="badge"></div>` : nothing}
         <div class="dpad">
@@ -1848,6 +1905,8 @@ export class RemoteMapperCard extends LitElement implements EditHost {
 
   private _renderEditor(): TemplateResult {
     const slot = this._remote!.slots[this._editingAction!];
+    const whole = this._editingLive?.whole;
+    const runs = whole && whole.events.length > 1 ? whole.events : undefined;
     return html`
       <div class="modal-backdrop" @click=${this._backdropClick(this._closeEditor)}>
         <div class="modal" @click=${this._ghostGuard}>
@@ -1867,11 +1926,16 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                 ${this._editingLive.branch_missing
                   ? html`<span class="warn">It has no branch for this event any more.</span>
                       Pick "Add this button to the remote automation" below to re-add one.`
-                  : this._editingLive.branch
-                    ? 'This event is one branch of it. Unticking "automation" below moves the branch\'s actions into this card and removes the branch; the other buttons keep theirs.'
+                  : this._editingLive.owned === false && runs
+                    ? `It runs ${runs.length} events on this remote (${runs.map((a) => this._eventName(a)).join(", ")}) and stays native; edit it there.` +
+                      (whole?.blocked
+                        ? ""
+                        : " Unticking the box below moves all of them into this card and turns it off (hand-back turns it on again).")
                     : this._editingLive.owned === false
                       ? "It stays native and enabled; edit it there. Unticking the box below copies its actions into this card and disables it (hand-back re-enables it)."
-                      : 'Unticking "automation" below deletes it on Save and moves its actions into this card. Cancel keeps things as they are.'}
+                      : this._editingLive.branch
+                        ? 'This event is one branch of it. Unticking "automation" below moves the branch\'s actions into this card and removes the branch; the other buttons keep theirs.'
+                        : 'Unticking "automation" below deletes it on Save and moves its actions into this card. Cancel keeps things as they are.'}
               </p>`
             : nothing}
           <div class="tabs">
@@ -1913,16 +1977,30 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                 <input
                   type="checkbox"
                   .checked=${this._draftMaterialized}
+                  ?disabled=${!!whole?.blocked && this._draftMaterialized}
                   @change=${(e: Event) => {
                     this._draftMaterialized = (e.target as HTMLInputElement).checked;
                   }}
                 />
-                ${this._editingLive?.branch
-                  ? "Keep as a branch of the remote automation (untick to move it into the card)"
-                  : this._editingLive?.owned === false
-                    ? "Keep linked to the automation (untick to absorb into the card)"
+                ${this._editingLive?.owned === false
+                  ? whole?.blocked
+                    ? "Keep linked to the automation"
+                    : (whole?.events.length ?? 0) > 1
+                      ? "Keep linked to the automation (untick to move the whole automation into the card)"
+                      : "Keep linked to the automation (untick to absorb into the card)"
+                  : this._editingLive?.branch
+                    ? "Keep as a branch of the remote automation (untick to move it into the card)"
                     : "Create as automation (editable/traceable in HA)"}
               </label>`}
+          ${whole?.blocked
+            ? html`<p class="hint">
+                ${whole.foreign
+                  ? "It can't move into the card or be disabled here: " +
+                    `${whole.blocked}, which would stop too.`
+                  : `It can't move into the card: ${whole.blocked}.`}
+                Edit it in HA.
+              </p>`
+            : nothing}
           ${this._draftError
             ? html`<p class="error">${this._draftError}</p>`
             : nothing}
@@ -1948,8 +2026,11 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                   <button class="danger" @click=${() => void this._confirmClear()}>
                     Clear
                   </button>
-                  <button @click=${() => void this._confirmArchive()}>
-                    ${slot.archived ? "Unarchive" : "Archive"}
+                  <button
+                    ?disabled=${!!whole?.foreign && !slot.archived}
+                    @click=${() => void this._confirmArchive()}
+                  >
+                    ${slot.archived ? "Enable" : "Disable"}
                   </button>
                 `
               : nothing}
@@ -2589,14 +2670,11 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       padding: 4px 8px;
     }
     .dpad-dock {
-      position: absolute;
-      right: 8px;
-      bottom: 8px;
       display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 4px;
-      z-index: 20;
+      justify-content: flex-end;
+      align-items: center;
+      gap: var(--ha-space-2, 8px);
+      margin: -4px 0 12px;
     }
     .badge {
       font-family: var(--code-font-family, monospace);
@@ -2939,6 +3017,10 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     .buttons .danger {
       color: var(--error-color, #db4437);
       border-color: var(--error-color, #db4437);
+    }
+    .buttons button:disabled {
+      opacity: 0.4;
+      cursor: default;
     }
   `;
 }

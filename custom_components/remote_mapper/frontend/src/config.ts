@@ -12,7 +12,7 @@ export interface RemoteMapperCardConfig {
   title?: string;
   /** false hides the title text (header keeps its buttons). */
   show_title?: boolean;
-  /** grid (default) — button grid; canvas — legacy free-drag tiles. */
+  /** grid (default) — button grid; canvas — free-drag tiles, one per event. */
   layout?: LayoutKind;
   /** Grid only: assisted (default, popover), replica (physical remote), all (every event). */
   display?: DisplayMode;
@@ -37,7 +37,7 @@ export const DISPLAY_MODES: Array<{ value: DisplayMode; label: string }> = [
 
 export const LAYOUT_KINDS: Array<{ value: LayoutKind; label: string }> = [
   { value: "grid", label: "Grid — buttons arranged like the remote" },
-  { value: "canvas", label: "Canvas — free-drag tiles (legacy)" },
+  { value: "canvas", label: "Canvas — free placement, one tile per event" },
 ];
 
 export const ASSISTED_TRIGGERS: Array<{ value: AssistedTrigger; label: string }> = [

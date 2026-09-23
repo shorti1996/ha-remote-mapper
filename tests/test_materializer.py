@@ -135,6 +135,52 @@ async def test_materialize_toggle_on(hass, hass_ws_client, remote_device) -> Non
     assert res["result"]["live"]["edit_url"] == f"/config/automation/edit/{config_id}"
 
 
+async def test_alias_uses_device_name_and_card_name(
+    hass, hass_ws_client, remote_device
+) -> None:
+    """Renamed device + the card's inferred name make the alias, tag last.
+
+    A later save with no name keeps the alias (a rename in HA survives);
+    a slot name replaces it.
+    """
+    from homeassistant.helpers import device_registry as dr
+
+    entry = await _setup(hass, remote_device)
+    registry = dr.async_get(hass)
+    device = registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    registry.async_update_device(device.id, name_by_user="Desk remote")
+    client = await hass_ws_client(hass)
+
+    res = await _ws(client, {"type": f"{DOMAIN}/list_remotes"})
+    assert res["result"]["remotes"] == [
+        {"entry_id": entry.entry_id, "title": "Desk remote"}
+    ]
+    res = await _ws(
+        client, {"type": f"{DOMAIN}/get_remote", "entry_id": entry.entry_id}
+    )
+    assert res["result"]["title"] == "Desk remote"
+
+    save = {
+        "type": f"{DOMAIN}/save_slot",
+        "entry_id": entry.entry_id,
+        "action_id": "1_single",
+        "sequence": SEQ,
+        "materialized": True,
+    }
+    res = await _ws(client, {**save, "auto_name": "Automation test"})
+    assert res["success"], res
+    alias = "Desk remote · Automation test [remote_mapper]"
+    assert _automations_yaml(hass)[0]["alias"] == alias
+
+    res = await _ws(client, save)
+    assert res["success"], res
+    assert _automations_yaml(hass)[0]["alias"] == alias
+
+    res = await _ws(client, {**save, "name": "Lamp", "auto_name": "ignored"})
+    assert res["success"], res
+    assert _automations_yaml(hass)[0]["alias"] == "Desk remote · Lamp [remote_mapper]"
+
+
 async def test_dematerialize_folds_external_edit(
     hass, hass_ws_client, remote_device
 ) -> None:
@@ -377,14 +423,28 @@ async def test_plain_save_on_materialized_slot_rejected(
     assert items[0]["actions"] == new_seq
 
 
-def test_build_payload_alias_includes_name() -> None:
-    """The slot name lands in the automation alias; absent name = old alias."""
-    from custom_components.remote_mapper.materializer import build_payload
+def test_managed_alias_names_the_event() -> None:
+    """Alias: remote · event, tag last; the event is named, labelled, or its id."""
+    from custom_components.remote_mapper.naming import (
+        event_label,
+        is_managed_alias,
+        managed_alias,
+        plain_alias,
+    )
 
-    trigger = {"platform": "device", "domain": "mqtt"}
-    assert build_payload("Desk", "1_single", trigger, [])["alias"] == (
-        "[remote_mapper] Desk · 1_single"
-    )
-    assert build_payload("Desk", "1_single", trigger, [], "Lamp")["alias"] == (
-        "[remote_mapper] Desk · 1_single — Lamp"
-    )
+    remote = {
+        "source": "device_trigger",
+        "grid_layout": {"buttons": {"2": {"row": 0, "col": 1, "label": "Kitchen"}}},
+    }
+    assert event_label(remote, "1_single", "Lamp") == "Lamp"
+    assert event_label(remote, "2_single", None) == "Kitchen single"
+    assert event_label(remote, "1_single", None) == "1_single"
+    alias = managed_alias("Desk", "Toggle lamp")
+    assert alias == "Desk · Toggle lamp [remote_mapper]"
+    assert managed_alias("Desk") == "Desk [remote_mapper]"
+    # both tag positions are ours; hand-back strips either
+    assert is_managed_alias(alias)
+    assert is_managed_alias("[remote_mapper] Desk · 1_single")
+    assert not is_managed_alias("Desk lamp")
+    assert plain_alias(alias) == "Desk · Toggle lamp"
+    assert plain_alias("[remote_mapper] Desk · 1_single") == "Desk · 1_single"
