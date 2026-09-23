@@ -66,8 +66,10 @@ move under a version heading when `make release VERSION=x.y.z` runs.
   events. Linked automations still show their own name, except a per-remote
   one, whose name fits every event: its events show their branch.
 - **The canvas D-pad sits below the tiles.** It floated over the bottom-right
-  corner and hid tiles in a narrow card. The layout option reads *Canvas —
-  free placement, one tile per event* (was "(legacy)").
+  corner and hid tiles in a narrow card. Its buttons are now 40 px touch
+  targets sized with HA's tokens, and the position readout shows only while
+  dragging. The layout option reads *Canvas — free placement, one tile per
+  event* (was "(legacy)").
 - **Empty events read "not set"** (was "unassigned", cut to "unassign…" on
   narrow pads).
 

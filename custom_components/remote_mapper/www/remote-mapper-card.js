@@ -1265,39 +1265,44 @@ function t(t,e,i,s){var o,r=arguments.length,n=r<3?e:null===s?s=Object.getOwnPro
       font-size: 1em;
       padding: 4px 8px;
     }
+    /* card UI below the canvas, not inside its scaled viewport: tokens */
     .dpad-dock {
       display: flex;
       justify-content: flex-end;
       align-items: center;
       gap: var(--ha-space-2, 8px);
-      margin: -4px 0 12px;
+      margin: calc(-1 * var(--ha-space-1, 4px)) 0 var(--ha-space-3, 12px);
     }
     .badge {
-      font-family: var(--code-font-family, monospace);
-      font-size: 0.75em;
+      font-family: var(--ha-font-family-code, monospace);
+      font-size: var(--ha-font-size-s, 12px);
       background: var(--card-background-color, #222);
       border: 1px solid var(--divider-color, #444);
-      border-radius: 6px;
-      padding: 2px 8px;
-      min-height: 1.2em;
+      border-radius: var(--ha-border-radius-sm, 4px);
+      padding: var(--ha-space-1, 4px) var(--ha-space-2, 8px);
+    }
+    /* filled in while dragging; an empty bordered box reads as a bug */
+    .badge:empty {
+      display: none;
     }
     .dpad {
       display: grid;
-      grid-template-columns: repeat(3, 34px);
-      grid-auto-rows: 34px;
-      gap: 2px;
+      grid-template-columns: repeat(3, var(--ha-space-10, 40px));
+      grid-auto-rows: var(--ha-space-10, 40px);
+      gap: var(--ha-space-1, 4px);
       background: var(--card-background-color, #222);
       border: 1px solid var(--divider-color, #444);
-      border-radius: 10px;
-      padding: 4px;
+      border-radius: var(--ha-border-radius-lg, 12px);
+      padding: var(--ha-space-1, 4px);
     }
     .dpad button {
       border: none;
-      border-radius: 6px;
+      border-radius: var(--ha-border-radius-md, 8px);
       background: rgba(127, 127, 127, 0.12);
       color: var(--primary-text-color);
       cursor: pointer;
-      font-size: 0.9em;
+      font: inherit;
+      font-size: var(--ha-font-size-m, 14px);
     }
     .dpad button:disabled {
       opacity: 0.3;
