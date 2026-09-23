@@ -148,9 +148,17 @@ export class EditController {
   }
 
   /** Cancel: discard working state, revert to last saved layout. */
-  cancel(): void {
+  cancel(force = false): void {
     if (!this.session) return;
-    if (this.dirty && !window.confirm("Discard layout changes?")) return;
+    if (
+      !force &&
+      this.dirty &&
+      !window.confirm(
+        "Discard layout changes? Event edits made in this session are already saved."
+      )
+    ) {
+      return;
+    }
     this.teardown();
     this.host.requestUpdate();
   }

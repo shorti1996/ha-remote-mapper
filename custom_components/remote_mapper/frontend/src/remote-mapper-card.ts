@@ -13,12 +13,13 @@
  * runs the bound sequence — it is not the physical remote event.
  */
 import { css, html, LitElement, nothing, type TemplateResult } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 
 import "./card-editor";
 import "./grid-picker";
 import "./remote-grid";
 import { clearGridDraft, getGridDraft, setGridDraft } from "./grid-drafts";
+import { advanceTip, nextTip, skipTips, TIPS } from "./onboarding";
 import { linkedSaveBlocker } from "./slot-save";
 import { bundleStatus, CARD_VERSION } from "./version";
 
@@ -280,6 +281,10 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   @state() private _hostWidth = 0;
 
   // grid layout (plan 04): draft-then-commit, like the canvas session
+  /** Set by HA inside the card-config dialog: the card is a preview there. */
+  @property({ type: Boolean }) public preview = false;
+  /** Bumped when an onboarding tip is dismissed so the banner re-renders. */
+  @state() private _tipsRev = 0;
   @state() private _gridEditing = false;
   @state() private _gridDraft?: GridLayout;
   @state() private _pickerOpen = false;
@@ -596,6 +601,30 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     return list.filter((s) => !!s.config_id);
   }
 
+  /** HA's own confirm dialog, falling back to window.confirm. */
+  private async _confirm(opts: {
+    title: string;
+    text: string;
+    confirmText: string;
+    destructive?: boolean;
+  }): Promise<boolean> {
+    try {
+      const helpers = await loadHelpers();
+      if (helpers?.showConfirmationDialog) {
+        return !!(await helpers.showConfirmationDialog(this, {
+          title: opts.title,
+          text: opts.text,
+          confirmText: opts.confirmText,
+          dismissText: "Cancel",
+          destructive: opts.destructive,
+        }));
+      }
+    } catch {
+      /* fall through */
+    }
+    return window.confirm(`${opts.title}\n\n${opts.text}`);
+  }
+
   public notify(message: string): void {
     // native HA toast (DDC layout-persistence pattern)
     window.dispatchEvent(
@@ -738,6 +767,33 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     if (!draft || !this._remote || this._gridEditing) return;
     this._gridDraft = normalizeGrid(draft, this._remote.buttons ?? []);
     this._gridEditing = true;
+  }
+
+  /** X in grid edit mode: ask only when the layout draft differs from what is saved. */
+  private async _discardGridEdit(): Promise<void> {
+    const saved = this._remote
+      ? normalizeGrid(this._remote.grid_layout, this._remote.buttons ?? [])
+      : undefined;
+    const dirty =
+      !!this._gridDraft && JSON.stringify(this._gridDraft) !== JSON.stringify(saved);
+    if (dirty && !(await this._confirmDiscardLayout())) return;
+    this._cancelGridEdit();
+  }
+
+  private async _discardCanvasEdit(): Promise<void> {
+    if (this._edit.dirty && !(await this._confirmDiscardLayout())) return;
+    this._edit.cancel(true);
+  }
+
+  private _confirmDiscardLayout(): Promise<boolean> {
+    return this._confirm({
+      title: "Discard layout changes?",
+      text:
+        "Button names, positions and grid size go back to the last saved layout. " +
+        "Event edits made in this session are already saved and stay.",
+      confirmText: "Discard",
+      destructive: true,
+    });
   }
 
   private async _saveGridEdit(): Promise<void> {
@@ -984,6 +1040,49 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     } catch (err) {
       this._draftError = (err as { message?: string }).message ?? String(err);
     }
+  }
+
+  /** Clear button: explain the blast radius before the first server call. */
+  private async _confirmClear(): Promise<void> {
+    const slot = this._remote?.slots[this._editingAction ?? ""];
+    const name = this._draftName.trim() || this._editingAction || "this event";
+    const linked = this._isLinked(slot);
+    const imported = this._importedSources(slot).length > 0;
+    const text = linked
+      ? `The link from "${name}" to its automation is removed. The automation itself ` +
+        "stays in HA, enabled, and keeps firing on its own trigger."
+      : imported
+        ? `"${name}" is emptied in this card. The original automation it was imported ` +
+          "from stays in HA (still disabled). Import can pick it up again, and Hand back " +
+          "re-enables everything at once."
+        : `"${name}" is emptied in this card. Automations and scenes that existed before ` +
+          "this integration are not touched; if the card created any, you are asked next.";
+    const ok = await this._confirm({
+      title: "Clear this event?",
+      text,
+      confirmText: "Clear",
+      destructive: true,
+    });
+    if (ok) await this._clearSlot();
+  }
+
+  private async _confirmArchive(): Promise<void> {
+    const slot = this._remote?.slots[this._editingAction!];
+    if (!slot) return;
+    if (slot.archived) {
+      await this._toggleArchived();
+      return;
+    }
+    const name = this._draftName.trim() || this._editingAction || "this event";
+    const ok = await this._confirm({
+      title: "Archive this event?",
+      text:
+        `"${name}" keeps its setup but stops running until you unarchive it` +
+        (slot.materialized ? "; its automation is switched off meanwhile." : ".") +
+        " Nothing is deleted.",
+      confirmText: "Archive",
+    });
+    if (ok) await this._toggleArchived();
   }
 
   private async _clearSlot(decision?: string): Promise<void> {
@@ -1235,10 +1334,11 @@ export class RemoteMapperCard extends LitElement implements EditHost {
 
     if (this._isGrid()) return this._renderGridCard();
 
-    const editing = this._edit.active;
+    const editing = !this.preview && this._edit.active;
     return html`
       <ha-card>
         ${this._renderStaleBundle()}
+        ${this._renderOnboarding()}
         <div class="header">
           ${this._renderTitle()}
           <span class="header-buttons">
@@ -1252,12 +1352,14 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                   ${this._iconButton("mdi:undo", "Undo", () => this._edit.undo(), {
                     disabled: !this._edit.canUndo,
                   })}
-                  ${this._iconButton("mdi:close", "Cancel (Esc)", () => this._edit.cancel())}
-                  ${this._iconButton("mdi:check", "Done — save layout", () => void this._edit.done(), {
+                  ${this._iconButton("mdi:close", "Discard layout changes (Esc)", () => void this._discardCanvasEdit())}
+                  ${this._iconButton("mdi:check", "Save layout", () => void this._edit.done(), {
                     active: true,
                   })}
                 `
-              : this._iconButton("mdi:pencil", "Edit layout & slots", this._enterEdit)}
+              : this.preview
+                ? nothing
+                : this._iconButton("mdi:pencil", "Edit layout & slots", this._enterEdit)}
           </span>
         </div>
         ${this._renderTip()}
@@ -1271,12 +1373,13 @@ export class RemoteMapperCard extends LitElement implements EditHost {
 
   private _renderGridCard(): TemplateResult {
     const remote = this._remote!;
-    const editing = this._gridEditing;
+    const editing = !this.preview && this._gridEditing;
     const layout = this._gridLayout()!;
     const buttons = remote.buttons ?? [];
     return html`
       <ha-card>
         ${this._renderStaleBundle()}
+        ${this._renderOnboarding()}
         <div class="header">
           ${this._renderTitle()}
           <span class="header-buttons">
@@ -1295,15 +1398,20 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                   ${this._iconButton("mdi:export", "Hand this remote back to HA…", () => {
                     this._releaseOpen = true;
                   })}
-                  ${this._iconButton("mdi:close", "Cancel", this._cancelGridEdit)}
-                  ${this._iconButton("mdi:check", "Done — save layout", () => void this._saveGridEdit(), {
+                  ${this._iconButton("mdi:close", "Discard layout changes", () => void this._discardGridEdit())}
+                  ${this._iconButton("mdi:check", "Save layout", () => void this._saveGridEdit(), {
                     active: true,
                   })}
                 `
-              : this._iconButton("mdi:pencil", "Edit layout & slots", this._enterGridEdit)}
+              : this.preview
+                ? nothing
+                : this._iconButton("mdi:pencil", "Edit layout & slots", this._enterGridEdit)}
           </span>
         </div>
         ${this._renderTip()}
+        ${this.preview
+          ? html`<p class="hint grid-hint">· Edit buttons and events from the dashboard; this preview only shows the card</p>`
+          : nothing}
         ${editing && this._pickerOpen
           ? html`<div class="picker-dock">
               <remote-mapper-grid-picker
@@ -1316,7 +1424,8 @@ export class RemoteMapperCard extends LitElement implements EditHost {
           : nothing}
         ${editing
           ? html`<p class="hint grid-hint">· Tap a button to rename it or edit its events</p>
-            <p class="hint grid-hint">· Drag a button onto another cell to swap</p>`
+            <p class="hint grid-hint">· Drag a button onto another cell to swap</p>
+            <p class="hint grid-hint">· Event edits save right away; ✓ saves the layout, ✕ discards it</p>`
           : nothing}
         ${buttons.length === 0
           ? nothing // an empty grid is just blank space; the hint below says what to do
@@ -1836,10 +1945,10 @@ export class RemoteMapperCard extends LitElement implements EditHost {
               : nothing}
             ${slot
               ? html`
-                  <button class="danger" @click=${() => this._clearSlot()}>
+                  <button class="danger" @click=${() => void this._confirmClear()}>
                     Clear
                   </button>
-                  <button @click=${this._toggleArchived}>
+                  <button @click=${() => void this._confirmArchive()}>
                     ${slot.archived ? "Unarchive" : "Archive"}
                   </button>
                 `
@@ -1876,6 +1985,42 @@ export class RemoteMapperCard extends LitElement implements EditHost {
         Remote Mapper was updated to v${backend}; this tab still runs the
         v${CARD_VERSION} card.
         <button @click=${() => void reloadWithClearedCache()}>Reload</button>
+      </div>
+    `;
+  }
+
+  /** First-run tips, one at a time, in the same strip as the update banner. */
+  private _renderOnboarding(): TemplateResult | typeof nothing {
+    if (this.preview) return nothing;
+    void this._tipsRev; // re-render after a tap
+    const tip = nextTip();
+    if (!tip) return nothing;
+    return html`
+      <div class="tipbar">
+        <span class="tipbar-text"
+          ><b>Tip ${tip.index + 1}/${TIPS.length}</b> ${tip.text}</span
+        >
+        <span class="tipbar-buttons">
+          <button
+            @click=${() => {
+              advanceTip();
+              this._tipsRev++;
+            }}
+          >
+            ${tip.index + 1 < TIPS.length ? "Next" : "Got it"}
+          </button>
+          ${tip.index + 1 < TIPS.length
+            ? html`<button
+                class="quiet"
+                @click=${() => {
+                  skipTips();
+                  this._tipsRev++;
+                }}
+              >
+                Skip
+              </button>`
+            : nothing}
+        </span>
       </div>
     `;
   }
@@ -2674,6 +2819,40 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       line-height: var(--ha-line-height-normal, 1.6);
       background: var(--warning-color, #ffa600);
       color: var(--text-primary-color, #fff);
+    }
+    .tipbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--ha-space-2, 8px);
+      padding: var(--ha-space-2, 8px) var(--ha-space-4, 16px);
+      font-size: var(--ha-font-size-m, 14px);
+      line-height: var(--ha-line-height-normal, 1.6);
+      background: var(--secondary-background-color, rgba(127, 127, 127, 0.15));
+      color: var(--primary-text-color);
+      border-bottom: 1px solid var(--divider-color, rgba(127, 127, 127, 0.3));
+    }
+    .tipbar-text {
+      flex: 1 1 240px;
+    }
+    .tipbar-buttons {
+      display: flex;
+      gap: var(--ha-space-2, 8px);
+    }
+    .tipbar button {
+      min-height: var(--ha-space-9, 36px);
+      padding: var(--ha-space-1, 4px) var(--ha-space-3, 12px);
+      border: 1px solid var(--primary-color);
+      border-radius: var(--ha-border-radius-md, 8px);
+      background: transparent;
+      color: var(--primary-color);
+      font: inherit;
+      cursor: pointer;
+    }
+    .tipbar button.quiet {
+      border-color: var(--divider-color, rgba(127, 127, 127, 0.3));
+      color: var(--secondary-text-color);
     }
     .stale button {
       min-height: var(--ha-space-9, 36px);
