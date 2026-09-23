@@ -18,31 +18,12 @@ import { customElement, state } from "lit/decorators.js";
 import "./card-editor";
 import "./grid-picker";
 import "./remote-grid";
-
-/**
- * Grid edit drafts keyed by entry id. HA's card editor calls setConfig on
- * every form change and rebuilds the preview on Save, which would
- * otherwise drop an unticked draft; the module instance outlives the
- * element, so a recreated card resumes the edit session instead.
- */
-const gridDrafts = new Map<string, GridLayout>();
-
-/** Replaced by rollup with package.json's version; unbuilt source keeps the marker. */
-const CARD_VERSION = "__CARD_VERSION__";
+import { clearGridDraft, getGridDraft, setGridDraft } from "./grid-drafts";
+import { linkedSaveBlocker } from "./slot-save";
+import { bundleStatus, CARD_VERSION } from "./version";
 
 /** The reload dialog is offered once per page load, whichever card notices first. */
 let reloadPrompted = false;
-
-/** Numeric compare of dotted versions: <0 a older, >0 a newer, 0 equal. */
-function compareVersions(a: string, b: string): number {
-  const pa = a.split(".").map((n) => parseInt(n, 10) || 0);
-  const pb = b.split(".").map((n) => parseInt(n, 10) || 0);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
-    if (d) return d;
-  }
-  return 0;
-}
 
 /**
  * Full reload that also empties the service-worker Cache Storage, which
@@ -740,7 +721,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   private _cancelGridEdit = (): void => {
     this._gridEditing = false;
     this._gridDraft = undefined;
-    if (this._entryId) gridDrafts.delete(this._entryId);
+    clearGridDraft(this._entryId);
     this._pickerOpen = false;
     this._buttonSheet = undefined;
   };
@@ -748,12 +729,12 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   /** Every draft change lands in the registry so a rebuilt card can resume. */
   private _setGridDraft(draft: GridLayout): void {
     this._gridDraft = draft;
-    if (this._entryId) gridDrafts.set(this._entryId, draft);
+    setGridDraft(this._entryId, draft);
   }
 
   /** Pick up a draft an earlier instance of this card left unticked. */
   private _resumeGridEdit(): void {
-    const draft = this._entryId ? gridDrafts.get(this._entryId) : undefined;
+    const draft = getGridDraft(this._entryId);
     if (!draft || !this._remote || this._gridEditing) return;
     this._gridDraft = normalizeGrid(draft, this._remote.buttons ?? []);
     this._gridEditing = true;
@@ -961,20 +942,19 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       this._isLinked(this._remote?.slots[this._editingAction ?? ""]) &&
       this._draftMaterialized
     ) {
-      // Linked + "keep linked" ticked: the native automation is canonical.
-      // A new sequence here would replace the link with a fresh owned
-      // automation, so refuse unless the actions are untouched.
-      const live = JSON.stringify(this._editingLive?.actions ?? []);
-      const draft = this._yamlEditorOk
-        ? JSON.stringify(this._yamlValue ?? [])
-        : JSON.stringify(this._parseDraftOrNull() ?? null);
-      if (this._editorTab === "quick" || draft !== live) {
-        this._draftError =
-          "This event is linked to a native automation. Edit its actions in HA, " +
-          "or untick \"Keep linked\" to absorb your changes into the card.";
+      // Linked + "keep linked" ticked: only a name change may go through
+      const blocked = linkedSaveBlocker({
+        linked: true,
+        keepLinked: true,
+        tab: this._editorTab,
+        quickMode: this._quickMode,
+        draft: this._yamlEditorOk ? (this._yamlValue ?? []) : this._parseDraftOrNull(),
+        live: this._editingLive?.actions ?? [],
+      });
+      if (blocked) {
+        this._draftError = blocked;
         return;
       }
-      // Nothing but the name changed — save that without touching the link
     } else if (this._editorTab === "quick") {
       if (!this._quickEntity) {
         this._draftError = "Pick an entity first";
@@ -1878,10 +1858,9 @@ export class RemoteMapperCard extends LitElement implements EditHost {
    */
   private _renderStaleBundle(): TemplateResult | typeof nothing {
     const backend = this._remote?.version;
-    if (!backend || CARD_VERSION.startsWith("__") || backend === CARD_VERSION) {
-      return nothing;
-    }
-    if (compareVersions(CARD_VERSION, backend) > 0) {
+    const status = bundleStatus(CARD_VERSION, backend);
+    if (status === "current" || !backend) return nothing;
+    if (status === "ahead") {
       // Files on disk are newer than the running backend: HA was not
       // restarted after the update. A reload can't fix that.
       return html`

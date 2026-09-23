@@ -46,7 +46,6 @@ interface DragState {
   x: number;
   y: number;
   moved: boolean;
-  /** Pointer went down on an event chip (all mode) — tap = edit it. */
 }
 
 const DRAG_THRESHOLD = 8;

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 import { defineConfig } from "vitest/config";
 
-// Pure-module tests only (HA frontend convention): logic lives outside the
-// Lit elements and is tested in node; the elements are exercised in the
-// dev HA. Add environment: "happy-dom" per-file if an element test is ever
-// needed.
+// Default: pure-module tests in node (HA frontend convention: logic lives
+// outside the Lit elements). Element tests opt into happy-dom per file
+// with a `// @vitest-environment happy-dom` docblock — see
+// test/remote-grid.test.ts for the tap-semantics suite.
 export default defineConfig({
   test: {
     include: ["test/**/*.test.ts"],
