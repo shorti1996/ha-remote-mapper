@@ -133,7 +133,9 @@ class RemoteMapperConfigFlow(ConfigFlow, domain=DOMAIN):
         """Pick the source device."""
         if user_input is not None:
             self._device_id = user_input[CONF_DEVICE_ID]
-            await self.async_set_unique_id(self._device_id)
+            # A flow left open (page reloaded mid-setup) must not block a
+            # retry; HA aborts the stale one when this one creates the entry.
+            await self.async_set_unique_id(self._device_id, raise_on_progress=False)
             self._abort_if_unique_id_configured()
             await self._async_probe()
             return await self.async_step_actions()
@@ -166,7 +168,9 @@ class RemoteMapperConfigFlow(ConfigFlow, domain=DOMAIN):
             if not entity_ids:
                 errors["base"] = "no_event_entities"
             else:
-                await self.async_set_unique_id(f"matter:{device_id}")
+                await self.async_set_unique_id(
+                    f"matter:{device_id}", raise_on_progress=False
+                )
                 self._abort_if_unique_id_configured()
                 buttons = {
                     token: entity_id
@@ -215,7 +219,7 @@ class RemoteMapperConfigFlow(ConfigFlow, domain=DOMAIN):
         unique_id: str,
         actions: list[str],
     ) -> ConfigFlowResult:
-        await self.async_set_unique_id(unique_id)
+        await self.async_set_unique_id(unique_id, raise_on_progress=False)
         self._abort_if_unique_id_configured()
         return self.async_create_entry(
             title=title,

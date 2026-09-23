@@ -26,9 +26,10 @@ JSMODULES: Final[list[dict[str, str]]] = [
 # Persistent notification raised when the card resource is (re)registered.
 RELOAD_NOTIFICATION_ID: Final = f"{DOMAIN}_reload_browser"
 
-# Prefixes stamped onto materialized automations/scenes (M4+).
-# Orphan detection is a substring check on these — keep stable across versions.
-AUTOMATION_ALIAS_PREFIX: Final = f"[{DOMAIN}]"
+# Stamped onto materialized automations (M4+): the alias tag (a prefix
+# before 0.1.5, a suffix since) and the description marker. Detection is a
+# substring check on these — keep stable across versions.
+AUTOMATION_ALIAS_TAG: Final = f"[{DOMAIN}]"
 MANAGED_DESCRIPTION_MARKER: Final = f"Auto-managed by {DOMAIN}."
 
 # Bus event fired after every mutating WS handler; the card refetches on it.

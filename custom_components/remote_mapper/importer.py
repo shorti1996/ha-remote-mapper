@@ -30,7 +30,8 @@ from homeassistant.components.automation import (
 )
 from homeassistant.const import ATTR_ENTITY_ID
 
-from .const import AUTOMATION_ALIAS_PREFIX, DOMAIN, MANAGED_DESCRIPTION_MARKER
+from .const import DOMAIN, MANAGED_DESCRIPTION_MARKER
+from .naming import is_managed_alias
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -112,7 +113,7 @@ class ImportScanner:
                 continue
             raw = dict(entity.raw_config)
             alias = raw.get("alias") or entity_id
-            if str(alias).startswith(AUTOMATION_ALIAS_PREFIX) or (
+            if is_managed_alias(alias) or (
                 MANAGED_DESCRIPTION_MARKER in str(raw.get("description", ""))
             ):
                 continue  # our own materialized automation — not an import
@@ -140,6 +141,8 @@ class ImportScanner:
                 continue
             merged["sequence"] = [*merged["sequence"], *proposal["sequence"]]
             merged["alias"] = f"{merged['alias']} + {proposal['alias']}"
+            names = [n for n in (merged["name"], proposal["name"]) if n]
+            merged["name"] = " + ".join(names) or None
             merged["mixed"] = merged["mixed"] or proposal["mixed"]
             merged["sources"].append(
                 {
@@ -205,7 +208,7 @@ class ImportScanner:
         # Shape B: flat actions, exactly one of our subtypes triggering
         subtypes = set(id_map.values())
         if len(subtypes) == 1 and not mixed:
-            self._propose(next(iter(subtypes)), actions, base, store)
+            self._propose(next(iter(subtypes)), actions, base, store, name=alias)
             return
         self._skip(
             entity_id,
@@ -239,7 +242,11 @@ class ImportScanner:
                 if (action_id := id_map.get(trigger_id)) is None:
                     # Branch for another device in a mixed automation
                     continue
-                self._propose(action_id, sequence, base, store)
+                # the automation's alias names the remote; a branch alias
+                # (HA's "rename" on an option) names this event
+                self._propose(
+                    action_id, sequence, base, store, name=option.get("alias")
+                )
                 proposed_any = True
         if not proposed_any and not flagged_any:
             self._skip(entity_id, alias, "no_matching_branches")
@@ -250,6 +257,7 @@ class ImportScanner:
         sequence: list[Any],
         base: dict[str, Any],
         store: RemoteMapperStore,
+        name: str | None = None,
     ) -> None:
         existing = store.get_slot(self.entry_id, action_id)
         self.proposals.append(
@@ -257,6 +265,8 @@ class ImportScanner:
                 **base,
                 "action_id": action_id,
                 "sequence": sequence,
+                # slot name on absorb; None = the card infers one
+                "name": (str(name).strip() or None) if name else None,
                 "conflict": existing is not None,
             }
         )
@@ -280,7 +290,7 @@ async def async_apply(
     applied: list[str] = []
     linked: list[str] = []
     conflicts: list[str] = []
-    to_disable: set[str] = set()
+    to_disable: dict[str, str | None] = {}  # entity id → config id
 
     for proposal in proposals:
         action_id = proposal["action_id"]
@@ -304,6 +314,7 @@ async def async_apply(
         ]
         slot = default_slot()
         slot["sequence"] = proposal["sequence"]
+        slot["name"] = proposal.get("name") or None
         slot["imported_from"] = {
             "entity_id": sources[0].get("entity_id"),
             "config_id": sources[0].get("config_id"),
@@ -316,7 +327,7 @@ async def async_apply(
         applied.append(action_id)
         for source in sources:
             if source.get("disable_source") and source.get("entity_id"):
-                to_disable.add(source["entity_id"])
+                to_disable[source["entity_id"]] = source.get("config_id")
 
     for entity_id in sorted(to_disable):
         await hass.services.async_call(
@@ -326,6 +337,10 @@ async def async_apply(
             blocking=True,
         )
         _LOGGER.info("%s: disabled imported source %s", DOMAIN, entity_id)
+    store.async_remember_disabled(
+        entry_id,
+        [{"entity_id": e, "config_id": c} for e, c in sorted(to_disable.items())],
+    )
 
     return {
         "applied": applied,

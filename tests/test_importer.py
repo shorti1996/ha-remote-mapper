@@ -111,6 +111,9 @@ async def test_scan_shapes_a_and_b(hass, hass_ws_client, remote_device) -> None:
     assert by_action["1_single"]["source_config_id"] == "auto_a"
     assert by_action["1_single"]["disable_source"] is True
     assert by_action["1_hold"]["source_entity_id"] == "automation.pilot_single_button"
+    # a per-event automation names its slot; a per-remote one names no event
+    assert by_action["1_hold"]["name"] == "Pilot single button"
+    assert by_action["1_single"]["name"] is None
     assert res["result"]["skipped"] == []
 
 

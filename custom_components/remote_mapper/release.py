@@ -45,7 +45,10 @@ def imported_sources(slot: dict[str, Any]) -> list[dict[str, Any]]:
 async def async_reenable_imported(
     hass: HomeAssistant, store: RemoteMapperStore, entry_id: str
 ) -> list[str]:
-    """Turn the imported originals of every slot back on. Returns entity ids."""
+    """Turn every original this remote disabled back on. Returns entity ids.
+
+    Covers slots' import trails and originals whose slot was cleared since.
+    """
     remote = store.get_remote(entry_id)
     if remote is None:
         return []
@@ -55,6 +58,7 @@ async def async_reenable_imported(
             for slot in remote.get("slots", {}).values()
             for source in imported_sources(slot)
         }
+        | {item["entity_id"] for item in store.disabled_originals(entry_id)}
     )
     present = [e for e in entity_ids if hass.states.get(e) is not None]
     if present:
@@ -62,6 +66,7 @@ async def async_reenable_imported(
             "automation", "turn_on", {ATTR_ENTITY_ID: present}, blocking=True
         )
         _LOGGER.info("%s: re-enabled imported originals %s", DOMAIN, present)
+    store.async_forget_disabled(entry_id, entity_ids)
     return present
 
 
@@ -73,6 +78,7 @@ async def async_release_remote(
 ) -> dict[str, Any]:
     """Undo the integration's footprint for one remote, then remove it."""
     from .materializer import async_materialize, async_unmanage
+    from .naming import remote_name
 
     remote = store.get_remote(entry.entry_id)
     if remote is None:
@@ -91,18 +97,13 @@ async def async_release_remote(
     for action_id, slot in list(remote.get("slots", {}).items()):
         if imported_sources(slot) and not slot.get("materialized"):
             continue  # originals are back — the slot just goes away
-        plain_alias = f"{entry.title} · {slot.get('name') or action_id}"
         if slot.get("materialized") and slot.get("automation_id"):
             config_id = slot["automation_id"]
             if not slot.get("owned", True):
                 summary["kept"].append(action_id)  # linked: not ours, untouched
                 continue
-            if slot.get("shared_automation"):
-                plain_alias = entry.title
             if config_id not in unmanaged:
-                unmanaged[config_id] = await async_unmanage(
-                    hass, config_id, plain_alias
-                )
+                unmanaged[config_id] = await async_unmanage(hass, config_id)
             if unmanaged[config_id]:
                 summary["kept"].append(action_id)
             else:
@@ -110,9 +111,9 @@ async def async_release_remote(
         elif convert_remaining and slot.get("sequence") and not slot.get("archived"):
             try:
                 config_id = await async_materialize(
-                    hass, store, entry.entry_id, action_id, entry.title
+                    hass, store, entry.entry_id, action_id, remote_name(hass, entry)
                 )
-                await async_unmanage(hass, config_id, plain_alias)
+                await async_unmanage(hass, config_id)
                 summary["converted"].append(action_id)
             except Exception as err:  # keep going, report
                 _LOGGER.warning("%s: could not convert %s: %s", DOMAIN, action_id, err)

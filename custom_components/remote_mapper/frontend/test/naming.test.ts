@@ -55,7 +55,11 @@ describe("stepName", () => {
     expect(stepName({ choose: [] }, hass)).toBe("Choose");
     expect(stepName({ delay: "00:00:05" }, hass)).toBe("Delay");
     expect(stepName({ action: "vacuum.return_to_base" }, hass)).toBe("Dock");
-    expect(stepName({ action: "foo.do_the_thing" }, hass)).toBe("Do the thing");
+    expect(stepName({ action: "foo.do_the_thing" }, hass)).toBe("Do the thing foo");
+    expect(stepName({ action: "persistent_notification.create", data: { message: "x" } }, hass)).toBe(
+      "Create persistent notification"
+    );
+    expect(stepName({ action: "notify.mobile_app_pixel" }, hass)).toBe("Notify mobile app pixel");
     expect(stepName({ action: "light.toggle", target: { entity_id: "light.unknown" } }, {})).toBe(
       "Toggle light.unknown"
     );

@@ -11,6 +11,7 @@ evolve without versioned clutter or orphans.
 from __future__ import annotations
 
 import logging
+from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.exceptions import HomeAssistantError
@@ -51,6 +52,23 @@ def scene_config_id(entry_id: str, action_id: str) -> str:
     return f"{DOMAIN}_{entry_id}_{action_id}"
 
 
+def _plain(value: Any) -> Any:
+    """Enum members → their value, recursively.
+
+    HA 2026.7 keys light attributes with a StrEnum
+    (``LightEntityCapabilityAttribute``) and stores ``ColorMode`` members as
+    values; ``homeassistant.util.yaml.dump`` refuses both, so a capture of
+    any light failed with "cannot represent an object".
+    """
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, dict):
+        return {_plain(k): _plain(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_plain(v) for v in value]
+    return value
+
+
 def capture_entities(hass: HomeAssistant, entity_ids: list[str]) -> dict[str, Any]:
     """Current states → scene entities map."""
     entities: dict[str, Any] = {}
@@ -60,9 +78,9 @@ def capture_entities(hass: HomeAssistant, entity_ids: list[str]) -> dict[str, An
             _LOGGER.warning("Snapshot: %s has no state, skipping", entity_id)
             continue
         attrs = {
-            key: value
+            _plain(key): _plain(value)
             for key, value in state.attributes.items()
-            if key not in _ATTR_DENYLIST and value is not None
+            if str(key) not in _ATTR_DENYLIST and value is not None
         }
         entities[entity_id] = {"state": state.state, **attrs}
     return entities

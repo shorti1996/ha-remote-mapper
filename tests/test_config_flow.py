@@ -128,3 +128,31 @@ async def test_duplicate_device_aborts(hass, remote_device) -> None:
     )
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "already_configured"
+
+
+async def test_retry_after_abandoned_flow(hass, remote_device) -> None:
+    """A setup left open on the actions step doesn't block a second attempt."""
+
+    async def _to_actions() -> str:
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"next_step_id": "device"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"device_id": remote_device}
+        )
+        assert result["step_id"] == "actions"
+        return result["flow_id"]
+
+    stale = await _to_actions()
+    retry = await _to_actions()
+    result = await hass.config_entries.flow.async_configure(
+        retry, {"actions": ["1_single"], "reprobe": False}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    # the abandoned one is gone, not left to create a duplicate
+    assert stale not in {
+        f["flow_id"] for f in hass.config_entries.flow.async_progress()
+    }

@@ -117,7 +117,12 @@ export function stepName(raw: unknown, hass?: HassNames): string {
     return target ? `Select · ${target}` : "Select option";
   }
   const verb = VERBS[service] ?? humanize(service);
-  return target ? `${verb} ${target}` : verb;
+  if (target) return `${verb} ${target}`;
+  if (service in VERBS) return verb;
+  // No target to name: say what the verb acts on (the service's domain)
+  const words = (s: string) => s.replace(/_/g, " ");
+  if (domain === "notify") return `Notify ${words(service)}`;
+  return `${verb} ${words(domain)}`;
 }
 
 /** Name for a whole sequence: first step, "+N" for the rest. */

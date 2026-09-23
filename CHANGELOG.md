@@ -3,6 +3,101 @@
 Notable changes per release. Unreleased entries collect on `master` and
 move under a version heading when `make release VERSION=x.y.z` runs.
 
+## Unreleased
+
+### Fixed
+
+- **Scene from current state works on HA 2026.7 lights.** Capture failed
+  with "cannot represent an object … LightEntityCapabilityAttribute" because
+  HA now keys light attributes with a StrEnum and stores `ColorMode` members
+  as values, which the YAML writer refuses. Enum members are flattened to
+  their plain values before the scene is written.
+- **Unticking "Keep linked" absorbs again.** On a linked event the editor
+  opens on Quick / "Link existing automation"; saving from there re-sent the
+  link and ignored the unticked box, so the automation stayed native and
+  enabled. The save now sends only `materialized: false`, which the backend
+  already treats as absorb (copy in, disable the original).
+- **Absorb → Clear → Link no longer leaves the original off.** Each remote
+  now records the automations it disabled, so clearing an absorbed event no
+  longer loses track of them. Linking one of them again (Import's default,
+  or *Link existing automation*) switches it back on, unless another event
+  still runs an absorbed copy. Hand back re-enables every recorded original.
+- **The card uses the device's name.** The card editor's remote list, the
+  default card title and the hand-back dialog showed the config entry title
+  (the name at setup), not the name given to the device afterwards.
+- **An absorbed event keeps the automation's name.** Import (absorb) and
+  unticking *Keep linked* name the event after the automation's alias; a
+  per-remote automation (one `choose` branch per event) uses the branch's
+  alias, if any. Steps without a target now name their domain: "Create
+  persistent notification" instead of "Create".
+- **Retrying an abandoned Add-remote dialog works.** A setup left open (page
+  reloaded mid-flow) blocked the next attempt with the raw key
+  `already_in_progress`. The new flow replaces it; the message has a text if
+  it ever shows.
+- **Unlinking one event of a per-remote automation no longer breaks the
+  others.** For an automation with one `choose` branch per event, unticking
+  *Keep linked* copied the whole `choose` into that one event and turned the
+  automation off, so the other buttons stopped. After a confirmation that
+  lists them, every event the automation runs on this remote now gets its own
+  branch, and the automation is turned off once. It is refused when the
+  automation also runs on another remote's or device's triggers, has
+  conditions on the whole automation or a `default` branch, or when one of
+  those events already has its own action. In the first three cases the
+  editor locks the checkbox and shows the reason instead of offering the
+  untick.
+- **Disabling one linked event disables all events linked to the same
+  automation.** The automation goes off in HA as a whole; the dialog lists
+  the events and all of them are marked disabled. For an automation that
+  also runs on another remote, *Disable* is greyed out. Disabled buttons in
+  the event editor now look disabled.
+
+### Changed
+
+- **Archive is now called Disable** (*Enable* to undo), HA's word for an
+  automation that is switched off. The event keeps its setup.
+- **Automations the card creates are named `<remote> · <event> [remote_mapper]`.**
+  The event is the slot name, else the name the card inferred from the
+  actions, else the button label and event. The tag moved from the start to
+  the end, so HA's automation list sorts by remote. Existing automations keep
+  their alias until their event is saved again; hand back strips the tag in
+  either position.
+- **Pads show what an automation-backed event does.** They showed the
+  automation's alias; they now show the inferred name, as for card-built
+  events. Linked automations still show their own name, except a per-remote
+  one, whose name fits every event: its events show their branch.
+- **The canvas D-pad sits below the tiles.** It floated over the bottom-right
+  corner and hid tiles in a narrow card. Its buttons are now 40 px touch
+  targets sized with HA's tokens, and the position readout shows only while
+  dragging. The layout option reads *Canvas — free placement, one tile per
+  event* (was "(legacy)").
+- **The canvas tile toolbar uses HA icon buttons.** *Slot settings*, *Send
+  backward* and *Bring forward* are 48 px icon buttons with tooltips (were
+  ⚙ ↓ ↑ glyphs sized in `em`).
+- **The card title stays readable in edit mode.** In a narrow card the six
+  edit buttons squeezed the title down to one letter; they now wrap onto a
+  row of their own.
+- **Empty events read "not set"** (was "unassigned", cut to "unassign…" on
+  narrow pads).
+
+### Tested
+
+In a dev Home Assistant 2026.7.2, with a demo automation that has one
+`choose` branch each for buttons 1 and 2 of a 4-button remote:
+
+- Import offered *Link* for both events.
+- *Disable* asked "Disable 2 events?" and named both. The automation went
+  off and both pads dimmed; *Enable* turned the automation and both events
+  back on.
+- Unticking *Keep linked* asked "Move the whole automation into the card?".
+  After *Move all 2*, each event had its own branch, button 1 took its
+  branch's name ("Strip on"), the automation was off, and running button 1
+  from the card posted its notification.
+- With an extra trigger from outside the remote in the automation, the
+  checkbox stayed locked, *Disable* was greyed out, and the editor showed
+  why.
+- After *Clear* the automation stayed off; linking it again turned it back
+  on.
+
 ## 0.1.4 — 2026-09-23
 
 Python changed, so restart Home Assistant after updating.

@@ -431,3 +431,121 @@ async def test_link_keeps_import_trail(hass, hass_ws_client, remote_device) -> N
     slot = store.get_slot(entry.entry_id, "1_double")
     assert slot["automation_id"] == "orig_1"
     assert slot["imported_from"]["config_id"] == "old"
+
+
+async def _apply(client, entry_id: str, mode: str) -> dict:
+    scan = (await _ws(client, {"type": f"{DOMAIN}/scan_import", "entry_id": entry_id}))[
+        "result"
+    ]
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/apply_import",
+            "entry_id": entry_id,
+            "proposals": [{**p, "mode": mode} for p in scan["proposals"]],
+        },
+    )
+    assert res["success"], res
+    return res["result"]
+
+
+async def _clear(client, entry_id: str, action_id: str) -> None:
+    res = await _ws(
+        client,
+        {"type": f"{DOMAIN}/clear_slot", "entry_id": entry_id, "action_id": action_id},
+    )
+    assert res["success"], res
+
+
+async def test_absorb_clear_link_turns_original_back_on(
+    hass, hass_ws_client, remote_device
+) -> None:
+    """Absorb → Clear → Import (link): the automation we disabled fires again."""
+    entry = await _setup(hass, remote_device)
+    client = await hass_ws_client(hass)
+    store = hass.data[DOMAIN]["store"]
+
+    await _apply(client, entry.entry_id, "absorb")
+    assert hass.states.get("automation.pilot_1_single").state == "off"
+    # the automation's alias names the absorbed slot
+    assert store.get_slot(entry.entry_id, "1_single")["name"] == "Pilot 1_single"
+
+    await _clear(client, entry.entry_id, "1_single")
+    assert hass.states.get("automation.pilot_1_single").state == "off"
+
+    result = await _apply(client, entry.entry_id, "link")
+    assert result["linked"] == ["1_single"]
+    assert hass.states.get("automation.pilot_1_single").state == "on"
+    assert store.disabled_originals(entry.entry_id) == []
+
+    res = await _ws(
+        client, {"type": f"{DOMAIN}/release_remote", "entry_id": entry.entry_id}
+    )
+    assert res["result"]["kept"] == ["1_single"]
+    assert hass.states.get("automation.pilot_1_single").state == "on"
+
+
+async def test_hand_back_after_clear_reenables_original(
+    hass, hass_ws_client, remote_device
+) -> None:
+    """Clearing an absorbed slot doesn't make hand-back forget the original."""
+    entry = await _setup(hass, remote_device)
+    client = await hass_ws_client(hass)
+
+    await _apply(client, entry.entry_id, "absorb")
+    await _clear(client, entry.entry_id, "1_single")
+    res = await _ws(
+        client, {"type": f"{DOMAIN}/release_remote", "entry_id": entry.entry_id}
+    )
+    assert res["result"]["reenabled"] == ["automation.pilot_1_single"]
+    assert hass.states.get("automation.pilot_1_single").state == "on"
+
+
+async def test_link_leaves_original_off_while_absorbed_copy_runs(
+    hass, hass_ws_client, remote_device
+) -> None:
+    """Another event still runs the absorbed copy: linking must not double-fire."""
+    entry = await _setup(hass, remote_device)
+    client = await hass_ws_client(hass)
+    await _apply(client, entry.entry_id, "absorb")  # 1_single holds the copy
+
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/save_slot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_double",
+            "link_entity_id": "automation.pilot_1_single",
+        },
+    )
+    assert res["success"], res
+    assert hass.states.get("automation.pilot_1_single").state == "off"
+
+
+async def test_unlink_names_slot_after_automation(
+    hass, hass_ws_client, remote_device
+) -> None:
+    """Untick with an empty name: the slot takes the automation's alias."""
+    entry = await _setup(hass, remote_device)
+    client = await hass_ws_client(hass)
+    await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/save_slot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_double",
+            "link_entity_id": "automation.pilot_1_single",
+        },
+    )
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/save_slot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_double",
+            "materialized": False,
+            "name": None,
+        },
+    )
+    assert res["success"], res
+    assert res["result"]["slot"]["name"] == "Pilot 1_single"

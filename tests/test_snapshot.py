@@ -114,6 +114,52 @@ async def test_snapshot_creates_scene_and_binding(
     assert owned["entities"] == ["light.a", "light.b"]
 
 
+async def test_snapshot_flattens_enum_attributes(
+    hass, hass_ws_client, remote_device
+) -> None:
+    """HA 2026.7 lights: StrEnum attribute keys and ColorMode values.
+
+    ``homeassistant.util.yaml.dump`` refuses enum objects, so the capture
+    must store their plain values or every light snapshot fails.
+    """
+    from homeassistant.components.light import (
+        ColorMode,
+        LightEntityCapabilityAttribute,
+    )
+
+    hass.states.async_set(
+        "light.a",
+        "on",
+        {
+            LightEntityCapabilityAttribute.MIN_COLOR_TEMP_KELVIN: 2000,
+            "supported_color_modes": [ColorMode.COLOR_TEMP],
+            "color_mode": ColorMode.COLOR_TEMP,
+            "brightness": 120,
+        },
+    )
+    entry = await _setup(
+        hass, remote_device, options={"snapshot_entities": ["light.a"]}
+    )
+    client = await hass_ws_client(hass)
+
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/create_snapshot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_single",
+            "name": "Warm",
+        },
+    )
+    assert res["success"], res
+    captured = _scenes_yaml(hass)[0]["entities"]["light.a"]
+    assert captured["min_color_temp_kelvin"] == 2000
+    assert captured["color_mode"] == "color_temp"
+    assert captured["brightness"] == 120
+    # denylisted even when the key arrives as an enum member
+    assert "supported_color_modes" not in captured
+
+
 async def test_re_snapshot_in_place(hass, hass_ws_client, remote_device) -> None:
     """Same scene id + entity set, new states — no versioned clutter."""
     hass.states.async_set("light.a", "on", {"brightness": 120})

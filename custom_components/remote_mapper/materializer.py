@@ -28,7 +28,8 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.util.file import write_utf8_file_atomic
 from homeassistant.util.yaml import dump, load_yaml
 
-from .const import AUTOMATION_ALIAS_PREFIX, DOMAIN, MANAGED_DESCRIPTION_MARKER
+from .const import DOMAIN, MANAGED_DESCRIPTION_MARKER
+from .naming import event_label, managed_alias, plain_alias
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -47,20 +48,11 @@ def automation_config_id(entry_id: str, action_id: str) -> str:
 
 
 def build_payload(
-    remote_title: str,
-    action_id: str,
+    alias: str,
     trigger: dict[str, Any],
     sequence: list[Any],
-    name: str | None = None,
 ) -> dict[str, Any]:
-    """Automation payload — plural keys (2024.10+ editor convention).
-
-    The user's slot name (if any) goes into the alias so the automation
-    reads well in HA's own list.
-    """
-    alias = f"{AUTOMATION_ALIAS_PREFIX} {remote_title} · {action_id}"
-    if name:
-        alias = f"{alias} — {name}"
+    """Automation payload — plural keys (2024.10+ editor convention)."""
     return {
         "alias": alias,
         "description": (
@@ -178,8 +170,15 @@ async def async_materialize(
     entry_id: str,
     action_id: str,
     title: str,
+    auto_name: str | None = None,
 ) -> str:
-    """Create/update the slot's automation; returns the config id."""
+    """Create/update the slot's automation; returns the config id.
+
+    The alias names the event by the slot name, else ``auto_name`` (the
+    name the card inferred from the actions), else the button label. An
+    update with neither keeps the alias the automation already has, so a
+    re-snapshot doesn't undo a rename made in HA.
+    """
     from .adapters import get_adapter
 
     remote = store.get_remote(entry_id)
@@ -190,11 +189,15 @@ async def async_materialize(
     adapter = get_adapter(remote["source"])
     trigger = adapter.build_trigger(action_id, remote["source_config"])
     config_id = automation_config_id(entry_id, action_id)
-    payload = build_payload(
-        title, action_id, trigger, slot["sequence"], slot.get("name")
+    config_store = _get_config_store(hass)
+    name = slot.get("name") or auto_name
+    existing = None if name else await config_store.async_get(config_id)
+    alias = (existing or {}).get("alias") or managed_alias(
+        title, event_label(remote, action_id, name)
     )
+    payload = build_payload(alias, trigger, slot["sequence"])
 
-    await _get_config_store(hass).async_upsert(config_id, payload)
+    await config_store.async_upsert(config_id, payload)
 
     slot["materialized"] = True
     slot["automation_id"] = config_id
@@ -235,6 +238,51 @@ async def async_link(
     slot["shared_automation"] = False
     # imported_from is kept on purpose: the originals' chips stay visible
     store.async_set_slot(entry_id, action_id, slot)
+    await _async_reenable_if_ours(hass, store, entry_id, action_id, config_id)
+
+
+async def _async_reenable_if_ours(
+    hass: HomeAssistant,
+    store: RemoteMapperStore,
+    entry_id: str,
+    action_id: str,
+    config_id: str,
+) -> None:
+    """Turn a just-linked automation back on if this remote switched it off.
+
+    Absorb → Clear → Link (import's default) otherwise points the button
+    at an automation that never fires, and hand-back leaves it off for
+    good. It stays off while another slot still runs an absorbed copy —
+    both would fire on the press.
+    """
+    from .release import imported_sources
+
+    remote = store.get_remote(entry_id)
+    entity_id = automation_entity_id(hass, config_id)
+    if remote is None or entity_id is None:
+        return
+
+    def _is_it(source: dict[str, Any]) -> bool:
+        return source.get("entity_id") == entity_id or (
+            source.get("config_id") == config_id
+        )
+
+    ours = any(_is_it(s) for s in store.disabled_originals(entry_id))
+    for other_id, other in remote.get("slots", {}).items():
+        if not any(_is_it(s) for s in imported_sources(other)):
+            continue
+        if other_id != action_id and not other.get("materialized"):
+            return  # an absorbed copy still runs on another event
+        ours = True  # import trail from before disabled_originals existed
+    if not ours:
+        return
+    state = hass.states.get(entity_id)
+    if state is not None and state.state == "off":
+        await hass.services.async_call(
+            AUTOMATION_DOMAIN, "turn_on", {"entity_id": entity_id}, blocking=True
+        )
+        _LOGGER.info("%s: re-enabled %s on link", DOMAIN, entity_id)
+    store.async_forget_disabled(entry_id, [entity_id])
 
 
 async def async_absorb_link(
@@ -243,13 +291,19 @@ async def async_absorb_link(
     entry_id: str,
     action_id: str,
     sequence: list[Any] | None = None,
-) -> None:
-    """Unlink: copy the automation's actions into the slot, disable it.
+) -> list[str]:
+    """Unlink: copy the automation's actions into the card, disable it.
 
     Same footprint as an absorbing import — the original is disabled
     (never deleted) and remembered in imported_from for hand-back.
-    ``sequence`` (already validated) replaces the live actions when given.
+    ``sequence`` (already validated) replaces this event's live actions.
+
+    A per-remote automation (one choose branch per event) can only be
+    turned off as a whole, so every event it runs on this remote gets its
+    own branch in the same step. Returns the events absorbed.
     """
+    from .store import default_slot
+
     slot = store.get_slot(entry_id, action_id)
     if not is_linked(slot):
         raise HomeAssistantError(f"Slot {entry_id}/{action_id} is not linked")
@@ -258,30 +312,109 @@ async def async_absorb_link(
     if raw is None:
         raise HomeAssistantError(f"Automation {config_id} no longer exists")
     entity_id = automation_entity_id(hass, config_id)
-    slot["sequence"] = (
-        list(sequence)
-        if sequence is not None
-        else list(raw.get("actions", raw.get("action", [])) or [])
-    )
-    slot["materialized"] = False
-    slot["automation_id"] = None
-    slot["owned"] = True
-    slot["imported_from"] = {
-        "entity_id": entity_id,
-        "config_id": config_id,
-        "sources": [{"entity_id": entity_id, "config_id": config_id}],
-    }
-    store.async_set_slot(entry_id, action_id, slot)
+    alias = raw.get("alias") or entity_id or config_id
+
+    plan = whole_automation_plan(store, entry_id, raw)
+    if plan is None:
+        copies = {
+            action_id: (
+                list(raw.get("actions", raw.get("action", [])) or []),
+                absorbed_name(raw, action_id),
+            )
+        }
+    else:
+        if plan["blocked"]:
+            raise HomeAssistantError(
+                f'"{alias}" can\'t move into the card: {plan["blocked"]}. '
+                "Edit it in HA instead."
+            )
+        events = list(dict.fromkeys([*plan["events"], action_id]))
+        taken = [
+            event
+            for event in events
+            if not _free_for_absorb(store.get_slot(entry_id, event), config_id)
+        ]
+        if taken:
+            raise HomeAssistantError(
+                f'"{alias}" also runs {", ".join(taken)}, which already have '
+                "their own action here. Clear those events first, or edit the "
+                "automation in HA."
+            )
+        from .remote_automation import branch_view
+
+        copies = {}
+        for event in events:
+            view = branch_view(raw, event) or {}
+            copies[event] = (list(view.get("actions") or []), view.get("alias"))
+    if sequence is not None:
+        copies[action_id] = (list(sequence), copies[action_id][1])
+
+    origin = {"entity_id": entity_id, "config_id": config_id}
+    for event, (actions, name) in copies.items():
+        target = store.get_slot(entry_id, event) or default_slot()
+        target["sequence"] = actions
+        target["materialized"] = False
+        target["automation_id"] = None
+        target["owned"] = True
+        target["imported_from"] = {**origin, "sources": [dict(origin)]}
+        if not target.get("name"):
+            target["name"] = name
+        store.async_set_slot(entry_id, event, target)
     if entity_id:
         await hass.services.async_call(
             AUTOMATION_DOMAIN, "turn_off", {"entity_id": entity_id}, blocking=True
         )
+        store.async_remember_disabled(entry_id, [origin])
+    return list(copies)
 
 
-async def async_unmanage(hass: HomeAssistant, config_id: str, alias: str) -> bool:
+def _free_for_absorb(slot: dict[str, Any] | None, config_id: str) -> bool:
+    """Empty, or linked to the automation being absorbed."""
+    return slot is None or (is_linked(slot) and slot["automation_id"] == config_id)
+
+
+def whole_automation_plan(
+    store: RemoteMapperStore, entry_id: str, raw: dict[str, Any]
+) -> dict[str, Any] | None:
+    """per_remote_plan() over this remote's events; None for other shapes."""
+    from .remote_automation import per_remote_plan
+
+    remote = store.get_remote(entry_id) or {}
+    return per_remote_plan(
+        raw,
+        list(remote.get("layout", {}).get("actions", [])),
+        (remote.get("source_config") or {}).get("device_id"),
+    )
+
+
+def linked_events(store: RemoteMapperStore, entry_id: str, config_id: str) -> list[str]:
+    """This remote's events linked to one native automation."""
+    remote = store.get_remote(entry_id) or {}
+    return [
+        action_id
+        for action_id, slot in remote.get("slots", {}).items()
+        if is_linked(slot) and slot["automation_id"] == config_id
+    ]
+
+
+def absorbed_name(raw: dict[str, Any], action_id: str) -> str | None:
+    """Slot name for an absorbed automation: its alias, when it is per-event.
+
+    A per-remote automation (one choose branch per event) names the whole
+    remote, so its alias would label every button the same.
+    """
+    from .remote_automation import branch_view
+
+    alias = str(raw.get("alias") or "").strip()
+    if not alias or branch_view(raw, action_id) is not None:
+        return None
+    return alias
+
+
+async def async_unmanage(hass: HomeAssistant, config_id: str) -> bool:
     """Turn a managed automation into a plain one (release flow).
 
-    Keeps triggers/actions; replaces our prefixed alias and strips the
+    Keeps triggers/actions; drops our tag from the alias and strips the
     auto-managed description. False if the automation no longer exists.
     """
     store = _get_config_store(hass)
@@ -289,7 +422,7 @@ async def async_unmanage(hass: HomeAssistant, config_id: str, alias: str) -> boo
     if raw is None:
         return False
     payload = {k: v for k, v in raw.items() if k != "id"}
-    payload["alias"] = alias
+    payload["alias"] = plain_alias(payload.get("alias") or config_id)
     description = str(payload.get("description", ""))
     if MANAGED_DESCRIPTION_MARKER in description:
         payload["description"] = ""
@@ -298,13 +431,19 @@ async def async_unmanage(hass: HomeAssistant, config_id: str, alias: str) -> boo
 
 
 async def async_get_live_view(
-    hass: HomeAssistant, slot: dict[str, Any], action_id: str | None = None
+    hass: HomeAssistant,
+    slot: dict[str, Any],
+    action_id: str | None = None,
+    store: RemoteMapperStore | None = None,
+    entry_id: str | None = None,
 ) -> dict[str, Any] | None:
     """Summary of the materialized automation for the card.
 
     With ``action_id``, a single-choose automation keyed on trigger ids
     (the remote's shared automation, or an imported "Shape A" one) is
-    narrowed to this event's branch.
+    narrowed to this event's branch. With ``store`` and ``entry_id``, a
+    linked one also carries ``whole``: what unticking or disabling one
+    event does to the others (the automation only goes off as a whole).
     """
     from .remote_automation import branch_view
 
@@ -331,6 +470,15 @@ async def async_get_live_view(
         view["actions"] = branch["actions"]
         view["branch"] = True
         view["branch_missing"] = branch["branch_missing"]
+        view["branch_alias"] = branch["alias"]
+        if store is not None and entry_id and is_linked(slot):
+            plan = whole_automation_plan(store, entry_id, raw) or {}
+            view["whole"] = {
+                "events": list(dict.fromkeys([*plan.get("events", []), action_id])),
+                "linked": linked_events(store, entry_id, config_id),
+                "foreign": plan.get("foreign", False),
+                "blocked": plan.get("blocked"),
+            }
     return view
 
 

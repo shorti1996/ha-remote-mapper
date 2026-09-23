@@ -98,8 +98,16 @@ def test_payload_shape() -> None:
     assert branches[1]["sequence"] == SEQ
     assert payload["mode"] == "parallel"
     assert find_branch(payload, "b") == 1
-    assert branch_view(payload, "b") == {"actions": SEQ, "branch_missing": False}
-    assert branch_view(payload, "zzz") == {"actions": [], "branch_missing": True}
+    assert branch_view(payload, "b") == {
+        "actions": SEQ,
+        "branch_missing": False,
+        "alias": None,
+    }
+    assert branch_view(payload, "zzz") == {
+        "actions": [],
+        "branch_missing": True,
+        "alias": None,
+    }
 
 
 def test_branch_resolves_after_id_rename() -> None:
@@ -118,7 +126,7 @@ def test_branch_resolves_after_id_rename() -> None:
     )
     payload["triggers"][0]["id"] = "tap"
     payload["actions"][0]["choose"][0]["conditions"][0]["id"] = "tap"
-    assert branch_view(payload, "1_single") == {"actions": SEQ, "branch_missing": False}
+    assert branch_view(payload, "1_single")["actions"] == SEQ
 
 
 def test_non_shape_a_is_left_alone() -> None:

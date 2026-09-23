@@ -129,6 +129,43 @@ class RemoteMapperStore:
         if remote and remote["slots"].pop(action_id, None) is not None:
             self.async_schedule_save()
 
+    # ── originals switched off by import/absorb ──────────────────────
+
+    def disabled_originals(self, entry_id: str) -> list[dict[str, Any]]:
+        """Automations this remote turned off and has not turned back on.
+
+        Kept on the remote, not the slot: clearing an absorbed slot must
+        not make hand-back or a later link forget the original is off.
+        """
+        remote = self.get_remote(entry_id)
+        return list(remote.get("disabled_originals", [])) if remote else []
+
+    def async_remember_disabled(
+        self, entry_id: str, sources: list[dict[str, Any]]
+    ) -> None:
+        """Record originals just turned off ({entity_id, config_id})."""
+        known = self.data["remotes"][entry_id].setdefault("disabled_originals", [])
+        seen = {item["entity_id"] for item in known}
+        for source in sources:
+            if (entity_id := source.get("entity_id")) and entity_id not in seen:
+                known.append(
+                    {"entity_id": entity_id, "config_id": source.get("config_id")}
+                )
+                seen.add(entity_id)
+        self.async_schedule_save()
+
+    def async_forget_disabled(self, entry_id: str, entity_ids: list[str]) -> None:
+        """Drop originals that are back on."""
+        remote = self.get_remote(entry_id)
+        if not remote or not remote.get("disabled_originals"):
+            return
+        remote["disabled_originals"] = [
+            item
+            for item in remote["disabled_originals"]
+            if item["entity_id"] not in entity_ids
+        ]
+        self.async_schedule_save()
+
     # ── owned scenes (ownership registry, design §7) ─────────────────
 
     def get_owned_scene(self, scene_id: str) -> dict[str, Any] | None:

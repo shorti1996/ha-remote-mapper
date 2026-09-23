@@ -64,7 +64,8 @@
       "no_event_entities": "That device has no event.* entities. Pick a device whose buttons appear as event entities, or use another source type."
     },
     "abort": {
-      "already_configured": "This remote is already configured."
+      "already_configured": "This remote is already configured.",
+      "already_in_progress": "This remote is already being set up in another dialog. Finish or close that one first."
     }
   },
   "options": {
