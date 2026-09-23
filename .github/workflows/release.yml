@@ -50,14 +50,29 @@ jobs:
 
       # HACS shows the release body in HA's update dialog, and generated
       # notes list only PRs, so the body comes from this version's
-      # CHANGELOG.md section (heading "## x.y.z — date").
+      # CHANGELOG.md section (heading "## x.y.z — date"). The second awk
+      # joins hard-wrapped lines: the release page renders each as <br>.
       - name: Release notes from CHANGELOG
         run: |
           TAG="${GITHUB_REF_NAME#v}"
           awk -v v="$TAG" '
             /^## / { if (found) exit; if ($0 == "## " v || index($0, "## " v " ") == 1) { found = 1; next } }
             found
-          ' CHANGELOG.md > release-notes.md
+          ' CHANGELOG.md | awk '
+            function flush() { if (have) print buf; have = 0; open = 0 }
+            /^[ \t]*(```|~~~)/ { flush(); print; fence = !fence; next }
+            fence { print; next }
+            /^[ \t]*$/ { flush(); print; next }
+            {
+              starts = $0 ~ /^[ \t]*([-*+][ \t]|[0-9]+[.)][ \t]|#+([ \t]|$)|>|\||<)/ ||
+                       $0 ~ /^[ \t]*(---+|===+|\*\*\*+|___+)[ \t]*$/
+              if (open && !starts) { line = $0; sub(/^[ \t]+/, "", line); buf = buf " " line }
+              else { flush(); buf = $0; have = 1 }
+              open = buf !~ /^[ \t]*(#+([ \t]|$)|>|\||<|---+[ \t]*$|===+[ \t]*$|\*\*\*+[ \t]*$|___+[ \t]*$)/ &&
+                     buf !~ /(  |\\)$/
+            }
+            END { flush() }
+          ' > release-notes.md
           grep -q '[^[:space:]]' release-notes.md || echo "::warning::No '## $TAG' section in CHANGELOG.md"
           cat release-notes.md
 
