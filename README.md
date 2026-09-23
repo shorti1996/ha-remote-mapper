@@ -3,6 +3,8 @@
 **Turn any Zigbee / Matter / MQTT remote into a card that looks like the
 remote — and assign what each button does right there, on the dashboard.**
 
+[Features](#what-you-get) · [Supported remotes](#supported-remotes) · [Install](#install) · [Guides](#guides) · [Card options](#card-options) · [Leaving](#leaving)
+
 🎬 **Prefer watching to reading?** The [guides](docs/guides/README.md) show
 every step as a short screen recording: adding a remote, assigning buttons,
 capturing scenes, importing your existing automations.
