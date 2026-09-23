@@ -80,6 +80,8 @@ export class RemoteMapperGrid extends LitElement {
   @property() public assistedTrigger: AssistedTrigger = "auto";
   /** all: arrangement of a button's event chips. */
   @property() public chipsLayout: ChipsLayout = "vertical";
+  /** all: leave out chips with nothing assigned, except while editing. */
+  @property({ type: Boolean }) public hideUnset = false;
 
   @state() private _popover?: string;
   @state() private _hoverOpt?: string;
@@ -463,9 +465,13 @@ export class RemoteMapperGrid extends LitElement {
   }
 
   private _renderChips(button: ButtonModel): TemplateResult {
+    const actions =
+      this.hideUnset && !this.editing
+        ? button.actions.filter((a) => this.slots[a.action_id]?.assigned)
+        : button.actions;
     return html`
       <div class="chips ${this.chipsLayout}">
-        ${button.actions.map((a) => {
+        ${actions.map((a) => {
           const slot = this.slots[a.action_id];
           const classes = [
             "chip",

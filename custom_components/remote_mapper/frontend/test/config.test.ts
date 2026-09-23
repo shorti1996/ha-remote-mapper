@@ -10,6 +10,7 @@ import {
   chipsLayoutOf,
   displayOf,
   hexToRgb,
+  hideUnsetOf,
   layoutOf,
   rgbToHex,
   styleVarsOf,
@@ -27,6 +28,13 @@ describe("config parsing", () => {
     expect(assistedTriggerOf({ type: "x", assisted_trigger: "press" })).toBe("press");
     expect(chipsLayoutOf({ type: "x", chips_layout: "spines" })).toBe("spines");
     expect(chipsLayoutOf({ type: "x", chips_layout: "diagonal" as never })).toBe("vertical");
+  });
+
+  it("hide_unset only applies to the all-visible display", () => {
+    expect(hideUnsetOf({ type: "x", display: "all", hide_unset: true })).toBe(true);
+    expect(hideUnsetOf({ type: "x", display: "all" })).toBe(false);
+    expect(hideUnsetOf({ type: "x", display: "replica", hide_unset: true })).toBe(false);
+    expect(hideUnsetOf({ type: "x", hide_unset: true })).toBe(false);
   });
 
   it("emits only the CSS vars that are set; opacity 1 is omitted", () => {
@@ -68,6 +76,7 @@ describe("editor round-trip", () => {
       display: "assisted",
       assisted_trigger: "auto",
       chips_layout: "vertical",
+      hide_unset: false,
       button_color_set: false,
       button_opacity: 1,
     });
@@ -94,6 +103,7 @@ describe("editor round-trip", () => {
       display: "replica",
       assisted_trigger: "press",
       chips_layout: "spines",
+      hide_unset: true,
       button_opacity: 0.4,
     });
     expect(on).toEqual({
@@ -104,9 +114,10 @@ describe("editor round-trip", () => {
       display: "replica",
       assisted_trigger: "press",
       chips_layout: "spines",
+      hide_unset: true,
       button_opacity: 0.4,
     });
-    const off = applyEditorValue(on, { ...editorValue(on), entry_id: AUTO_REMOTE, show_title: true, layout: "grid", display: "assisted", assisted_trigger: "auto", chips_layout: "vertical", button_opacity: 1 });
+    const off = applyEditorValue(on, { ...editorValue(on), entry_id: AUTO_REMOTE, show_title: true, layout: "grid", display: "assisted", assisted_trigger: "auto", chips_layout: "vertical", hide_unset: false, button_opacity: 1 });
     expect(off).toEqual(base);
   });
 

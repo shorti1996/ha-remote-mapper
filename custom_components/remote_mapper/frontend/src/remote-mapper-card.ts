@@ -54,6 +54,7 @@ import { tipAnchor, type TipAnchor } from "./gestures";
 import {
   assistedTriggerOf,
   chipsLayoutOf,
+  hideUnsetOf,
   displayOf,
   layoutOf,
   styleVarsOf,
@@ -1495,6 +1496,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
             .display=${displayOf(this._config)}
             .assistedTrigger=${assistedTriggerOf(this._config)}
             .chipsLayout=${chipsLayoutOf(this._config)}
+            .hideUnset=${hideUnsetOf(this._config)}
             .editing=${editing}
             .flash=${this._flash}
             @run-action=${(e: CustomEvent<{ actionId: string }>) =>

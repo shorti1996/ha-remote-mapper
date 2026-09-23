@@ -199,6 +199,7 @@ layout: grid              # grid (default) | canvas (free-drag tiles)
 display: assisted         # assisted (default) | replica | all
 assisted_trigger: auto    # assisted: auto (touch→press, mouse→tap) | tap | press
 chips_layout: vertical    # all: vertical | horizontal (wrapped) | compact | spines | grid
+hide_unset: false         # all: true leaves out events that are not set (edit mode shows them)
 button_color: "#3f51b5"   # any CSS color; unset = theme
 accent_color: ""          # borders, assigned marks, flashes; unset = primary
 text_color: ""

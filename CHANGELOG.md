@@ -5,6 +5,14 @@ move under a version heading when `make release VERSION=x.y.z` runs.
 
 ## Unreleased
 
+### Added
+
+- **Hide events that are not set.** A switch in the card editor for the
+  *All visible* display (`hide_unset: true` in YAML) leaves out the chips
+  of events with nothing assigned: a 4-button remote with five events set
+  shows five chips instead of twelve. The pencil's edit mode still shows
+  every event.
+
 ### Fixed
 
 - **Remotes that name the press first get one pad per button.** Aqara

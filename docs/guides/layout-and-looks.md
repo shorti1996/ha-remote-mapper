@@ -54,7 +54,9 @@ For a remote whose buttons don't sit on a grid, such as a round dial:
    - *Replica*: tap, double-tap and hold like the physical remote.
    - *All visible*: every event of every button as a chip.
 3. With *All visible*, choose how the chips are laid out under *Event
-   chips* (vertical list, compact icons, rotated spines, …).
+   chips* (vertical list, compact icons, rotated spines, …). Turn on *Hide
+   events that are not set* to show only the events that do something; the
+   pencil's edit mode still shows every event, so you can assign one.
 4. *Save*, then *Done*.
 
 ## Colours

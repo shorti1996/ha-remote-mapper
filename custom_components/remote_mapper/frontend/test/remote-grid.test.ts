@@ -131,6 +131,17 @@ describe("dashboard", () => {
     expect(events).toEqual([{ type: "run-action", detail: { actionId: "1_single" } }]);
   });
 
+  it("all with hideUnset: unset chips are left out, edit mode shows them", async () => {
+    const chips = (id: string) =>
+      [...cell(id).querySelectorAll(".chip")].map((c) => c.getAttribute("data-action"));
+    await mount({ display: "all", editing: false, hideUnset: true });
+    expect(chips("1")).toEqual(["1_single"]);
+    expect(chips("2")).toEqual(["2_single", "2_double"]);
+    grid.editing = true;
+    await grid.updateComplete;
+    expect(chips("1")).toEqual(["1_single", "1_double"]);
+  });
+
   it("assisted with a mouse: a tap opens the fan instead of running anything", async () => {
     await mount({ display: "assisted", editing: false, assistedTrigger: "tap" });
     tap(cell("2"));

@@ -32,6 +32,7 @@ const LABELS: Record<string, string> = {
   display: "Display mode",
   assisted_trigger: "Popover opens on",
   chips_layout: "Event chips",
+  hide_unset: "Hide events that are not set",
   button_color: "Button color",
   accent_color: "Accent color",
   text_color: "Text color",
@@ -40,6 +41,7 @@ const LABELS: Record<string, string> = {
 
 const HELPERS: Record<string, string> = {
   title: "Empty = the remote's name.",
+  hide_unset: "Edit mode (pencil) still shows them, so you can assign one.",
   button_color: "Pad background. Turn the switch off to use the theme.",
   accent_color: "Borders, assigned marks, flashes. Off = theme primary color.",
   text_color: "Off = theme text color.",
@@ -116,6 +118,7 @@ export class RemoteMapperCardEditor extends LitElement {
     }
     if (display === "all") {
       schema.push({ name: "chips_layout", selector: dropdown(CHIPS_LAYOUTS) });
+      schema.push({ name: "hide_unset", selector: { boolean: {} } });
     }
     // Native color picker (HA color_rgb selector) behind an on/off switch so
     // "use the theme" stays expressible; YAML may still hold any CSS color.

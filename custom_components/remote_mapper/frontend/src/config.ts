@@ -20,6 +20,8 @@ export interface RemoteMapperCardConfig {
   assisted_trigger?: AssistedTrigger;
   /** all only: how a button's event chips are arranged. */
   chips_layout?: ChipsLayout;
+  /** all only: leave out chips with nothing assigned (edit mode shows them). */
+  hide_unset?: boolean;
   /** Appearance — "#rrggbb" from the picker, or any CSS color / theme var in YAML. */
   button_color?: string;
   accent_color?: string;
@@ -77,6 +79,11 @@ export function chipsLayoutOf(config: RemoteMapperCardConfig | undefined): Chips
   return CHIPS_LAYOUTS.some((c) => c.value === value) ? (value as ChipsLayout) : "vertical";
 }
 
+/** hide_unset applies to the all-visible display only. */
+export function hideUnsetOf(config: RemoteMapperCardConfig | undefined): boolean {
+  return displayOf(config) === "all" && config?.hide_unset === true;
+}
+
 /** "#rrggbb" → [r, g, b] for HA's color_rgb selector; anything else → undefined. */
 export function hexToRgb(value: unknown): [number, number, number] | undefined {
   if (typeof value !== "string") return undefined;
@@ -107,6 +114,7 @@ export function editorValue(config: RemoteMapperCardConfig): Record<string, unkn
     display: displayOf(config),
     assisted_trigger: assistedTriggerOf(config),
     chips_layout: chipsLayoutOf(config),
+    hide_unset: config.hide_unset === true,
     button_color_set: !!config.button_color,
     accent_color_set: !!config.accent_color,
     text_color_set: !!config.text_color,
@@ -140,6 +148,7 @@ export function applyEditorValue(
   set("display", value.display, value.display === "assisted");
   set("assisted_trigger", value.assisted_trigger, value.assisted_trigger === "auto");
   set("chips_layout", value.chips_layout, value.chips_layout === "vertical");
+  set("hide_unset", value.hide_unset, value.hide_unset !== true);
   for (const key of COLOR_KEYS) {
     if (!value[`${key}_set`]) {
       delete next[key];
