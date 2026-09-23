@@ -8,7 +8,7 @@ remote — and assign what each button does right there, on the dashboard.**
 [Features](#what-you-get) •
 [Supported remotes](#supported-remotes) •
 [Install](#install) •
-[Guides](#guides) •
+[Guides (GIFs!)](#guides) •
 [Card options](#card-options) •
 [Leaving](#leaving)
 
