@@ -3,6 +3,16 @@
 **Turn any Zigbee / Matter / MQTT remote into a card that looks like the
 remote — and assign what each button does right there, on the dashboard.**
 
+🎬 **Prefer watching to reading?** The [guides](docs/guides/README.md) show
+every step as a short screen recording: adding a remote, assigning buttons,
+capturing scenes, importing your existing automations.
+
+> [!TIP]
+> **Never installed a HACS integration that ships its own dashboard card?**
+> Watch [Getting started](docs/guides/getting-started.md) before you begin.
+> The integration and the card are added in two different places, and the
+> card is only listed under *By card*.
+
 No blueprints, no one-automation-per-button, no YAML hunting. Pick the
 button, pick the action, done. Everything else (automations, scenes, the
 device's quirks) is handled for you. Works with any remote Home Assistant
