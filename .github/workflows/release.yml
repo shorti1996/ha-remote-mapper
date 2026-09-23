@@ -48,7 +48,21 @@ jobs:
           scripts/package.sh remote_mapper.zip
           unzip -l remote_mapper.zip
 
+      # HACS shows the release body in HA's update dialog, and generated
+      # notes list only PRs, so the body comes from this version's
+      # CHANGELOG.md section (heading "## x.y.z — date").
+      - name: Release notes from CHANGELOG
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          awk -v v="$TAG" '
+            /^## / { if (found) exit; if ($0 == "## " v || index($0, "## " v " ") == 1) { found = 1; next } }
+            found
+          ' CHANGELOG.md > release-notes.md
+          grep -q '[^[:space:]]' release-notes.md || echo "::warning::No '## $TAG' section in CHANGELOG.md"
+          cat release-notes.md
+
       - uses: softprops/action-gh-release@v2
         with:
           files: remote_mapper.zip
+          body_path: release-notes.md
           generate_release_notes: true
