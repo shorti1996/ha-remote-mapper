@@ -32,6 +32,10 @@ one card, whatever the radio.
 
 ![Five remotes of different shapes](docs/img/hero-remotes.jpg)
 
+<p align="center">
+  <img src="docs/img/hero-icon-card.png" width="640" alt="A 6-button remote and its Remote Mapper card: each button lists its single, double and hold action">
+</p>
+
 ## Why
 
 Remotes are the best input device in a smart home and the worst to set up.
