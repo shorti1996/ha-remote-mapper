@@ -1879,9 +1879,11 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     const vw = this._hostWidth || 300;
     const cx = t.offsetX + (sel.x + sel.w / 2) * t.scale;
     const topPx = t.offsetY + sel.y * t.scale;
-    const flip = topPx < 46;
+    // chipbar: 48px icon buttons + 2 × 4px padding, 6px off the tile
+    const flip = topPx < 62;
     const top = flip ? t.offsetY + (sel.y + sel.h) * t.scale + 6 : topPx - 6;
-    const left = Math.min(Math.max(cx, 110), Math.max(110, vw - 110));
+    // half its width (3 × 48px + gaps and padding) clears the card edges
+    const left = Math.min(Math.max(cx, 84), Math.max(84, vw - 84));
     return html`
       <div
         class="chipbar"
@@ -1890,15 +1892,13 @@ export class RemoteMapperCard extends LitElement implements EditHost {
           : "-100%"})"
         @pointerdown=${(e: Event) => e.stopPropagation()}
       >
-        <button title="Slot settings" @click=${() => this.openSettings(sel.id)}>
-          ⚙
-        </button>
-        <button title="Send backward" @click=${() => this._edit.zOp("backward")}>
-          ↓
-        </button>
-        <button title="Bring forward" @click=${() => this._edit.zOp("forward")}>
-          ↑
-        </button>
+        ${this._iconButton("mdi:cog", "Slot settings", () => this.openSettings(sel.id))}
+        ${this._iconButton("mdi:arrange-send-backward", "Send backward", () =>
+          this._edit.zOp("backward")
+        )}
+        ${this._iconButton("mdi:arrange-bring-forward", "Bring forward", () =>
+          this._edit.zOp("forward")
+        )}
       </div>
     `;
   }
@@ -2475,31 +2475,39 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   }
 
   static override styles = css`
-    /* Header mirrors ha-card's .card-header: 24px title, 48px icon buttons */
+    /* Header mirrors ha-card's .card-header: 24px title, 48px icon buttons.
+       Edit mode shows six buttons; in a narrow card they wrap onto their
+       own row instead of squeezing the title down to one letter. */
     .header {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
-      justify-content: space-between;
-      gap: var(--ha-space-2, 8px);
+      column-gap: var(--ha-space-2, 8px);
       padding: var(--ha-space-1, 4px) var(--ha-space-1, 4px) 0 var(--ha-space-4, 16px);
       min-height: var(--ha-space-12, 48px);
     }
     .title {
+      /* grows into the free space; below 160px the buttons wrap instead */
+      flex: 1 1 0;
+      min-width: min(100%, calc(2 * var(--ha-space-20, 80px)));
       color: var(--ha-card-header-color, var(--primary-text-color));
       font-family: var(--ha-card-header-font-family, inherit);
       font-size: var(--ha-card-header-font-size, var(--ha-font-size-2xl, 24px));
       font-weight: var(--ha-card-header-font-weight, var(--ha-font-weight-normal, 400));
       letter-spacing: -0.012em;
       line-height: var(--ha-line-height-condensed, 1.2);
-      min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    .title:empty {
+      min-width: 0;
     }
     .header-buttons {
       display: flex;
       align-items: center;
       flex: none;
+      margin-left: auto;
     }
     ha-icon-button {
       color: var(--secondary-text-color);
@@ -2651,23 +2659,19 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       right: -6px;
       cursor: nwse-resize;
     }
+    /* over the viewport but not inside the scaled canvas: tokens */
     .chipbar {
       position: absolute;
       display: flex;
-      gap: 2px;
-      padding: 4px;
-      border-radius: 10px;
+      gap: var(--ha-space-1, 4px);
+      padding: var(--ha-space-1, 4px);
+      border-radius: var(--ha-border-radius-lg, 12px);
       background: var(--card-background-color, #222);
-      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+      box-shadow: var(--ha-box-shadow-m, 0 2px 12px rgba(0, 0, 0, 0.4));
       z-index: 20;
     }
-    .chipbar button {
-      border: none;
-      background: none;
+    .chipbar ha-icon-button {
       color: var(--primary-text-color);
-      cursor: pointer;
-      font-size: 1em;
-      padding: 4px 8px;
     }
     /* card UI below the canvas, not inside its scaled viewport: tokens */
     .dpad-dock {

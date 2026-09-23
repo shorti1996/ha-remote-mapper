@@ -70,6 +70,12 @@ move under a version heading when `make release VERSION=x.y.z` runs.
   targets sized with HA's tokens, and the position readout shows only while
   dragging. The layout option reads *Canvas — free placement, one tile per
   event* (was "(legacy)").
+- **The canvas tile toolbar uses HA icon buttons.** *Slot settings*, *Send
+  backward* and *Bring forward* are 48 px icon buttons with tooltips (were
+  ⚙ ↓ ↑ glyphs sized in `em`).
+- **The card title stays readable in edit mode.** In a narrow card the six
+  edit buttons squeezed the title down to one letter; they now wrap onto a
+  row of their own.
 - **Empty events read "not set"** (was "unassigned", cut to "unassign…" on
   narrow pads).
 
