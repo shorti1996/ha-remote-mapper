@@ -29,8 +29,36 @@ const gridDrafts = new Map<string, GridLayout>();
 
 /** Replaced by rollup with package.json's version; unbuilt source keeps the marker. */
 const CARD_VERSION = "__CARD_VERSION__";
+
+/** The reload dialog is offered once per page load, whichever card notices first. */
+let reloadPrompted = false;
+
+/** Numeric compare of dotted versions: <0 a older, >0 a newer, 0 equal. */
+function compareVersions(a: string, b: string): number {
+  const pa = a.split(".").map((n) => parseInt(n, 10) || 0);
+  const pb = b.split(".").map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d) return d;
+  }
+  return 0;
+}
+
+/**
+ * Full reload that also empties the service-worker Cache Storage, which
+ * is where HA keeps the module after a plain reload would still serve it.
+ */
+async function reloadWithClearedCache(): Promise<void> {
+  try {
+    const keys = await window.caches?.keys();
+    await Promise.all((keys ?? []).map((k) => window.caches.delete(k)));
+  } catch {
+    /* no Cache Storage (private window, http) — a reload is still right */
+  }
+  window.location.reload();
+}
 import { EditController, type EditHost } from "./canvas/edit-controller";
-import { ensureHaForm, ensureYamlEditor } from "./canvas/ha-loader";
+import { ensureHaForm, ensureYamlEditor, loadHelpers } from "./canvas/ha-loader";
 import { computeTransform, type CanvasTransform } from "./canvas/scaling";
 import type { CanvasLayout, WidgetConfig } from "./canvas/types";
 import { deepClone } from "./canvas/util";
@@ -1855,13 +1883,44 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     if (!backend || CARD_VERSION.startsWith("__") || backend === CARD_VERSION) {
       return nothing;
     }
+    if (compareVersions(CARD_VERSION, backend) > 0) {
+      // Files on disk are newer than the running backend: HA was not
+      // restarted after the update. A reload can't fix that.
+      return html`
+        <div class="stale">
+          This tab runs the v${CARD_VERSION} card but Home Assistant still runs
+          Remote Mapper v${backend}. Restart Home Assistant to finish the update.
+        </div>
+      `;
+    }
+    void this._offerReloadDialog(backend);
     return html`
       <div class="stale">
         Remote Mapper was updated to v${backend}; this tab still runs the
         v${CARD_VERSION} card.
-        <button @click=${() => window.location.reload()}>Reload</button>
+        <button @click=${() => void reloadWithClearedCache()}>Reload</button>
       </div>
     `;
+  }
+
+  /** HA's own confirm dialog (the one HACS shows), once per page load. */
+  private async _offerReloadDialog(backend: string): Promise<void> {
+    if (reloadPrompted) return;
+    reloadPrompted = true;
+    try {
+      const helpers = await loadHelpers();
+      const ok = await helpers?.showConfirmationDialog?.(this, {
+        title: "Reload",
+        text:
+          `Remote Mapper was updated to v${backend}, but this page still runs ` +
+          `the v${CARD_VERSION} card. Reload the page to use the new version?`,
+        confirmText: "Reload",
+        dismissText: "Later",
+      });
+      if (ok) await reloadWithClearedCache();
+    } catch {
+      /* helpers unavailable — the banner stays as the fallback */
+    }
   }
 
   /** What the name will be if left empty — inferred from the current draft. */
