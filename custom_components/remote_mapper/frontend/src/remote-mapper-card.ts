@@ -1353,8 +1353,6 @@ export class RemoteMapperCard extends LitElement implements EditHost {
             .flash=${this._flash}
             @run-action=${(e: CustomEvent<{ actionId: string }>) =>
               void this._runSlot(e.detail.actionId)}
-            @edit-action=${(e: CustomEvent<{ actionId: string }>) =>
-              void this._openEditor(e.detail.actionId)}
             @open-button=${(e: CustomEvent<{ buttonId: string }>) => {
               this._buttonSheet = e.detail.buttonId;
               this._modalOpenedAt = Date.now();

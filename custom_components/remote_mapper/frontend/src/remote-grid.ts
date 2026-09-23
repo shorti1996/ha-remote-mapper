@@ -6,8 +6,9 @@
  *
  * Events (all bubble + composed):
  *   run-action     {actionId}   dashboard gesture resolved to a slot
- *   edit-action    {actionId}   edit mode: open the slot editor
- *   open-button    {buttonId}   edit mode: open the button sheet
+ *   open-button    {buttonId}   edit mode: a tap anywhere on the button
+ *                               (chips included) opens the button sheet —
+ *                               the same path in every display mode
  *   layout-changed {layout}     edit mode: cells swapped
  */
 import { css, html, LitElement, nothing, type TemplateResult } from "lit";
@@ -46,7 +47,6 @@ interface DragState {
   y: number;
   moved: boolean;
   /** Pointer went down on an event chip (all mode) — tap = edit it. */
-  fromChip?: string;
 }
 
 const DRAG_THRESHOLD = 8;
@@ -226,7 +226,6 @@ export class RemoteMapperGrid extends LitElement {
     const el = e.currentTarget as HTMLElement;
     if (this.editing) {
       el.setPointerCapture(e.pointerId);
-      const chip = (e.target as HTMLElement).closest?.(".chip") as HTMLElement | null;
       this._drag = {
         id: button.id,
         row,
@@ -236,7 +235,6 @@ export class RemoteMapperGrid extends LitElement {
         x: e.clientX,
         y: e.clientY,
         moved: false,
-        fromChip: chip?.dataset.action,
       };
       return;
     }
@@ -305,8 +303,6 @@ export class RemoteMapperGrid extends LitElement {
           const next = swapCells(this.layout, drag, { row, col });
           if (next !== this.layout) this._emit("layout-changed", { layout: next });
         }
-      } else if (drag.fromChip) {
-        this._emit("edit-action", { actionId: drag.fromChip });
       } else {
         this._emit("open-button", { buttonId: drag.id });
       }
