@@ -229,12 +229,12 @@ snapshot scenes, and removes the remote. Deleting the integration from
 
 - **Tapping a pad on the dashboard runs the action** — I do this very
   often, mind-palace style. The remote's card is on the dashboard related
-  to the area where the physical remote is. It's also handy for testing
-  from the couch. The card is a virtual remote: a button backed by an
-  automation runs that automation too (its own, a linked one, or its
-  branch of the remote's automation). It is not the physical button
-  event, so the automation's conditions are skipped and other automations
-  listening for the press stay quiet.
+  to the area where the physical remote is.
+  - It's also handy for testing from the couch. The card is a virtual
+    remote: a button backed by an automation runs that automation too (its
+    own, a linked one, or its branch of the remote's automation).
+  - It is not the physical button event, so the automation's conditions
+    are skipped and other automations listening for the press stay quiet.
 - Scenes and automations the integration created are the only ones it will
   ever offer to delete, and it asks first (remembered choice: ask / always /
   never).
