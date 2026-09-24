@@ -68,8 +68,8 @@ device, where every button shows what it does and lets you change it.
 
   > Odd-shaped remote?
   Switch the card to the **canvas** layout: free-drag, resizable tiles on
-  a design surface, with nudge arrows and z-order — perfect for a round
-  (joypad-style) dial or a remote with an off-grid button.
+  a design surface, with (joypad-style) nudge arrows and z-order — perfect
+  for a round dial or a remote with an off-grid button.
 
 - **Three ways to use it** (per card, in the card editor):
 
@@ -227,9 +227,10 @@ snapshot scenes, and removes the remote. Deleting the integration from
 
 ## Good to know
 
-- **Tapping a pad on the dashboard runs the action** — use the card as a
-  remote in its own right (I do this very often, mind-palace style). It's
-  also handy for testing from the couch. It is not the physical button event; automations you
+- **Tapping a pad on the dashboard runs the action** — I do this very
+  often, mind-palace style. The remote's card is on the dashboard related
+  to the area where the physical remote is. It's also handy for testing
+  from the couch. It is not the physical button event; automations you
   materialized don't fire from it.
 - Scenes and automations the integration created are the only ones it will
   ever offer to delete, and it asks first (remembered choice: ask / always /
