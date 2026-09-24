@@ -68,7 +68,7 @@ device, where every button shows what it does and lets you change it.
 
   > Odd-shaped remote?
   Switch the card to the **canvas** layout: free-drag, resizable tiles on
-  a design surface, with (joypad-style) nudge arrows and z-order — perfect
+  a design surface, with nudge arrows (joypad-style) and z-order — perfect
   for a round dial or a remote with an off-grid button.
 
 - **Three ways to use it** (per card, in the card editor):
