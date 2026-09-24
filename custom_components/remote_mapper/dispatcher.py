@@ -84,19 +84,80 @@ class SlotDispatcher:
         )
 
     async def async_dispatch(self, action_id: str) -> None:
-        """Run the slot's sequence, honoring the skip matrix."""
+        """Physical press: run the slot's sequence, honoring the skip matrix."""
         slot = self.store.get_slot(self.entry_id, action_id)
         if slot is None:
             # Empty slot — no-op by design
             return
         if slot.get("archived") or slot.get("materialized"):
-            # Archived = soft-disabled; materialized = the generated
-            # automation handles the parallel trigger.
+            # Archived = soft-disabled; materialized = the automation has
+            # its own trigger for this press and is already running.
             return
-        sequence = slot.get("sequence") or []
-        if not sequence:
+        await self._async_run_sequence(action_id, slot.get("sequence") or [])
+
+    async def async_run_from_card(self, action_id: str) -> None:
+        """Dashboard tap: run whatever the slot is bound to.
+
+        No physical event happened, so nothing else runs this press and the
+        skip matrix does not apply. A slot's own sequence runs as usual; an
+        automation-backed slot runs its automation:
+
+        - a branch of a Shape A automation (the remote's shared one, or an
+          imported one) runs the branch's actions ad hoc — HA's
+          ``automation.trigger`` resets the ``trigger`` variable, so the
+          ``choose`` could never pick the branch;
+        - any other automation is triggered with ``skip_condition`` — its
+          conditions may read ``trigger.*``, which a tap does not carry.
+        """
+        from .materializer import _get_config_store, automation_entity_id
+        from .remote_automation import branch_view
+
+        slot = self.store.get_slot(self.entry_id, action_id)
+        if slot is None or slot.get("archived"):
+            return
+        if not slot.get("materialized"):
+            await self._async_run_sequence(action_id, slot.get("sequence") or [])
             return
 
+        config_id = slot.get("automation_id")
+        raw = (
+            await _get_config_store(self.hass).async_get(config_id)
+            if config_id
+            else None
+        )
+        if raw is None:
+            self._record_failure(action_id, "The automation no longer exists")
+            return
+        if (branch := branch_view(raw, action_id)) is not None:
+            if branch["branch_missing"]:
+                self._record_failure(
+                    action_id, "The automation has no branch for this event"
+                )
+                return
+            await self._async_run_sequence(action_id, branch["actions"])
+            return
+
+        entity_id = automation_entity_id(self.hass, config_id)
+        if entity_id is None:
+            self._record_failure(action_id, "The automation has no entity")
+            return
+        try:
+            await self.hass.services.async_call(
+                "automation",
+                "trigger",
+                {"entity_id": entity_id, "skip_condition": True},
+                blocking=True,
+                context=Context(),
+            )
+        except Exception as err:
+            self._record_failure(action_id, str(err), err)
+            return
+        self.store.async_record_run(self.entry_id, action_id, None)
+
+    async def _async_run_sequence(self, action_id: str, sequence: list[Any]) -> None:
+        """Run actions as an ad-hoc Script; failures land in last_error."""
+        if not sequence:
+            return
         try:
             validated = cv.SCRIPT_SCHEMA(sequence)
             validated = await async_validate_actions_config(self.hass, validated)
@@ -109,9 +170,14 @@ class SlotDispatcher:
             # Real Context so logbook attribution works
             await script.async_run(context=Context())
         except Exception as err:
-            _LOGGER.warning(
-                "Slot %s/%s failed: %s", self.name, action_id, err, exc_info=True
-            )
-            self.store.async_record_run(self.entry_id, action_id, str(err))
+            self._record_failure(action_id, str(err), err)
             return
         self.store.async_record_run(self.entry_id, action_id, None)
+
+    def _record_failure(
+        self, action_id: str, message: str, err: Exception | None = None
+    ) -> None:
+        _LOGGER.warning(
+            "Slot %s/%s failed: %s", self.name, action_id, message, exc_info=err
+        )
+        self.store.async_record_run(self.entry_id, action_id, message)

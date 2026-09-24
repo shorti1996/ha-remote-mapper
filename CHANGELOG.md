@@ -3,6 +3,17 @@
 Notable changes per release. Unreleased entries collect on `master` and
 move under a version heading when `make release VERSION=x.y.z` runs.
 
+## Unreleased
+
+### Changed
+
+- **Tapping an automation-backed button on the card runs its automation.**
+  The card is a virtual remote: a button with its own automation or a
+  linked one triggers it (conditions skipped, since a tap carries no
+  `trigger` data); a branch of the remote's automation runs the branch's
+  actions. Before, these taps flashed the pad and ran nothing. Physical
+  presses are unchanged: the automation's own trigger handles them.
+
 ## 0.1.6 — 2026-09-24
 
 ### Added

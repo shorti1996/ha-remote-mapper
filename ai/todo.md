@@ -8,4 +8,5 @@ creating a new automation instead of keeping the linked one~~ (fixed 2026-09-23)
 6. Scenes as first-class citizens: same handling as for automations
 (import, hand back to HA)
 7. A way to wipe remembered default choices (e.g. delete ask / always / never)
-and show the onboarding tips again
+and show the onboarding tips again 
+8. Possibility to change the default action labels (1, 2, hourglass) to mdi:icons

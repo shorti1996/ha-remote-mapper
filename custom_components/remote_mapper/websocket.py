@@ -921,16 +921,17 @@ async def ws_release_remote(
 async def ws_run_slot(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
 ) -> None:
-    """Fire the bound sequence from the card (test from the couch).
+    """Run the slot from the card: the card is a virtual remote.
 
-    On-screen tap ≠ physical event — this runs the slot regardless of the
-    dispatcher's subscription, but honors the same skip matrix.
+    On-screen tap ≠ physical event — nothing else reacts to it, so an
+    automation-backed slot runs its automation here instead of being
+    skipped (see SlotDispatcher.async_run_from_card).
     """
     dispatcher = _dispatcher(hass, msg["entry_id"])
     if dispatcher is None:
         connection.send_error(msg["id"], ERR_NOT_FOUND, "Remote not loaded")
         return
-    await dispatcher.async_dispatch(msg["action_id"])
+    await dispatcher.async_run_from_card(msg["action_id"])
     slot = _store(hass).get_slot(msg["entry_id"], msg["action_id"])
     connection.send_result(
         msg["id"], {"last_error": slot.get("last_error") if slot else None}
