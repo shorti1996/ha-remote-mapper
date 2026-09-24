@@ -68,8 +68,8 @@ device, where every button shows what it does and lets you change it.
 
   > Odd-shaped remote?
   Switch the card to the **canvas** layout: free-drag, resizable tiles on
-  a design surface, with nudge arrows and z-order, for a round dial or a
-  remote with an off-grid button.
+  a design surface, with nudge arrows and z-order — perfect for a round
+  (joypad-style) dial or a remote with an off-grid button.
 
 - **Three ways to use it** (per card, in the card editor):
 
@@ -80,11 +80,12 @@ device, where every button shows what it does and lets you change it.
   | **All visible** | every event of every button as a chip | tap a chip |
 
   <!-- screenshots: the three modes side by side -->
-  ![Replica / all visible / assisted](docs/img/modes.png)
+  ![Assisted / replica / all visible](docs/img/modes.png)
 
-- **Keep what you already have.** Existing automations for the remote are
-  **linked**: they stay native and enabled, the card shows them by name
-  with their on/off state, and one tap opens them in HA's automation
+- **Keep what you already have.** Your existing automations for the remote
+  are detected and **linked**: import them to show them natively on the
+  card and manage the remote's actions from one place. They stay native,
+  the card shows them by name with their on/off state, and one tap opens them in HA's automation
   editor (scenes and scripts they use get their own edit buttons). Prefer
   the card as the single place? Choose **absorb** instead: the actions
   move into the card and the original is disabled, never deleted.
@@ -108,7 +109,8 @@ device, where every button shows what it does and lets you change it.
   state becomes a scene bound to that button. *Re-snapshot* later updates
   it in place. Prefer HA's editor? *Automation for this button* or
   *Automation for the whole remote* creates the shell with the right
-  triggers and opens it there.
+  triggers already in place, and you fill in the actions — skip the
+  boring part where you start with an empty page.
 
 - **Real automations when you want them.** Tick *Create as automation* on
   any button: it becomes a native HA automation (traces, the HA editor,
@@ -171,6 +173,8 @@ The card ships with the integration; no separate frontend install. (YAML
 dashboards: add the resource
 `/hacsfiles/remote_mapper/remote-mapper-card.js` as a module.)
 
+Then head to [Getting started](docs/guides/getting-started.md).
+
 ## Guides
 
 Step-by-step, each with a short screen recording:
@@ -223,8 +227,9 @@ snapshot scenes, and removes the remote. Deleting the integration from
 
 ## Good to know
 
-- **Tapping a pad on the dashboard runs the action** — handy for testing
-  from the couch. It is not the physical button event; automations you
+- **Tapping a pad on the dashboard runs the action** — use the card as a
+  remote in its own right (I do this very often, mind-palace style). It's
+  also handy for testing from the couch. It is not the physical button event; automations you
   materialized don't fire from it.
 - Scenes and automations the integration created are the only ones it will
   ever offer to delete, and it asks first (remembered choice: ask / always /
