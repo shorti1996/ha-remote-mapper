@@ -17,6 +17,11 @@ permissions:
 
 jobs:
   cla:
+    # The repo owner's own PRs (including commits written for them by tools)
+    # need no CLA.
+    if: >-
+      (github.event.pull_request.user.login || github.event.issue.user.login)
+      != github.repository_owner
     runs-on: ubuntu-latest
     steps:
       - uses: contributor-assistant/github-action@v2.6.1
