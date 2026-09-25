@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 /** Dashboard-side card config (per card instance, lives in Lovelace). */
-import type { DisplayMode, LayoutKind } from "./model";
+import { KIND_ICON, KINDS, type DisplayMode, type Kind, type LayoutKind } from "./model";
 
 export type AssistedTrigger = "auto" | "tap" | "press";
 export type ChipsLayout = "vertical" | "horizontal" | "compact" | "spines" | "grid";
@@ -28,7 +28,22 @@ export interface RemoteMapperCardConfig {
   text_color?: string;
   /** Pad background opacity 0.1–1 (text and accent stay solid). */
   button_opacity?: number;
+  /** Event marks per kind: "mdi:…" for an icon, any other text as is; unset = 1 / 2 / 3 / ⧗ / ↥ / •. */
+  event_icons?: Partial<Record<Kind, string>>;
   [key: string]: unknown;
+}
+
+/** The mark for every kind: the card's override, else the default text. */
+export function eventIconsOf(config: RemoteMapperCardConfig | undefined): Record<Kind, string> {
+  const out = { ...KIND_ICON };
+  const icons = config?.event_icons;
+  if (icons && typeof icons === "object") {
+    for (const kind of KINDS) {
+      const value = icons[kind];
+      if (typeof value === "string" && value.trim()) out[kind] = value.trim();
+    }
+  }
+  return out;
 }
 
 export const DISPLAY_MODES: Array<{ value: DisplayMode; label: string }> = [
@@ -122,6 +137,9 @@ export function editorValue(config: RemoteMapperCardConfig): Record<string, unkn
     accent_color: hexToRgb(config.accent_color) ?? [63, 81, 181],
     text_color: hexToRgb(config.text_color) ?? [255, 255, 255],
     button_opacity: config.button_opacity ?? 1,
+    event_icons: Object.fromEntries(
+      KINDS.map((kind) => [kind, config.event_icons?.[kind] ?? ""])
+    ),
   };
 }
 
@@ -166,6 +184,16 @@ export function applyEditorValue(
   }
   const opacity = value.button_opacity;
   set("button_opacity", opacity, typeof opacity !== "number" || opacity >= 1);
+  // Marks: only the kinds that were set, trimmed; none set = no key at all
+  const rawIcons = value.event_icons;
+  const icons: Partial<Record<Kind, string>> = {};
+  if (rawIcons && typeof rawIcons === "object") {
+    for (const kind of KINDS) {
+      const v = (rawIcons as Record<string, unknown>)[kind];
+      if (typeof v === "string" && v.trim()) icons[kind] = v.trim();
+    }
+  }
+  set("event_icons", icons, Object.keys(icons).length === 0);
   return next;
 }
 

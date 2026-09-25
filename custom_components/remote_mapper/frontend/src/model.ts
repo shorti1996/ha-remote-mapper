@@ -44,6 +44,10 @@ export const GRID_SCHEMA_VERSION = 1;
 /** Mirrors GRID_MAX in websocket.py. */
 export const GRID_MAX = 12;
 
+/** Every kind, in the order the marks and the editor list them. */
+export const KINDS: readonly Kind[] = ["single", "double", "triple", "hold", "release", "other"];
+
+/** Default text marks; a card may replace any with an mdi: icon (event_icons). */
 export const KIND_ICON: Record<Kind, string> = {
   single: "1",
   double: "2",

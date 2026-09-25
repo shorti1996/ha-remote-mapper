@@ -9,12 +9,14 @@ import {
   assistedTriggerOf,
   chipsLayoutOf,
   displayOf,
+  eventIconsOf,
   hexToRgb,
   hideUnsetOf,
   layoutOf,
   rgbToHex,
   styleVarsOf,
 } from "../src/config";
+import { KIND_ICON } from "../src/model";
 
 describe("config parsing", () => {
   it("falls back to defaults for unknown values", () => {
@@ -136,5 +138,36 @@ describe("editor round-trip", () => {
     expect(applyEditorValue(yaml, { ...editorValue(yaml), button_color_set: true }).button_color).toBe("var(--x)");
     const cleared = applyEditorValue(picked, { ...editorValue(picked), accent_color_set: false });
     expect(cleared.accent_color).toBeUndefined();
+  });
+});
+
+describe("event_icons", () => {
+  it("falls back to the text marks kind by kind", () => {
+    expect(eventIconsOf({ type: "x" })).toEqual(KIND_ICON);
+    expect(eventIconsOf({ type: "x", event_icons: { hold: " mdi:timer ", double: "" } })).toEqual({
+      ...KIND_ICON,
+      hold: "mdi:timer",
+    });
+    expect(eventIconsOf({ type: "x", event_icons: "junk" as never })).toEqual(KIND_ICON);
+  });
+
+  it("editor round-trip keeps only the kinds that were set", () => {
+    const cfg = { type: "x", event_icons: { hold: "mdi:timer" } };
+    const value = editorValue(cfg);
+    expect(value.event_icons).toEqual({
+      single: "",
+      double: "",
+      triple: "",
+      hold: "mdi:timer",
+      release: "",
+      other: "",
+    });
+    const cleared = applyEditorValue(cfg, { ...value, event_icons: { ...(value.event_icons as object), hold: "" } });
+    expect("event_icons" in cleared).toBe(false);
+    const more = applyEditorValue(cfg, {
+      ...value,
+      event_icons: { ...(value.event_icons as object), single: "mdi:gesture-tap " },
+    });
+    expect(more.event_icons).toEqual({ single: "mdi:gesture-tap", hold: "mdi:timer" });
   });
 });
