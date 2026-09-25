@@ -9,6 +9,7 @@ import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import { ensureHaForm } from "./canvas/ha-loader";
+import { KIND_ICON, KIND_TITLE, KINDS } from "./model";
 import { resetTips, tipsSeen } from "./onboarding";
 import {
   applyEditorValue,
@@ -245,6 +246,13 @@ export class RemoteMapperCardEditor extends LitElement {
       name: "button_opacity",
       selector: { number: { min: 0.1, max: 1, step: 0.05, mode: "slider" } },
     });
+    // Event marks: an mdi icon per kind, empty = the text default
+    schema.push({
+      name: "event_icons",
+      type: "expandable",
+      title: "Event marks",
+      schema: KINDS.map((kind) => ({ name: kind, selector: { icon: {} } })),
+    });
     const data = editorValue(config);
     return html`
       <ha-form
@@ -254,7 +262,9 @@ export class RemoteMapperCardEditor extends LitElement {
         .computeLabel=${(s: { name: string }) =>
           s.name.endsWith("_set")
             ? `Custom ${LABELS[s.name.slice(0, -4)].toLowerCase()}`
-            : (LABELS[s.name] ?? s.name)}
+            : s.name in KIND_TITLE
+              ? `${KIND_TITLE[s.name as keyof typeof KIND_TITLE]} (default: ${KIND_ICON[s.name as keyof typeof KIND_ICON]})`
+              : (LABELS[s.name] ?? s.name)}
         .computeHelper=${(s: { name: string }) =>
           s.name === "display" && layoutOf(config) === "canvas"
             ? "Ignored for the canvas layout (every tile is already visible)."

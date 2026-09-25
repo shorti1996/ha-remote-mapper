@@ -9,4 +9,4 @@ creating a new automation instead of keeping the linked one~~ (fixed 2026-09-23)
 (import, hand back to HA)~~ (skipped 2026-09-25: scenes already get the same footprint — created from the card, edited in HA via the chip, re-snapshot, kept on hand-back, same delete policy)
 7. ~~A way to wipe remembered default choices (e.g. delete ask / always / never)
 and show the onboarding tips again~~ (done 2026-09-25: "Start over" section in the card editor)
-8. Possibility to change the default action labels (1, 2, hourglass) to mdi:icons
+8. ~~Possibility to change the default action labels (1, 2, hourglass) to mdi:icons~~ (done 2026-09-25: "Event marks" in the card editor, event_icons in YAML)

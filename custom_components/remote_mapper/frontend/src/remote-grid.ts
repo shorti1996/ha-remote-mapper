@@ -32,6 +32,7 @@ import {
   type GridLayout,
   type Kind,
 } from "./model";
+import { renderMark } from "./mark";
 import { dropTargetFor } from "./move";
 
 export interface SlotView {
@@ -100,6 +101,8 @@ export class RemoteMapperGrid extends LitElement {
   @property() public chipsLayout: ChipsLayout = "vertical";
   /** all: leave out chips with nothing assigned, except while editing. */
   @property({ type: Boolean }) public hideUnset = false;
+  /** Mark per kind: "mdi:…" or text (config.ts eventIconsOf). */
+  @property({ attribute: false }) public kindIcons: Record<Kind, string> = KIND_ICON;
 
   @state() private _popover?: string;
   @state() private _hoverOpt?: string;
@@ -496,7 +499,7 @@ export class RemoteMapperGrid extends LitElement {
             class="ghost action-ghost"
             style="left:${this._actionDrag.x}px;top:${this._actionDrag.y}px"
           >
-            <span class="icon">${KIND_ICON[this._actionDrag.action.kind]}</span>
+            <span class="icon">${renderMark(this.kindIcons[this._actionDrag.action.kind])}</span>
             ${this._actionDrag.summary}
           </div>`
         : nothing}
@@ -589,7 +592,7 @@ export class RemoteMapperGrid extends LitElement {
             @pointermove=${h.pointermove}
             @pointerup=${h.pointerup}
             @pointercancel=${h.pointercancel}
-            >${KIND_ICON[a.kind]}</span
+            >${renderMark(this.kindIcons[a.kind])}</span
           >`;
         })}
       </span>
@@ -641,7 +644,7 @@ export class RemoteMapperGrid extends LitElement {
                 this._run(a.action_id);
               }}
             >
-              <span class="icon">${KIND_ICON[a.kind]}</span>
+              <span class="icon">${renderMark(this.kindIcons[a.kind])}</span>
               <span class="text">${slot?.summary ?? "not set"}</span>
               ${slot?.error ? html`<span class="err" title=${slot.error}>!</span>` : nothing}
               ${slot?.stale ? html`<span class="stale" title="Source no longer reports this action">stale</span>` : nothing}
@@ -679,7 +682,7 @@ export class RemoteMapperGrid extends LitElement {
               data-action=${a.action_id}
             >
               <span class="circle" title="${a.event} (${KIND_TITLE[a.kind]})"
-                >${KIND_ICON[a.kind]}</span
+                >${renderMark(this.kindIcons[a.kind])}</span
               >
             </div>
           `;
@@ -805,6 +808,15 @@ export class RemoteMapperGrid extends LitElement {
       opacity: 1;
       border-color: var(--rm-ac);
       color: var(--rm-ac);
+    }
+    /* mdi marks: sized like the text they replace, in every place a mark shows */
+    .mark-icon {
+      --mdc-icon-size: var(--ha-space-4, 16px);
+      display: inline-flex;
+    }
+    .grid.editing .kind .mark-icon,
+    .circle .mark-icon {
+      --mdc-icon-size: var(--ha-space-5, 20px);
     }
     /* Edit mode: marks and chips are drag handles — touch-sized, and the
        browser must not scroll while a finger drags one */

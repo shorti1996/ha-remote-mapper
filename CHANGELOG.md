@@ -22,6 +22,11 @@ move under a version heading when `make release VERSION=x.y.z` runs.
   card created?", *Forget* drops the remote's default entities for *Scene
   from current state*, and *Show again* brings the first-run tips back in
   this browser (on every open card at once).
+- **Icons for the event marks.** *Event marks* in the card editor takes an
+  mdi icon per press kind (single, double, triple, hold, release, other);
+  empty keeps the text default (`1 2 3 ⧗ ↥ •`). The icon shows wherever the
+  mark does: the rings on a pad, the chips in *All visible*, the assisted
+  fan, the button sheet. YAML: `event_icons: {hold: mdi:gesture-tap-hold}`.
 
 ## 0.1.7 — 2026-09-24
 

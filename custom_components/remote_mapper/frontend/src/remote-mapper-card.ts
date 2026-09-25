@@ -51,9 +51,11 @@ import { computeTransform, type CanvasTransform } from "./canvas/scaling";
 import type { CanvasLayout, WidgetConfig } from "./canvas/types";
 import { deepClone } from "./canvas/util";
 import { tipAnchor, type TipAnchor } from "./gestures";
+import { renderMark } from "./mark";
 import {
   assistedTriggerOf,
   chipsLayoutOf,
+  eventIconsOf,
   hideUnsetOf,
   displayOf,
   layoutOf,
@@ -62,7 +64,6 @@ import {
 } from "./config";
 import {
   buttonLabel,
-  KIND_ICON,
   KIND_TITLE,
   normalizeGrid,
   resizeGrid,
@@ -1568,6 +1569,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
             .assistedTrigger=${assistedTriggerOf(this._config)}
             .chipsLayout=${chipsLayoutOf(this._config)}
             .hideUnset=${hideUnsetOf(this._config)}
+            .kindIcons=${eventIconsOf(this._config)}
             .editing=${editing}
             .flash=${this._flash}
             @run-action=${(e: CustomEvent<{ actionId: string }>) =>
@@ -1733,7 +1735,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                 <li class=${view?.assigned ? "on" : ""}>
                   <span class="ev-main">
                     <span class="ev-icon" title=${KIND_TITLE[a.kind]}
-                      >${KIND_ICON[a.kind]}</span
+                      >${renderMark(eventIconsOf(this._config)[a.kind])}</span
                     >
                     <span class="ev-name">${a.event}</span>
                     <span class="ev-summary">${view?.summary ?? "not set"}</span>
@@ -2925,6 +2927,10 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       border: 1px solid var(--primary-color);
       font-size: var(--ha-font-size-s, 12px);
       font-weight: var(--ha-font-weight-medium, 500);
+    }
+    .ev-icon .mark-icon {
+      --mdc-icon-size: var(--ha-space-4, 16px);
+      display: inline-flex;
     }
     .ev-name {
       flex: none;

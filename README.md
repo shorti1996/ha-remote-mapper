@@ -210,6 +210,9 @@ button_color: "#3f51b5"   # any CSS color; unset = theme
 accent_color: ""          # borders, assigned marks, flashes; unset = primary
 text_color: ""
 button_opacity: 1         # 0.1 – 1, pad background only
+event_icons:              # marks per press kind; unset = 1 2 3 ⧗ ↥ •
+  single: mdi:gesture-tap
+  hold: mdi:gesture-tap-hold
 ```
 
 Themes can set `--remote-mapper-button-color`, `--remote-mapper-accent-color`,
