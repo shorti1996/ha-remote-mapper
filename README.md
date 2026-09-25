@@ -30,7 +30,7 @@ device's quirks) is handled for you. Works with any remote Home Assistant
 can hear — Zigbee (Zigbee2MQTT, ZHA), Matter, plain MQTT, event entities —
 one card, whatever the radio.
 
-![Five remotes of different shapes](docs/img/hero-remotes.jpg)
+https://github.com/user-attachments/assets/d5f94855-6c3b-46ef-a432-abf84127bbfb
 
 <p align="center">
   <img src="docs/img/hero-icon-card-v2.png" width="720" alt="A 6-button remote and its Remote Mapper card: each button lists its single, double and hold action">
@@ -133,7 +133,11 @@ device, where every button shows what it does and lets you change it.
 
 Remote Mapper is transport-agnostic: it listens for button events and maps
 them, it never talks to the radio. If Home Assistant sees the press, the
-card can map it. Pick the source when adding a remote:
+card can map it.
+
+![Five remotes of different shapes](docs/img/hero-remotes.jpg)
+
+Pick the source when adding a remote:
 
 <!-- screenshot: the source-type menu of the config flow -->
 ![Add remote: device triggers, Matter, Zigbee2MQTT topic, event entity, generic MQTT](docs/img/sources.png)
