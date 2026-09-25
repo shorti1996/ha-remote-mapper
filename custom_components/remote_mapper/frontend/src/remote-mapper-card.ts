@@ -72,6 +72,7 @@ import {
   type GridLayout,
 } from "./model";
 import { errorText } from "./errors";
+import { moveGroups, moveTargetLabel } from "./move";
 import { inferName } from "./naming";
 import type { SlotView } from "./remote-grid";
 
@@ -356,6 +357,10 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   // clear-policy dialog
   @state() private _clearArtifacts?: Record<string, unknown>;
   @state() private _clearRemember = false;
+
+  // "Move to…" panel: pick another event of the remote; a set one swaps
+  @state() private _moveOpen = false;
+  @state() private _moveTarget = "";
 
   // hand back to HA (release)
   @state() private _releaseOpen = false;
@@ -717,6 +722,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
             ? "The automation has no branch for this event any more — edit the slot to re-add it"
             : (slot?.last_error ?? null),
           stale: stale.has(a.action_id),
+          linked: this._isLinked(slot),
         };
       }
     }
@@ -915,6 +921,8 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     this._draftError = undefined;
     this._draftMaterialized = slot?.materialized ?? false;
     this._editingLive = undefined;
+    this._moveOpen = false;
+    this._moveTarget = "";
 
     void ensureHaForm().then((ok) => {
       this._haFormOk = ok;
@@ -958,6 +966,62 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     this._draftError = undefined;
     this._editingLive = undefined;
     this._clearArtifacts = undefined;
+    this._moveOpen = false;
+  }
+
+  /** Move this event's action to the picked event; a set target swaps. */
+  private async _moveSlot(): Promise<void> {
+    const source = this._editingAction;
+    const target = this._moveTarget;
+    if (!source || !target) {
+      this._draftError = "Pick an event to move to";
+      return;
+    }
+    try {
+      await this._performMove(source, target);
+      this._closeEditor();
+    } catch (err) {
+      this._draftError = (err as { message?: string }).message ?? String(err);
+    }
+  }
+
+  /**
+   * A mark dropped on another event in the grid. Unlike a button swap this
+   * is saved at once, so a swap (target set) asks first; a plain move just
+   * happens and says so in a toast.
+   */
+  private async _onMoveAction(source: string, target: string): Promise<void> {
+    const targetSlot = this._remote?.slots[target];
+    if (targetSlot) {
+      const ok = await this._confirm({
+        title: "Swap these two events?",
+        text:
+          `"${this._slotSummary(this._remote?.slots[source])}" goes to ` +
+          `${this._eventName(target)} and "${this._slotSummary(targetSlot)}" to ` +
+          `${this._eventName(source)}. This is saved right away.`,
+        confirmText: "Swap",
+      });
+      if (!ok) return;
+    }
+    try {
+      await this._performMove(source, target);
+    } catch (err) {
+      this.notify(`Move failed: ${(err as { message?: string }).message ?? String(err)}`);
+    }
+  }
+
+  private async _performMove(source: string, target: string): Promise<void> {
+    const res = await this._hass!.callWS<{ moved: string[]; swapped: boolean }>({
+      type: "remote_mapper/move_slot",
+      entry_id: this._entryId,
+      action_id: source,
+      target_action_id: target,
+    });
+    this.notify(
+      res.swapped
+        ? `Swapped ${this._eventName(source)} and ${this._eventName(target)}`
+        : `Moved ${this._eventName(source)} to ${this._eventName(target)}`
+    );
   }
 
   /** "Create new" modes: make the thing, bind it, and (automations) go edit it. */
@@ -1483,6 +1547,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
         ${editing
           ? html`<p class="hint grid-hint">· Tap a button to rename it or edit its events</p>
             <p class="hint grid-hint">· Drag a button onto another cell to swap</p>
+            <p class="hint grid-hint">· Drag an event mark onto another event or button to move its action</p>
             <p class="hint grid-hint">· Event edits save right away; ✓ saves the layout, ✕ discards it</p>`
           : nothing}
         ${buttons.length === 0
@@ -1508,6 +1573,8 @@ export class RemoteMapperCard extends LitElement implements EditHost {
             @layout-changed=${(e: CustomEvent<{ layout: GridLayout }>) => {
               this._setGridDraft(e.detail.layout);
             }}
+            @move-action=${(e: CustomEvent<{ actionId: string; targetId: string }>) =>
+              void this._onMoveAction(e.detail.actionId, e.detail.targetId)}
           ></remote-mapper-grid>
             `}
         ${buttons.length === 0
@@ -2025,6 +2092,18 @@ export class RemoteMapperCard extends LitElement implements EditHost {
               : nothing}
             ${slot
               ? html`
+                  <button
+                    title=${this._isLinked(slot)
+                      ? "A linked automation fires on its own trigger; change the trigger in HA"
+                      : "Move this action to another event or button"}
+                    ?disabled=${this._isLinked(slot)}
+                    @click=${() => {
+                      this._moveOpen = !this._moveOpen;
+                      this._draftError = undefined;
+                    }}
+                  >
+                    Move…
+                  </button>
                   <button class="danger" @click=${() => void this._confirmClear()}>
                     Clear
                   </button>
@@ -2037,7 +2116,73 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                 `
               : nothing}
           </div>
+          ${this._moveOpen && slot ? this._renderMovePanel(slot) : nothing}
           ${this._clearArtifacts ? this._renderClearDialog() : nothing}
+        </div>
+      </div>
+    `;
+  }
+
+  /** Target picker under the footer: every other event, grouped by button. */
+  private _renderMovePanel(slot: SlotRecord): TemplateResult {
+    const remote = this._remote!;
+    const layout = this._gridLayout()!;
+    const linked = new Set(
+      Object.keys(remote.slots).filter((id) => this._isLinked(remote.slots[id]))
+    );
+    const groups = moveGroups(
+      remote.buttons ?? [],
+      layout,
+      this._slotViews(),
+      linked,
+      this._editingAction!
+    );
+    const chosen = groups.flatMap((g) => g.targets).find((t) => t.actionId === this._moveTarget);
+    const own = slot.materialized && !slot.shared_automation && !this._isLinked(slot);
+    return html`
+      <div class="decision move">
+        <p><b>Move to another event</b></p>
+        <p class="hint">
+          The action, its name and its scene go with it. A set event swaps its
+          action with this one.${own
+            ? " The automation the card created is made again for the new event (its traces start over)."
+            : slot.shared_automation
+              ? " Its branch of the remote automation is re-keyed to the new event."
+              : ""}
+        </p>
+        <select
+          class="move-target"
+          .value=${this._moveTarget}
+          @change=${(e: Event) => {
+            this._moveTarget = (e.target as HTMLSelectElement).value;
+          }}
+        >
+          <option value="" ?selected=${!this._moveTarget}>Pick an event…</option>
+          ${groups.map(
+            (g) => html`<optgroup label=${g.label}>
+              ${g.targets.map(
+                (t) => html`<option
+                  value=${t.actionId}
+                  ?disabled=${t.linked}
+                  ?selected=${t.actionId === this._moveTarget}
+                >
+                  ${moveTargetLabel(t)}
+                </option>`
+              )}
+            </optgroup>`
+          )}
+        </select>
+        <div class="buttons">
+          <button ?disabled=${!chosen} @click=${() => void this._moveSlot()}>
+            ${chosen?.swapWith ? "Swap" : "Move"}
+          </button>
+          <button
+            @click=${() => {
+              this._moveOpen = false;
+            }}
+          >
+            Cancel
+          </button>
         </div>
       </div>
     `;
@@ -2894,6 +3039,22 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     }
     .decision p {
       margin: 0 0 8px;
+    }
+    .decision.move {
+      border-color: var(--primary-color);
+    }
+    .move-target {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      font: inherit;
+      font-size: var(--ha-font-size-m, 14px);
+      min-height: var(--ha-space-9, 36px);
+      padding: 0 var(--ha-space-2, 8px);
+      background: var(--card-background-color, inherit);
+      color: inherit;
+      border: 1px solid var(--divider-color, #444);
+      border-radius: var(--ha-border-radius-md, 8px);
     }
     .error {
       color: var(--error-color, #db4437);

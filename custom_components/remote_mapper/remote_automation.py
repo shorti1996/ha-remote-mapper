@@ -402,6 +402,93 @@ async def async_remove_branch(
     return False
 
 
+async def async_move_branches(
+    hass: HomeAssistant,
+    store: RemoteMapperStore,
+    entry_id: str,
+    moves: dict[str, str],
+) -> None:
+    """Re-key branches to other events in one write: ``{source: target}``.
+
+    A target that is itself a source swaps: both branches keep their
+    trigger and condition and exchange sequence and alias. A one-way move
+    takes the source's trigger out and keys the branch to the target's
+    trigger, adding one when the automation has none for that event. The
+    store is not touched — the caller moves the slot records.
+    """
+    from .adapters import get_adapter
+
+    remote = store.get_remote(entry_id)
+    if remote is None:
+        raise HomeAssistantError(f"Unknown remote {entry_id}")
+    config_id = remote_automation_config_id(entry_id)
+    raw = await _get_config_store(hass).async_get(config_id)
+    if raw is None:
+        raise HomeAssistantError("The shared automation no longer exists")
+    payload = _normalized(raw)
+    choose = _choose_step(payload)
+    if choose is None:
+        raise HomeAssistantError(
+            "The shared automation was restructured in HA — move the branch there"
+        )
+    # Positional ids would shift after a removal — pin every id first
+    for index, trigger in enumerate(payload["triggers"]):
+        if isinstance(trigger, dict) and "id" not in trigger:
+            trigger["id"] = str(index)
+    options = _as_list(choose.get("choose"))
+    contents: dict[str, tuple[int, dict[str, Any]]] = {}
+    for source in moves:
+        index = find_branch(payload, source)
+        if index is None:
+            raise HomeAssistantError(f"{source} has no branch in the shared automation")
+        contents[source] = (index, options[index])
+
+    adapter = get_adapter(remote["source"])
+    new_options = list(options)
+    dropped: set[int] = set()
+    removed_ids: set[str] = set()
+    added_triggers: list[dict[str, Any]] = []
+    for source, target in moves.items():
+        source_index, option = contents[source]
+        content = {k: v for k, v in option.items() if k != "conditions"}
+        if target in moves:
+            target_index, target_option = contents[target]
+            new_options[target_index] = {
+                "conditions": target_option["conditions"],
+                **content,
+            }
+            continue
+        removed_ids |= _trigger_ids_for(payload["triggers"], source)
+        target_index = find_branch(payload, target)
+        if target_index is not None:
+            # the automation already has a branch for the target (built in
+            # HA, unknown to the card): it takes over the content
+            new_options[target_index] = {
+                "conditions": options[target_index]["conditions"],
+                **content,
+            }
+            dropped.add(source_index)
+            continue
+        existing = _trigger_ids_for(payload["triggers"], target)
+        if existing:
+            branch_id = sorted(existing)[0]
+        else:
+            trigger = adapter.build_trigger(target, remote["source_config"])
+            added_triggers.append({**trigger, "id": target})
+            branch_id = target
+        new_options[source_index] = {
+            "conditions": [{"condition": "trigger", "id": branch_id}],
+            **content,
+        }
+    payload["triggers"] = [
+        t
+        for t in payload["triggers"]
+        if not (isinstance(t, dict) and str(t.get("id")) in removed_ids)
+    ] + added_triggers
+    choose["choose"] = [o for i, o in enumerate(new_options) if i not in dropped]
+    await _get_config_store(hass).async_upsert(config_id, payload)
+
+
 async def async_detach_branch(
     hass: HomeAssistant,
     store: RemoteMapperStore,

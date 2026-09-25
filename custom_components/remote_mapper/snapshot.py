@@ -96,7 +96,16 @@ async def async_create_snapshot(
     re_snapshot: bool = False,
 ) -> dict[str, Any]:
     """Capture states into a persistent scene bound to the slot."""
+    # A slot moved from another event keeps its scene: reuse that id so a
+    # capture updates it instead of leaving an orphan behind.
     config_id = scene_config_id(entry_id, action_id)
+    existing = store.get_slot(entry_id, action_id)
+    if (
+        existing
+        and (owned_id := existing.get("scene_id"))
+        and store.get_owned_scene(owned_id) is not None
+    ):
+        config_id = owned_id
 
     if re_snapshot:
         owned = store.get_owned_scene(config_id)

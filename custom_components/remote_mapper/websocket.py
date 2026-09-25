@@ -731,6 +731,42 @@ async def ws_archive_slot(
 
 @websocket_api.websocket_command(
     {
+        vol.Required("type"): f"{DOMAIN}/move_slot",
+        vol.Required("entry_id"): str,
+        vol.Required("action_id"): str,
+        vol.Required("target_action_id"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_move_slot(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    """Move a slot to another event of the remote; a set target swaps."""
+    from .move import async_move_slot
+
+    store = _store(hass)
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    if entry is None or store.get_remote(msg["entry_id"]) is None:
+        connection.send_error(msg["id"], ERR_NOT_FOUND, "Unknown remote")
+        return
+    try:
+        result = await async_move_slot(
+            hass,
+            store,
+            msg["entry_id"],
+            msg["action_id"],
+            msg["target_action_id"],
+            remote_name(hass, entry),
+        )
+    except Exception as err:
+        connection.send_error(msg["id"], ERR_INVALID_SEQUENCE, str(err))
+        return
+    _fire_updated(hass, msg["entry_id"], "slot_moved")
+    connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command(
+    {
         vol.Required("type"): f"{DOMAIN}/save_layout",
         vol.Required("entry_id"): str,
         vol.Optional("card_layout"): dict,
@@ -950,6 +986,7 @@ def async_register_websocket_commands(hass: HomeAssistant) -> None:
         ws_create_snapshot,
         ws_create_automation,
         ws_archive_slot,
+        ws_move_slot,
         ws_save_layout,
         ws_probe_device,
         ws_refresh_actions,

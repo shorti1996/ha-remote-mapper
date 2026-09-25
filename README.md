@@ -98,7 +98,9 @@ device, where every button shows what it does and lets you change it.
 - **Assign in seconds.** Tap an event → *Activate scene*, *Toggle entity*,
   *Run script*, *Set WLED preset*… with HA's own pickers. Need more? A
   YAML tab takes the full automation action syntax (`if`, `choose`,
-  templates).
+  templates). Put it on the wrong event? In edit mode, drag its mark onto
+  another event or button (*Move…* in the event editor does the same from
+  a list); a set event swaps.
 
   [![Assign an action: tap a button's event, pick Toggle entity, pick the light, save](docs/demo/03-assign-action.gif)](docs/demo/full/03-assign-action.gif)
 

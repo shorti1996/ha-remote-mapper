@@ -3,6 +3,21 @@
 Notable changes per release. Unreleased entries collect on `master` and
 move under a version heading when `make release VERSION=x.y.z` runs.
 
+## Unreleased
+
+### Added
+
+- **Move an action to another event.** In edit mode, drag an event mark
+  (the `1 2 ⧗` rings, or a chip in *All visible*) onto another event, or
+  onto a pad to land on the same kind of event there. *Move…* in the event
+  editor does the same from a list, grouped by button, and is the way for
+  the canvas layout. The action moves with its name, scene and disabled
+  state; a set event swaps the two (a drag asks first, since it is saved
+  right away). An automation the card created is made again for the new
+  event, a branch of the remote automation is re-keyed to it, and an owned
+  snapshot scene keeps its id. Linked automations stay where their trigger
+  is.
+
 ## 0.1.7 — 2026-09-24
 
 ### Changed

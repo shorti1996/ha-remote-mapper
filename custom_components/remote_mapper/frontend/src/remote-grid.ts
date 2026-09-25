@@ -10,6 +10,9 @@
  *                               (chips included) opens the button sheet —
  *                               the same path in every display mode
  *   layout-changed {layout}     edit mode: cells swapped
+ *   move-action    {actionId, targetId}
+ *                               edit mode: an event mark was dropped on
+ *                               another event (or a pad: same kind there)
  */
 import { css, html, LitElement, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -23,11 +26,13 @@ import {
   KIND_ICON,
   KIND_TITLE,
   swapCells,
+  type ButtonAction,
   type ButtonModel,
   type DisplayMode,
   type GridLayout,
   type Kind,
 } from "./model";
+import { dropTargetFor } from "./move";
 
 export interface SlotView {
   assigned: boolean;
@@ -35,6 +40,19 @@ export interface SlotView {
   summary: string;
   error: string | null;
   stale: boolean;
+  /** Linked to a native automation: the backend refuses to move it. */
+  linked?: boolean;
+}
+
+/** Edit mode: an event mark being dragged to another event. */
+interface ActionDragState {
+  action: ButtonAction;
+  summary: string;
+  startX: number;
+  startY: number;
+  x: number;
+  y: number;
+  moved: boolean;
 }
 
 interface DragState {
@@ -105,6 +123,9 @@ export class RemoteMapperGrid extends LitElement {
   }
   @state() private _drag?: DragState;
   @state() private _dropTarget?: string;
+  @state() private _actionDrag?: ActionDragState;
+  /** Action id the dragged mark would land on. */
+  @state() private _actionDrop?: string;
 
   private _recognizers = new Map<string, TapRecognizer>();
 
@@ -127,6 +148,8 @@ export class RemoteMapperGrid extends LitElement {
       this._popover = undefined;
       this._drag = undefined;
       this._dropTarget = undefined;
+      this._actionDrag = undefined;
+      this._actionDrop = undefined;
       for (const rec of this._recognizers.values()) rec.cancel();
     }
   }
@@ -344,6 +367,91 @@ export class RemoteMapperGrid extends LitElement {
     this._recognizers.get(button.id)?.cancel();
   }
 
+  // ── edit mode: drag an event mark onto another event ──────────────
+
+  /** Pointer handlers for a mark or chip while editing; nothing otherwise. */
+  private _markHandlers(action: ButtonAction): Record<string, (e: PointerEvent) => void> {
+    if (!this.editing) return {};
+    return {
+      pointerdown: (e) => this._onMarkDown(e, action),
+      pointermove: (e) => this._onMarkMove(e),
+      pointerup: (e) => this._onMarkUp(e),
+      pointercancel: () => this._onMarkCancel(),
+    };
+  }
+
+  private _onMarkDown(e: PointerEvent, action: ButtonAction): void {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    // the pad's own handler would start a button drag
+    e.stopPropagation();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    this._actionDrag = {
+      action,
+      summary: this.slots[action.action_id]?.summary ?? "not set",
+      startX: e.clientX,
+      startY: e.clientY,
+      x: e.clientX,
+      y: e.clientY,
+      moved: false,
+    };
+    this._actionDrop = undefined;
+  }
+
+  private _onMarkMove(e: PointerEvent): void {
+    const drag = this._actionDrag;
+    if (!drag) return;
+    e.stopPropagation();
+    if (!drag.moved) {
+      const dx = e.clientX - drag.startX;
+      const dy = e.clientY - drag.startY;
+      if (dx * dx + dy * dy < DRAG_THRESHOLD * DRAG_THRESHOLD) return;
+    }
+    this._actionDrag = { ...drag, moved: true, x: e.clientX, y: e.clientY };
+    const el = this._elementAt(e.clientX, e.clientY);
+    const mark = el?.closest("[data-action]") as HTMLElement | null;
+    const cell = el?.closest(".cell.btn") as HTMLElement | null;
+    const linked = new Set(
+      Object.keys(this.slots).filter((id) => this.slots[id]?.linked)
+    );
+    this._actionDrop = dropTargetFor(
+      { actionId: mark?.dataset.action, buttonId: cell?.dataset.button },
+      { actionId: drag.action.action_id, kind: drag.action.kind },
+      this.buttons,
+      linked
+    );
+  }
+
+  private _onMarkUp(e: PointerEvent): void {
+    const drag = this._actionDrag;
+    if (!drag) return;
+    e.stopPropagation();
+    const target = this._actionDrop;
+    this._actionDrag = undefined;
+    this._actionDrop = undefined;
+    if (!drag.moved) {
+      // a tap on a mark opens the button, same as a tap on the pad
+      const button = this.buttons.find((b) =>
+        b.actions.some((a) => a.action_id === drag.action.action_id)
+      );
+      if (button) this._emit("open-button", { buttonId: button.id });
+      return;
+    }
+    if (target) {
+      this._emit("move-action", { actionId: drag.action.action_id, targetId: target });
+    }
+  }
+
+  private _onMarkCancel(): void {
+    this._actionDrag = undefined;
+    this._actionDrop = undefined;
+  }
+
+  /** The pad a dragged mark would land on (same-kind drop), for its ring. */
+  private _padDropFor(button: ButtonModel): boolean {
+    const target = this._actionDrop;
+    return !!target && button.actions.some((a) => a.action_id === target);
+  }
+
   // ── render ────────────────────────────────────────────────────────
 
   protected override render() {
@@ -383,6 +491,15 @@ export class RemoteMapperGrid extends LitElement {
             ${buttonLabel(dragButton, layout)}
           </div>`
         : nothing}
+      ${this._actionDrag?.moved
+        ? html`<div
+            class="ghost action-ghost"
+            style="left:${this._actionDrag.x}px;top:${this._actionDrag.y}px"
+          >
+            <span class="icon">${KIND_ICON[this._actionDrag.action.kind]}</span>
+            ${this._actionDrag.summary}
+          </div>`
+        : nothing}
     `;
   }
 
@@ -410,7 +527,7 @@ export class RemoteMapperGrid extends LitElement {
       "cell",
       "btn",
       this._drag?.id === button.id && this._drag.moved ? "dragging" : "",
-      this._dropTarget === key ? "drop" : "",
+      this._dropTarget === key || this._padDropFor(button) ? "drop" : "",
       this._popover === button.id ? "active" : "",
       flashing && this.display !== "all" ? "flash" : "",
     ].join(" ");
@@ -454,9 +571,24 @@ export class RemoteMapperGrid extends LitElement {
         ${button.actions.map((a) => {
           const slot = this.slots[a.action_id];
           const on = slot?.assigned && !slot.archived;
+          const h = this._markHandlers(a);
+          const classes = [
+            "kind",
+            on ? "on" : "",
+            this.flash === a.action_id ? "flash" : "",
+            this._actionDrop === a.action_id ? "drop" : "",
+            this._actionDrag?.moved && this._actionDrag.action.action_id === a.action_id
+              ? "dragging"
+              : "",
+          ].join(" ");
           return html`<span
-            class="kind ${on ? "on" : ""} ${this.flash === a.action_id ? "flash" : ""}"
+            class=${classes}
+            data-action=${a.action_id}
             title="${a.event} (${KIND_TITLE[a.kind]}): ${slot?.summary ?? "not set"}"
+            @pointerdown=${h.pointerdown}
+            @pointermove=${h.pointermove}
+            @pointerup=${h.pointerup}
+            @pointercancel=${h.pointercancel}
             >${KIND_ICON[a.kind]}</span
           >`;
         })}
@@ -473,20 +605,27 @@ export class RemoteMapperGrid extends LitElement {
       <div class="chips ${this.chipsLayout}">
         ${actions.map((a) => {
           const slot = this.slots[a.action_id];
+          const h = this._markHandlers(a);
           const classes = [
             "chip",
             slot?.assigned ? "on" : "",
             slot?.archived ? "archived" : "",
             this.flash === a.action_id ? "flash" : "",
+            this._actionDrop === a.action_id ? "drop" : "",
+            this._actionDrag?.moved && this._actionDrag.action.action_id === a.action_id
+              ? "dragging"
+              : "",
           ].join(" ");
           return html`
             <button
               class=${classes}
               data-action=${a.action_id}
               title="${a.event} (${KIND_TITLE[a.kind]}): ${slot?.summary ?? "not set"}"
-              @pointerdown=${(e: PointerEvent) => this._chipPressStart(e, a.action_id)}
-              @pointerup=${this._chipPressEnd}
-              @pointercancel=${this._chipPressEnd}
+              @pointerdown=${h.pointerdown ??
+              ((e: PointerEvent) => this._chipPressStart(e, a.action_id))}
+              @pointermove=${h.pointermove}
+              @pointerup=${h.pointerup ?? this._chipPressEnd}
+              @pointercancel=${h.pointercancel ?? this._chipPressEnd}
               @contextmenu=${(e: Event) => {
                 if (this._chipTip) e.preventDefault();
               }}
@@ -666,6 +805,40 @@ export class RemoteMapperGrid extends LitElement {
       opacity: 1;
       border-color: var(--rm-ac);
       color: var(--rm-ac);
+    }
+    /* Edit mode: marks and chips are drag handles — touch-sized, and the
+       browser must not scroll while a finger drags one */
+    .grid.editing .kind,
+    .grid.editing .chip {
+      touch-action: none;
+      cursor: grab;
+    }
+    .grid.editing .kind {
+      width: var(--ha-space-9, 36px);
+      height: var(--ha-space-9, 36px);
+      font-size: var(--ha-font-size-m, 14px);
+    }
+    .kind.dragging,
+    .chip.dragging {
+      opacity: 0.25;
+    }
+    .kind.drop,
+    .chip.drop {
+      outline: 2px dashed var(--rm-ac);
+      outline-offset: 2px;
+      opacity: 1;
+    }
+    .action-ghost {
+      display: flex;
+      align-items: center;
+      gap: var(--ha-space-2, 8px);
+      max-width: 60vw;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .action-ghost .icon {
+      font-weight: var(--ha-font-weight-bold, 700);
     }
     /* While the pad flashes accent: siblings become faint rings, the
        mark that fired inverts (pad-colored disc, accent digit) and pulses */

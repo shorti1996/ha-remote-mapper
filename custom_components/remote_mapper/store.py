@@ -183,6 +183,12 @@ class RemoteMapperStore:
         }
         self.async_schedule_save()
 
+    def async_move_owned_scene(self, scene_id: str, created_for: str) -> None:
+        """Re-point ownership at another slot (the slot moved, the scene stays)."""
+        if (record := self.data["owned_scenes"].get(scene_id)) is not None:
+            record["created_for"] = created_for
+            self.async_schedule_save()
+
     def async_drop_owned_scene(self, scene_id: str) -> None:
         """Drop ownership (scene becomes indistinguishable from hand-made)."""
         if self.data["owned_scenes"].pop(scene_id, None) is not None:
