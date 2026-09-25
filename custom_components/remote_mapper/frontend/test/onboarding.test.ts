@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 import { describe, expect, it } from "vitest";
 
-import { advanceTip, nextTip, skipTips, TIPS, tipsSeen } from "../src/onboarding";
+import { advanceTip, nextTip, resetTips, skipTips, TIPS, tipsSeen } from "../src/onboarding";
 
 function memory() {
   const m = new Map<string, string>();
@@ -24,6 +24,13 @@ describe("onboarding tips", () => {
     const store = memory();
     skipTips(store);
     expect(nextTip(store)).toBeUndefined();
+  });
+
+  it("reset starts the tour over", () => {
+    const store = memory();
+    skipTips(store);
+    resetTips(store);
+    expect(nextTip(store)).toEqual({ index: 0, text: TIPS[0] });
   });
 
   it("survives junk in storage and no storage at all", () => {

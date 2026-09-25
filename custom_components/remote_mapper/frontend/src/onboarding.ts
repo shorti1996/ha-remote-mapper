@@ -60,3 +60,16 @@ export function advanceTip(store: StorageLike | undefined = storage()): void {
 export function skipTips(store: StorageLike | undefined = storage()): void {
   remember(TIPS.length, store);
 }
+
+/** Fired on window when the tips are reset, so open cards show them again. */
+export const TIPS_RESET_EVENT = "remote_mapper_tips_reset";
+
+/** Start the tour over in this browser. */
+export function resetTips(store: StorageLike | undefined = storage()): void {
+  remember(0, store);
+  try {
+    globalThis.dispatchEvent?.(new Event(TIPS_RESET_EVENT));
+  } catch {
+    /* no window (tests) */
+  }
+}

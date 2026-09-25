@@ -17,6 +17,11 @@ move under a version heading when `make release VERSION=x.y.z` runs.
   event, a branch of the remote automation is re-keyed to it, and an owned
   snapshot scene keeps its id. Linked automations stay where their trigger
   is.
+- **Start over.** The card editor ends with three buttons: *Ask again*
+  forgets the remembered answer to "also delete the scene / automation the
+  card created?", *Forget* drops the remote's default entities for *Scene
+  from current state*, and *Show again* brings the first-run tips back in
+  this browser (on every open card at once).
 
 ## 0.1.7 — 2026-09-24
 

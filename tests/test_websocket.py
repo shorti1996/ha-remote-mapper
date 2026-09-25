@@ -483,3 +483,55 @@ async def test_slot_name_round_trip(hass, hass_ws_client, remote_device) -> None
         },
     )
     assert res["result"]["slot"]["name"] is None
+
+
+async def test_get_and_reset_options(hass, hass_ws_client, remote_device) -> None:
+    """The card editor reads remembered choices and forgets them one by one."""
+    entry = await _setup_remote(hass, remote_device)
+    hass.config_entries.async_update_entry(
+        entry,
+        options={
+            "owned_scene_cleanup": "always_delete",
+            "snapshot_entities": ["light.a"],
+        },
+    )
+    client = await hass_ws_client(hass)
+    events = async_capture_events(hass, EVENT_UPDATED)
+
+    res = await _ws(
+        client, {"type": f"{DOMAIN}/get_options", "entry_id": entry.entry_id}
+    )
+    assert res["result"] == {
+        "cleanup_policy": "always_delete",
+        "snapshot_entities": ["light.a"],
+    }
+
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/reset_options",
+            "entry_id": entry.entry_id,
+            "cleanup_policy": True,
+        },
+    )
+    assert res["success"], res
+    assert entry.options == {"snapshot_entities": ["light.a"]}
+
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/reset_options",
+            "entry_id": entry.entry_id,
+            "snapshot_entities": True,
+        },
+    )
+    assert res["success"], res
+    assert entry.options == {}
+    res = await _ws(
+        client, {"type": f"{DOMAIN}/get_options", "entry_id": entry.entry_id}
+    )
+    assert res["result"] == {"cleanup_policy": "ask", "snapshot_entities": []}
+    assert [e.data["kind"] for e in events] == ["options_reset", "options_reset"]
+
+    res = await _ws(client, {"type": f"{DOMAIN}/get_options", "entry_id": "nope"})
+    assert res["error"]["code"] == "not_found"

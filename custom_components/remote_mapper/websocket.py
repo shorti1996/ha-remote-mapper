@@ -731,6 +731,64 @@ async def ws_archive_slot(
 
 @websocket_api.websocket_command(
     {
+        vol.Required("type"): f"{DOMAIN}/get_options",
+        vol.Required("entry_id"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_get_options(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    """Remembered per-remote choices, for the card editor's Reset section."""
+    from .cleanup import get_policy
+    from .const import CONF_SNAPSHOT_ENTITIES
+
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    if entry is None:
+        connection.send_error(msg["id"], ERR_NOT_FOUND, "Unknown remote")
+        return
+    connection.send_result(
+        msg["id"],
+        {
+            "cleanup_policy": get_policy(entry),
+            "snapshot_entities": list(entry.options.get(CONF_SNAPSHOT_ENTITIES, [])),
+        },
+    )
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/reset_options",
+        vol.Required("entry_id"): str,
+        # back to "ask" before deleting an owned scene/automation
+        vol.Optional("cleanup_policy", default=False): bool,
+        # forget the remote's default snapshot entity set
+        vol.Optional("snapshot_entities", default=False): bool,
+    }
+)
+@websocket_api.async_response
+async def ws_reset_options(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    """Forget remembered choices (the options flow can also change them)."""
+    from .const import CONF_OWNED_SCENE_CLEANUP, CONF_SNAPSHOT_ENTITIES
+
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    if entry is None:
+        connection.send_error(msg["id"], ERR_NOT_FOUND, "Unknown remote")
+        return
+    options = dict(entry.options)
+    if msg["cleanup_policy"]:
+        options.pop(CONF_OWNED_SCENE_CLEANUP, None)
+    if msg["snapshot_entities"]:
+        options.pop(CONF_SNAPSHOT_ENTITIES, None)
+    hass.config_entries.async_update_entry(entry, options=options)
+    _fire_updated(hass, msg["entry_id"], "options_reset")
+    connection.send_result(msg["id"], {})
+
+
+@websocket_api.websocket_command(
+    {
         vol.Required("type"): f"{DOMAIN}/move_slot",
         vol.Required("entry_id"): str,
         vol.Required("action_id"): str,
@@ -986,6 +1044,8 @@ def async_register_websocket_commands(hass: HomeAssistant) -> None:
         ws_create_snapshot,
         ws_create_automation,
         ws_archive_slot,
+        ws_get_options,
+        ws_reset_options,
         ws_move_slot,
         ws_save_layout,
         ws_probe_device,

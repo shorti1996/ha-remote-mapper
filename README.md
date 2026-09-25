@@ -239,7 +239,8 @@ snapshot scenes, and removes the remote. Deleting the integration from
     are skipped and other automations listening for the press stay quiet.
 - Scenes and automations the integration created are the only ones it will
   ever offer to delete, and it asks first (remembered choice: ask / always /
-  never).
+  never). *Start over* at the bottom of the card editor forgets that
+  choice, the default snapshot entities, or shows the first-run tips again.
 - If Zigbee2MQTT renames an action, the button gets a *stale* badge instead
   of silently breaking.
 

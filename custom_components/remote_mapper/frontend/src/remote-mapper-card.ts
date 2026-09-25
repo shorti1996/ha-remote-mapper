@@ -19,7 +19,7 @@ import "./card-editor";
 import "./grid-picker";
 import "./remote-grid";
 import { clearGridDraft, getGridDraft, setGridDraft } from "./grid-drafts";
-import { advanceTip, nextTip, skipTips, TIPS } from "./onboarding";
+import { advanceTip, nextTip, skipTips, TIPS, TIPS_RESET_EVENT } from "./onboarding";
 import {
   absorbsOnSave,
   disableConfirm,
@@ -299,6 +299,10 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   @property({ type: Boolean }) public preview = false;
   /** Bumped when an onboarding tip is dismissed so the banner re-renders. */
   @state() private _tipsRev = 0;
+  /** The card editor's "Show again": the banner comes back on every open card. */
+  private _onTipsReset = (): void => {
+    this._tipsRev++;
+  };
   @state() private _gridEditing = false;
   @state() private _gridDraft?: GridLayout;
   @state() private _pickerOpen = false;
@@ -446,6 +450,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       }
     });
     this._resizeObserver.observe(this);
+    window.addEventListener(TIPS_RESET_EVENT, this._onTipsReset);
     if (this._edit.tryResume()) this.requestUpdate();
     if (this._fetchStarted && !this._unsubEvents) void this._subscribe();
   }
@@ -453,6 +458,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   public override disconnectedCallback(): void {
     super.disconnectedCallback();
     this._resizeObserver?.disconnect();
+    window.removeEventListener(TIPS_RESET_EVENT, this._onTipsReset);
     this._unsubEvents?.();
     this._unsubEvents = undefined;
     this._unsubActions?.();

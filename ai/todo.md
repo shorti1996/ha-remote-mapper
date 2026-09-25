@@ -7,6 +7,6 @@ creating a new automation instead of keeping the linked one~~ (fixed 2026-09-23)
 5. ~~Possibility to move actions between slots in a button and between buttons~~ (done 2026-09-25: drag a mark, or Move… in the event editor)
 6. ~~Scenes as first-class citizens: same handling as for automations
 (import, hand back to HA)~~ (skipped 2026-09-25: scenes already get the same footprint — created from the card, edited in HA via the chip, re-snapshot, kept on hand-back, same delete policy)
-7. A way to wipe remembered default choices (e.g. delete ask / always / never)
-and show the onboarding tips again 
+7. ~~A way to wipe remembered default choices (e.g. delete ask / always / never)
+and show the onboarding tips again~~ (done 2026-09-25: "Start over" section in the card editor)
 8. Possibility to change the default action labels (1, 2, hourglass) to mdi:icons

@@ -9,6 +9,7 @@ import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import { ensureHaForm } from "./canvas/ha-loader";
+import { resetTips, tipsSeen } from "./onboarding";
 import {
   applyEditorValue,
   ASSISTED_TRIGGERS,
@@ -57,6 +58,18 @@ interface RemoteListItem {
   title: string;
 }
 
+/** Remembered per-remote choices (remote_mapper/get_options). */
+interface RemoteOptions {
+  cleanup_policy: "ask" | "always_delete" | "never_delete";
+  snapshot_entities: string[];
+}
+
+const POLICY_TEXT: Record<RemoteOptions["cleanup_policy"], string> = {
+  ask: "asks each time",
+  always_delete: "always deletes",
+  never_delete: "never deletes",
+};
+
 const dropdown = (options: unknown) => ({ select: { mode: "dropdown", options } });
 
 @customElement("remote-mapper-card-editor")
@@ -67,9 +80,54 @@ export class RemoteMapperCardEditor extends LitElement {
   @state() private _remotes?: RemoteListItem[];
   @state() private _formOk = false;
   private _fetching = false;
+  // Reset section: the remote's remembered choices + this browser's tips
+  @state() private _options?: RemoteOptions;
+  @state() private _tipsRev = 0;
+  private _optionsFor?: string;
 
   public setConfig(config: RemoteMapperCardConfig): void {
     this._config = config;
+  }
+
+  /** The remote this card shows: its entry_id, or the only one there is. */
+  private _entryId(): string | undefined {
+    if (this._config?.entry_id) return this._config.entry_id;
+    return this._remotes?.length === 1 ? this._remotes[0].entry_id : undefined;
+  }
+
+  private _fetchOptions(): void {
+    const entryId = this._entryId();
+    if (!this.hass || !entryId || entryId === this._optionsFor) return;
+    this._optionsFor = entryId;
+    this._options = undefined;
+    void this.hass
+      .callWS<RemoteOptions>({ type: "remote_mapper/get_options", entry_id: entryId })
+      .then((res) => {
+        if (this._optionsFor === entryId) this._options = res;
+      })
+      .catch(() => {
+        /* no backend for this remote — the section stays hidden */
+      });
+  }
+
+  private async _reset(what: "cleanup_policy" | "snapshot_entities"): Promise<void> {
+    const entryId = this._entryId();
+    if (!this.hass || !entryId) return;
+    try {
+      await this.hass.callWS({
+        type: "remote_mapper/reset_options",
+        entry_id: entryId,
+        [what]: true,
+      });
+      this._optionsFor = undefined;
+      this._fetchOptions();
+    } catch (err) {
+      window.dispatchEvent(
+        new CustomEvent("hass-notification", {
+          detail: { message: `Reset failed: ${(err as { message?: string }).message ?? String(err)}` },
+        })
+      );
+    }
   }
 
   public override connectedCallback(): void {
@@ -91,6 +149,63 @@ export class RemoteMapperCardEditor extends LitElement {
           this._remotes = [];
         });
     }
+    this._fetchOptions();
+  }
+
+  /** Forget remembered choices; each button says what it undoes. */
+  private _renderReset() {
+    const options = this._options;
+    const seen = tipsSeen();
+    void this._tipsRev;
+    if (!options && !seen) return nothing;
+    return html`
+      <div class="reset">
+        <p class="hint reset-title">Start over</p>
+        ${options
+          ? html`
+              <div class="reset-row">
+                <span class="hint">
+                  Deleting a scene or automation the card created:
+                  <b>${POLICY_TEXT[options.cleanup_policy]}</b>
+                </span>
+                <button
+                  ?disabled=${options.cleanup_policy === "ask"}
+                  @click=${() => void this._reset("cleanup_policy")}
+                >
+                  Ask again
+                </button>
+              </div>
+              <div class="reset-row">
+                <span class="hint">
+                  Default entities for <i>Scene from current state</i>:
+                  <b>${options.snapshot_entities.length ? options.snapshot_entities.length : "none"}</b>
+                </span>
+                <button
+                  ?disabled=${!options.snapshot_entities.length}
+                  @click=${() => void this._reset("snapshot_entities")}
+                >
+                  Forget
+                </button>
+              </div>
+            `
+          : nothing}
+        <div class="reset-row">
+          <span class="hint">
+            Tips at the top of the card, in this browser:
+            <b>${seen ? "seen" : "showing"}</b>
+          </span>
+          <button
+            ?disabled=${!seen}
+            @click=${() => {
+              resetTips();
+              this._tipsRev++;
+            }}
+          >
+            Show again
+          </button>
+        </div>
+      </div>
+    `;
   }
 
   protected override render() {
@@ -147,6 +262,7 @@ export class RemoteMapperCardEditor extends LitElement {
         @value-changed=${this._changed}
         @focusout=${this._trimOnBlur}
       ></ha-form>
+      ${this._renderReset()}
     `;
   }
 
@@ -176,6 +292,44 @@ export class RemoteMapperCardEditor extends LitElement {
     .hint {
       font-size: var(--ha-font-size-m, 14px);
       color: var(--secondary-text-color);
+    }
+    .reset {
+      margin-top: var(--ha-space-4, 16px);
+      padding-top: var(--ha-space-3, 12px);
+      border-top: 1px solid var(--divider-color, #444);
+    }
+    .reset-title {
+      margin: 0 0 var(--ha-space-2, 8px);
+      color: var(--primary-text-color);
+      font-weight: var(--ha-font-weight-medium, 500);
+    }
+    .reset-row {
+      display: flex;
+      align-items: center;
+      gap: var(--ha-space-3, 12px);
+      min-height: var(--ha-space-10, 40px);
+    }
+    .reset-row .hint {
+      flex: 1;
+      line-height: var(--ha-line-height-normal, 1.6);
+    }
+    .reset-row button {
+      flex: none;
+      min-height: var(--ha-space-9, 36px);
+      padding: var(--ha-space-1, 4px) var(--ha-space-3, 12px);
+      border: 1px solid var(--primary-color);
+      border-radius: var(--ha-border-radius-md, 8px);
+      background: transparent;
+      color: var(--primary-color);
+      font: inherit;
+      font-size: var(--ha-font-size-m, 14px);
+      cursor: pointer;
+    }
+    .reset-row button:disabled {
+      border-color: var(--divider-color, #444);
+      color: var(--secondary-text-color);
+      opacity: 0.6;
+      cursor: default;
     }
   `;
 }
