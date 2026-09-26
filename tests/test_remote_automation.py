@@ -337,6 +337,7 @@ async def test_save_edits_branch_and_untick_detaches(
     hass, hass_ws_client, remote_device
 ) -> None:
     """YAML save on a shared slot edits its branch; unticking pulls it back."""
+    calls = async_mock_service(hass, "test", "automation")
     entry = await _setup(hass, remote_device)
     store = hass.data[DOMAIN]["store"]
     client = await hass_ws_client(hass)
@@ -369,6 +370,10 @@ async def test_save_edits_branch_and_untick_detaches(
     assert slot["shared_automation"] is True and slot["name"] == "Tap"
     # no per-slot automation was created on the side
     assert [a["id"] for a in _yaml(hass)] == [config_id]
+    # the running automation picked up the edit
+    fire_remote_action(hass, "1_single")
+    await hass.async_block_till_done()
+    assert [c.data["via"] for c in calls] == ["slot"]
 
     res = await _ws(
         client,

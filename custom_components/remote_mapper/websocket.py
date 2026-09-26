@@ -247,6 +247,9 @@ async def ws_get_slot(
         vol.Optional("auto_name"): vol.Any(str, None),
         # Link mode: point the slot at an existing native automation entity
         vol.Optional("link_entity_id"): str,
+        # What happens to a snapshot scene the save stops running (as Clear)
+        vol.Optional("decision"): vol.In(["delete", "keep"]),
+        vol.Optional("remember", default=False): bool,
     }
 )
 @websocket_api.async_response
@@ -262,6 +265,7 @@ async def ws_save_slot(
     """
     from homeassistant.helpers import entity_registry as er
 
+    from . import cleanup
     from .materializer import (
         async_absorb_link,
         async_dematerialize,
@@ -283,6 +287,21 @@ async def ws_save_slot(
     entry = hass.config_entries.async_get_entry(msg["entry_id"])
     slot = store.get_slot(msg["entry_id"], msg["action_id"])
 
+    try:
+        replaced = await _replaced_scene(hass, store, msg)
+    except Exception as err:
+        connection.send_error(msg["id"], ERR_INVALID_SEQUENCE, str(err))
+        return
+    decision = cleanup.decide(entry, msg.get("decision")) if replaced else None
+    if replaced and decision is None:
+        # nothing saved yet: the card asks, then sends the save again
+        connection.send_result(
+            msg["id"], {"needs_decision": True, "artifacts": replaced}
+        )
+        return
+    if replaced and "decision" in msg and msg["remember"] and entry is not None:
+        cleanup.async_remember_policy(hass, entry, decision)
+
     if link_entity_id := msg.get("link_entity_id"):
         registry_entry = er.async_get(hass).async_get(link_entity_id)
         if registry_entry is None or registry_entry.domain != "automation":
@@ -301,6 +320,7 @@ async def ws_save_slot(
             slot = store.get_slot(msg["entry_id"], msg["action_id"])
             slot["name"] = (msg["name"] or "").strip() or None
             store.async_set_slot(msg["entry_id"], msg["action_id"], slot)
+        await _release_scene(hass, store, msg, replaced, decision)
         _fire_updated(hass, msg["entry_id"], "slot_linked")
         connection.send_result(
             msg["id"], {"slot": store.get_slot(msg["entry_id"], msg["action_id"])}
@@ -333,6 +353,7 @@ async def ws_save_slot(
             slot = store.get_slot(msg["entry_id"], msg["action_id"])
             slot["name"] = (msg["name"] or "").strip() or None
             store.async_set_slot(msg["entry_id"], msg["action_id"], slot)
+        await _release_scene(hass, store, msg, replaced, decision)
         _fire_updated(hass, msg["entry_id"], "slot_saved")
         connection.send_result(
             msg["id"], {"slot": store.get_slot(msg["entry_id"], msg["action_id"])}
@@ -416,8 +437,6 @@ async def ws_save_slot(
         if sequence is not None:
             slot = slot or default_slot()
             slot["sequence"] = sequence
-            # Manual edit breaks the canonical snapshot-scene link (§4)
-            slot["scene_id"] = None
             store.async_set_slot(msg["entry_id"], msg["action_id"], slot)
         if target_materialized:
             try:
@@ -433,10 +452,54 @@ async def ws_save_slot(
                 connection.send_error(msg["id"], ERR_INVALID_SEQUENCE, str(err))
                 return
 
+    await _release_scene(hass, store, msg, replaced, decision)
     _fire_updated(hass, msg["entry_id"], "slot_saved")
     connection.send_result(
         msg["id"], {"slot": store.get_slot(msg["entry_id"], msg["action_id"])}
     )
+
+
+async def _replaced_scene(
+    hass: HomeAssistant, store: RemoteMapperStore, msg: dict
+) -> dict[str, Any]:
+    """The slot's snapshot scene when this save stops running it, else {}.
+
+    A link replaces the slot's actions; a sequence replaces them unless it
+    still calls the scene.
+    """
+    from . import cleanup
+
+    slot = store.get_slot(msg["entry_id"], msg["action_id"])
+    if not (slot and slot.get("scene_id")):
+        return {}
+    if msg.get("link_entity_id"):
+        sequence: list[Any] = []
+    elif "sequence" in msg or "sequence_yaml" in msg:
+        sequence = await _validated_sequence(hass, msg)
+    else:
+        return {}
+    return cleanup.replaced_scene(
+        hass, store, msg["entry_id"], msg["action_id"], sequence
+    )
+
+
+async def _release_scene(
+    hass: HomeAssistant,
+    store: RemoteMapperStore,
+    msg: dict,
+    replaced: dict[str, Any],
+    decision: str | None,
+) -> None:
+    """After the save: delete the replaced scene, or keep it as the user's."""
+    from . import cleanup
+
+    if not replaced or decision is None:
+        return
+    await cleanup.async_cleanup_artifacts(hass, store, replaced, decision)
+    slot = store.get_slot(msg["entry_id"], msg["action_id"])
+    if slot and slot.get("scene_id") == replaced["scene"]["scene_id"]:
+        slot["scene_id"] = None
+        store.async_set_slot(msg["entry_id"], msg["action_id"], slot)
 
 
 @websocket_api.websocket_command(
@@ -469,16 +532,13 @@ async def ws_clear_slot(
     shared = is_shared(store.get_slot(msg["entry_id"], msg["action_id"]))
 
     if artifacts:
-        policy = cleanup.get_policy(entry)
-        decision = msg.get("decision")
+        decision = cleanup.decide(entry, msg.get("decision"))
         if decision is None:
-            if policy == "ask":
-                connection.send_result(
-                    msg["id"], {"needs_decision": True, "artifacts": artifacts}
-                )
-                return
-            decision = "delete" if policy == "always_delete" else "keep"
-        elif msg["remember"] and entry is not None:
+            connection.send_result(
+                msg["id"], {"needs_decision": True, "artifacts": artifacts}
+            )
+            return
+        if "decision" in msg and msg["remember"] and entry is not None:
             cleanup.async_remember_policy(hass, entry, decision)
         await cleanup.async_cleanup_artifacts(hass, store, artifacts, decision)
 
@@ -557,15 +617,17 @@ async def ws_create_snapshot(
             name,
             re_snapshot=msg["re_snapshot"],
         )
-        # The automation stays canonical: push the scene call where it runs
+        # The automation stays canonical: push the scene call where it runs.
+        # A re-snapshot keeps the scene's id, so what calls it is unchanged.
         slot = store.get_slot(msg["entry_id"], msg["action_id"])
-        if is_shared(slot):
+        fresh = not msg["re_snapshot"]
+        if fresh and is_shared(slot):
             await async_set_branch_sequence(
                 hass, msg["entry_id"], msg["action_id"], slot["sequence"]
             )
             slot["sequence"] = []
             store.async_set_slot(msg["entry_id"], msg["action_id"], slot)
-        elif slot and slot.get("materialized"):
+        elif fresh and slot and slot.get("materialized"):
             await async_materialize(
                 hass, store, msg["entry_id"], msg["action_id"], remote_name(hass, entry)
             )

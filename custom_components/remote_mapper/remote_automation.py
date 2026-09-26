@@ -22,7 +22,12 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.exceptions import HomeAssistantError
 
 from .const import DOMAIN, MANAGED_DESCRIPTION_MARKER
-from .materializer import _get_config_store
+from .materializer import (
+    _get_config_store,
+    async_dematerialize,
+    automation_entity_id,
+    is_linked,
+)
 from .naming import managed_alias
 from .store import default_slot
 
@@ -272,9 +277,10 @@ async def async_create_remote_automation(
 ) -> str:
     """Scaffold the shared automation for every given event.
 
-    Card-built slots move their sequence into their branch. Slots that
-    already have their own automation (materialized or linked) are left
-    alone — they can be cleared and added later.
+    Card-built slots move their sequence into their branch. Left out:
+    slots with their own automation (async_add_branch moves one in), linked
+    slots (the link has to be unticked first) and disabled slots (a branch
+    has no off switch of its own, so their steps would run).
     """
     from .adapters import get_adapter
 
@@ -290,10 +296,14 @@ async def async_create_remote_automation(
         slot = store.get_slot(entry_id, action_id)
         if slot and slot.get("materialized") and slot.get("automation_id") != config_id:
             continue
+        if slot and slot.get("archived"):
+            continue
         triggers[action_id] = adapter.build_trigger(action_id, remote["source_config"])
         sequences[action_id] = list(slot.get("sequence") or []) if slot else []
     if not triggers:
-        raise HomeAssistantError("Every event already has its own automation")
+        raise HomeAssistantError(
+            "Every event already has its own automation or is disabled"
+        )
 
     await _get_config_store(hass).async_upsert(
         config_id, build_remote_payload(title, triggers, sequences)
@@ -309,7 +319,14 @@ async def async_add_branch(
     entry_id: str,
     action_id: str,
 ) -> str:
-    """Append a trigger + branch for one event (grow as you go / re-add)."""
+    """Append a trigger + branch for one event (grow as you go / re-add).
+
+    An event with its own automation moves that automation's live actions
+    into the branch, and the automation is deleted, as unticking it would
+    do; both would otherwise fire on the press. Refused for a linked event,
+    whose native automation keeps firing on its own trigger, and for a
+    disabled one.
+    """
     from .adapters import get_adapter
 
     remote = store.get_remote(entry_id)
@@ -319,16 +336,37 @@ async def async_add_branch(
     raw = await _get_config_store(hass).async_get(config_id)
     if raw is None:
         raise HomeAssistantError("The remote has no shared automation yet")
+    slot = store.get_slot(entry_id, action_id)
+    if is_linked(slot):
+        raise HomeAssistantError(
+            "This event is linked to a native automation, which keeps firing "
+            "on its own trigger — untick the link first"
+        )
+    own = bool(
+        slot and slot.get("materialized") and slot.get("automation_id") != config_id
+    )
+    own_state = None
+    if own and (entity_id := automation_entity_id(hass, slot["automation_id"])):
+        own_state = hass.states.get(entity_id)
+    if (slot and slot.get("archived")) or (own_state and own_state.state == "off"):
+        raise HomeAssistantError(
+            "This event is disabled, and a branch has no off switch of its "
+            "own — enable it first"
+        )
 
     payload = _normalized(raw)
-    if find_branch(payload, action_id) is None:
+    has_branch = find_branch(payload, action_id) is not None
+    choose = _choose_step(payload)
+    if not has_branch and choose is None:
+        raise HomeAssistantError(
+            "The shared automation was restructured in HA — add the branch there"
+        )
+    if own:
+        await async_dematerialize(hass, store, entry_id, action_id, None)
         slot = store.get_slot(entry_id, action_id)
+
+    if not has_branch:
         sequence = list(slot.get("sequence") or []) if slot else []
-        choose = _choose_step(payload)
-        if choose is None:
-            raise HomeAssistantError(
-                "The shared automation was restructured in HA — add the branch there"
-            )
         # The trigger may still be there (user deleted only the branch)
         existing = _trigger_ids_for(payload["triggers"], action_id)
         if existing:

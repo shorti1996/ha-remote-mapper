@@ -1,4 +1,4 @@
-.PHONY: build dev clean test test-frontend lint format bump-version release ha-up ha-down ha-logs
+.PHONY: build dev clean test test-deep test-frontend lint format bump-version release ha-up ha-down ha-logs
 
 FRONTEND := custom_components/remote_mapper/frontend
 
@@ -29,6 +29,10 @@ clean:
 
 test: test-frontend
 	uv run pytest
+
+# the same suite with long random walks (tests/stress_rig.py), ~7 min
+test-deep:
+	STRESS_SEEDS=100 STRESS_STEPS=80 uv run pytest
 
 test-frontend:
 	cd $(FRONTEND) && npm test

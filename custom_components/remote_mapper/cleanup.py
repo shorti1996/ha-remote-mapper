@@ -49,6 +49,44 @@ def async_remember_policy(
     )
 
 
+def decide(entry: ConfigEntry | None, decision: str | None) -> str | None:
+    """The decision to apply: the one given, else the policy's; None = ask."""
+    if decision is not None:
+        return decision
+    policy = get_policy(entry)
+    if policy == CLEANUP_ASK:
+        return None
+    return DECISION_DELETE if policy == CLEANUP_ALWAYS_DELETE else DECISION_KEEP
+
+
+def _mentions(value: Any, needle: str) -> bool:
+    if isinstance(value, str):
+        return needle in value
+    if isinstance(value, dict):
+        return any(_mentions(v, needle) for v in value.values())
+    if isinstance(value, list):
+        return any(_mentions(v, needle) for v in value)
+    return False
+
+
+def replaced_scene(
+    hass: HomeAssistant,
+    store: RemoteMapperStore,
+    entry_id: str,
+    action_id: str,
+    sequence: list[Any],
+) -> dict[str, Any]:
+    """The slot's snapshot scene, as artifacts, when ``sequence`` no longer
+    runs it; empty when the slot owns none or the new actions still call it
+    somewhere (the link then stays)."""
+    scene = collect_artifacts(hass, store, entry_id, action_id).get("scene")
+    if scene is None or (
+        scene["entity_id"] and _mentions(sequence, scene["entity_id"])
+    ):
+        return {}
+    return {"scene": scene}
+
+
 def collect_artifacts(
     hass: HomeAssistant,
     store: RemoteMapperStore,

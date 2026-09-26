@@ -12,6 +12,7 @@ automatically), Node 22+, Docker.
 make dev        # card build (unminified, sourcemaps)
 make build      # production card build (output committed in www/)
 make test       # vitest (frontend pure modules) + pytest (integration)
+make test-deep  # pytest with 100-seed random walks (~7 min, before a release)
 make lint       # ruff check + format check
 make ha-up      # dev HA (stable) + mosquitto on :8123 / :1883
 make ha-logs    # follow HA logs

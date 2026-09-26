@@ -144,9 +144,11 @@ Field semantics:
   as `script.X.sequence` / automation `actions:` (supports `choose`,
   `parallel`, `repeat`, `if/then`, `wait_for_trigger`, templates — no
   restrictions vs. native automations).
-- `scene_id` — set when the slot's sequence is the canonical
-  single-`scene.turn_on` form created via the snapshot flow; arbitrary
-  sequences keep `null` and are exempt from scene-cleanup logic.
+- `scene_id` — set by the snapshot flow, which writes the canonical
+  single-`scene.turn_on` form; it stays while the slot's actions still
+  call the scene, steps added around the call included. A save or link
+  that stops calling it goes through the cleanup policy (§ 7), then the
+  field is `null`.
 - `materialized` / `automation_id` — § 6.
 - `schema_version` — per-slot, for action-name drift handling (§ 10).
 - `owned_scenes` — scenes created *by this integration* only; the ownership

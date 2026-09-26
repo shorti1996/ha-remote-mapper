@@ -24,13 +24,7 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.exceptions import HomeAssistantError
 
-from .materializer import (
-    AUTOMATION_DOMAIN,
-    async_dematerialize,
-    async_materialize,
-    automation_entity_id,
-    is_linked,
-)
+from .materializer import async_dematerialize, async_materialize, is_linked
 from .remote_automation import async_move_branches, is_shared
 
 if TYPE_CHECKING:
@@ -115,15 +109,9 @@ async def async_move_slot(
     if branch_moves:
         await async_move_branches(hass, store, entry_id, branch_moves)
     for src, dst in moves.items():
-        if kinds[src] != KIND_OWNED:
-            continue
-        config_id = await async_materialize(hass, store, entry_id, dst, title)
-        if records[src].get("archived") and (
-            entity_id := automation_entity_id(hass, config_id)
-        ):
-            await hass.services.async_call(
-                AUTOMATION_DOMAIN, "turn_off", {"entity_id": entity_id}, blocking=True
-            )
+        if kinds[src] == KIND_OWNED:
+            # async_materialize switches an archived record's automation off
+            await async_materialize(hass, store, entry_id, dst, title)
 
     _LOGGER.info(
         "%s: moved %s", entry_id, ", ".join(f"{s}→{d}" for s, d in moves.items())

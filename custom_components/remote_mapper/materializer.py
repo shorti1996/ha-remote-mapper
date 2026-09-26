@@ -14,6 +14,7 @@ canonical — the slot store keeps only a pointer.
 from __future__ import annotations
 
 import asyncio
+import copy
 import logging
 import shutil
 from pathlib import Path
@@ -103,11 +104,16 @@ class AutomationConfigStore:
         write_utf8_file_atomic(self._path, dump(data))
 
     async def async_get(self, config_id: str) -> dict[str, Any] | None:
-        """Live entity raw_config preferred; file fallback."""
+        """Live entity raw_config preferred; file fallback.
+
+        The live config is deep-copied: callers edit nested branches in
+        place, and a targeted reload skips an automation whose raw_config
+        already equals the new one — the old actions would keep running.
+        """
         if (component := self.hass.data.get(AUTOMATION_DATA)) is not None:
             for entity in component.entities:
                 if entity.unique_id == config_id and entity.raw_config is not None:
-                    return dict(entity.raw_config)
+                    return copy.deepcopy(dict(entity.raw_config))
         async with self._lock:
             data = await self.hass.async_add_executor_job(self._read_sync)
         for item in data:
@@ -116,7 +122,11 @@ class AutomationConfigStore:
         return None
 
     async def async_upsert(self, config_id: str, payload: dict[str, Any]) -> None:
-        """Validate, upsert by id (foreign entries untouched), reload."""
+        """Validate, upsert by id (foreign entries untouched), reload.
+
+        A new automation is switched on: HA gives it the last state of a
+        deleted one with the same entity id, which can be off.
+        """
         await async_validate_config_item(self.hass, config_id, dict(payload))
         new_value = {CONF_ID: config_id, **payload}
         async with self._lock:
@@ -124,14 +134,22 @@ class AutomationConfigStore:
             for index, item in enumerate(data):
                 if item.get(CONF_ID) == config_id:
                     data[index] = new_value
+                    created = False
                     break
             else:
                 data.append(new_value)
+                created = True
             await self.hass.async_add_executor_job(self._write_sync, data)
         # Targeted reload — same as the view's post_write_hook
         await self.hass.services.async_call(
             AUTOMATION_DOMAIN, SERVICE_RELOAD, {CONF_ID: config_id}, blocking=True
         )
+        entity_id = automation_entity_id(self.hass, config_id) if created else None
+        state = self.hass.states.get(entity_id) if entity_id else None
+        if state is not None and state.state == "off":
+            await self.hass.services.async_call(
+                AUTOMATION_DOMAIN, "turn_on", {"entity_id": entity_id}, blocking=True
+            )
 
     async def async_delete(self, config_id: str) -> bool:
         """Remove entry from yaml + drop the registry entity."""
@@ -178,6 +196,9 @@ async def async_materialize(
     name the card inferred from the actions), else the button label. An
     update with neither keeps the alias the automation already has, so a
     re-snapshot doesn't undo a rename made in HA.
+
+    A new automation gets the event's id, or ``<id>_2``… when that is
+    taken — by an automation kept on clear, which is the user's now.
     """
     from .adapters import get_adapter
 
@@ -188,8 +209,14 @@ async def async_materialize(
 
     adapter = get_adapter(remote["source"])
     trigger = adapter.build_trigger(action_id, remote["source_config"])
-    config_id = automation_config_id(entry_id, action_id)
     config_store = _get_config_store(hass)
+    config_id = slot.get("automation_id") if slot.get("materialized") else None
+    if not config_id:
+        config_id = base = automation_config_id(entry_id, action_id)
+        n = 1
+        while await config_store.async_get(config_id) is not None:
+            n += 1
+            config_id = f"{base}_{n}"
     name = slot.get("name") or auto_name
     existing = None if name else await config_store.async_get(config_id)
     alias = (existing or {}).get("alias") or managed_alias(
@@ -198,6 +225,11 @@ async def async_materialize(
     payload = build_payload(alias, trigger, slot["sequence"])
 
     await config_store.async_upsert(config_id, payload)
+    # an archived slot stays silent: its automation is switched off
+    if slot.get("archived") and (entity_id := automation_entity_id(hass, config_id)):
+        await hass.services.async_call(
+            AUTOMATION_DOMAIN, "turn_off", {"entity_id": entity_id}, blocking=True
+        )
 
     slot["materialized"] = True
     slot["automation_id"] = config_id

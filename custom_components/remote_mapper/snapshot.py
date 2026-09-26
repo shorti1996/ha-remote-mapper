@@ -52,6 +52,26 @@ def scene_config_id(entry_id: str, action_id: str) -> str:
     return f"{DOMAIN}_{entry_id}_{action_id}"
 
 
+async def _free_scene_id(
+    hass: HomeAssistant, store: RemoteMapperStore, base: str
+) -> str:
+    """``base``, or ``base_2``, ``base_3``… when a scene already has it.
+
+    A moved slot takes its scene's id along, and a scene kept on clear
+    outlives its slot; a new snapshot at the event they came from gets a
+    scene of its own instead of overwriting theirs.
+    """
+    scenes = get_scene_config_store(hass)
+    candidate, n = base, 1
+    while (
+        store.get_owned_scene(candidate) is not None
+        or await scenes.async_get(candidate) is not None
+    ):
+        n += 1
+        candidate = f"{base}_{n}"
+    return candidate
+
+
 def _plain(value: Any) -> Any:
     """Enum members → their value, recursively.
 
@@ -95,23 +115,26 @@ async def async_create_snapshot(
     name: str,
     re_snapshot: bool = False,
 ) -> dict[str, Any]:
-    """Capture states into a persistent scene bound to the slot."""
+    """Capture states into a persistent scene bound to the slot.
+
+    A re-snapshot changes only the scene's states: the slot, and the
+    automation or branch calling the scene, keep their actions.
+    """
     # A slot moved from another event keeps its scene: reuse that id so a
     # capture updates it instead of leaving an orphan behind.
-    config_id = scene_config_id(entry_id, action_id)
     existing = store.get_slot(entry_id, action_id)
-    if (
-        existing
-        and (owned_id := existing.get("scene_id"))
-        and store.get_owned_scene(owned_id) is not None
-    ):
+    owned_id = existing.get("scene_id") if existing else None
+    if owned_id and store.get_owned_scene(owned_id) is not None:
         config_id = owned_id
+    elif re_snapshot:
+        raise HomeAssistantError("Slot has no owned scene to re-snapshot")
+    else:
+        config_id = await _free_scene_id(
+            hass, store, scene_config_id(entry_id, action_id)
+        )
 
     if re_snapshot:
-        owned = store.get_owned_scene(config_id)
-        if owned is None:
-            raise HomeAssistantError("Slot has no owned scene to re-snapshot")
-        entity_ids = owned["entities"]
+        entity_ids = store.get_owned_scene(config_id)["entities"]
 
     entities = capture_entities(hass, entity_ids)
     if not entities:
@@ -131,11 +154,14 @@ async def async_create_snapshot(
         entities=list(entities),
     )
 
-    slot = store.get_slot(entry_id, action_id) or default_slot()
-    # Canonical single-turn_on form — the only writer of scene_id (§4)
-    slot["sequence"] = [{"action": "scene.turn_on", "target": {"entity_id": entity_id}}]
-    slot["scene_id"] = config_id
-    store.async_set_slot(entry_id, action_id, slot)
+    if not re_snapshot:
+        slot = store.get_slot(entry_id, action_id) or default_slot()
+        # Canonical single-turn_on form — the only writer of scene_id (§4)
+        slot["sequence"] = [
+            {"action": "scene.turn_on", "target": {"entity_id": entity_id}}
+        ]
+        slot["scene_id"] = config_id
+        store.async_set_slot(entry_id, action_id, slot)
 
     return {
         "scene_id": config_id,

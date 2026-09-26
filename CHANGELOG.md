@@ -3,6 +3,67 @@
 Notable changes per release. Unreleased entries collect on `master` and
 move under a version heading when `make release VERSION=x.y.z` runs.
 
+## Unreleased
+
+### Fixed
+
+- **Edits to the remote automation take effect without a restart.**
+  Swapping or moving two branches, or saving a branch from the card's
+  YAML tab, rewrote `automations.yaml` but left the running automation on
+  its old actions until HA restarted: the edit landed in the live
+  automation's config before the reload compared the two, so HA saw no
+  change and skipped it.
+- **"Add this button to the remote automation" on a button with its own
+  automation** moves that automation's actions into the branch and
+  deletes it. Before, both ran on every press.
+- **"Add this button" on a linked button is refused** with a hint to
+  untick the link first, and the card no longer offers it there. Before,
+  the card showed an empty branch while the native automation kept
+  firing.
+- **A disabled button stays out of the remote automation.** Creating it
+  for the whole remote pulled a disabled card-only button in as a branch
+  that ran on every press; now it is left out, and "Add this button"
+  asks to enable it first.
+- **A recreated automation starts on.** Moving an action onto another
+  event, or creating the remote automation again, could leave the new
+  automation off: HA gives it the last state of a deleted automation with
+  the same id, and the card derives ids from the event.
+- **A new snapshot leaves other scenes alone.** A snapshot on an event
+  whose earlier snapshot had moved to another event, or whose scene was
+  kept on clear, overwrote that scene. It now gets a scene of its own
+  (`…_2`).
+- **Re-snapshot changes only the scene's states.** On a branch of the
+  remote automation or a button's own automation it also replaced the
+  actions with the bare scene call, dropping steps added around it.
+- **A button's new automation leaves the one kept on clear alone.** After
+  *Clear → keep*, making the button's own automation again overwrote the
+  kept one and stayed off. It now gets an id of its own and runs.
+- **Replacing a snapshot scene asks what happens to it.** Saving actions
+  that no longer run a button's snapshot scene, or linking the button to
+  an automation, left the scene in HA unused and still recorded as the
+  card's. The save now asks, as *Clear* does: delete the scene, or keep it
+  as a scene of your own; a remembered choice answers without asking.
+  Actions that still call the scene keep it linked, so *Re-snapshot*
+  keeps working with steps added around the call.
+
+### Tested
+
+- `tests/test_stress_mix.py` and `tests/test_stress_content.py` drive the
+  card's operations over one six-event remote that mixes the remote
+  automation, per-button automations, linked native ones and card-only
+  slots holding actions, toggles, scripts, hand-made and snapshot scenes.
+  After every step each event is pressed and tapped, and every service
+  call, toggle flip, scene activation and script run is counted against
+  what the card shows. Scripted scenarios cover each fix above; a random
+  walk per file runs 3 seeds × 50 steps in `make test` and 100 × 80 in
+  the new `make test-deep`.
+- In a dev Home Assistant, over MQTT presses: a branch swap and a YAML-tab
+  edit take effect at once; "Add this button" moves a button's own
+  automation in and refuses linked and disabled ones; snapshots after a
+  move or a kept clear get ids of their own; re-snapshot keeps the steps
+  around the scene call; saving a toggle over a snapshot button shows the
+  scene dialog, and *Save, delete scene* saves and removes the scene.
+
 ## 0.1.8 — 2026-09-25
 
 ### Added

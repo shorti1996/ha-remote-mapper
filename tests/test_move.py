@@ -213,6 +213,7 @@ async def test_move_shared_branch(hass, hass_ws_client, remote_device) -> None:
 
 async def test_swap_shared_branches(hass, hass_ws_client, remote_device) -> None:
     """Two branches exchange their actions; triggers stay in place."""
+    calls = async_mock_service(hass, "test", "automation")
     entry = await _setup(hass, remote_device)
     client = await hass_ws_client(hass)
     await _save(client, entry, "1_single", SEQ_A)
@@ -240,6 +241,11 @@ async def test_swap_shared_branches(hass, hass_ws_client, remote_device) -> None
     }
     assert branches["1_single"] == SEQ_B
     assert branches["1_double"] == SEQ_A
+
+    # the running automation runs the swapped branches
+    fire_remote_action(hass, "1_single")
+    await hass.async_block_till_done()
+    assert [c.data["via"] for c in calls] == ["b"]
 
 
 async def test_move_shared_onto_plain(hass, hass_ws_client, remote_device) -> None:

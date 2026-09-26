@@ -359,9 +359,11 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   @state() private _haFormOk = false;
   @state() private _yamlEditorOk = false;
 
-  // clear-policy dialog
+  // clear-policy dialog; also asked by a save that replaces a snapshot scene
   @state() private _clearArtifacts?: Record<string, unknown>;
   @state() private _clearRemember = false;
+  /** The save waiting on the dialog's answer; unset when Clear opened it. */
+  @state() private _pendingSave?: Record<string, unknown>;
 
   // "Move to…" panel: pick another event of the remote; a set one swaps
   @state() private _moveOpen = false;
@@ -973,6 +975,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     this._draftError = undefined;
     this._editingLive = undefined;
     this._clearArtifacts = undefined;
+    this._pendingSave = undefined;
     this._moveOpen = false;
   }
 
@@ -1147,8 +1150,31 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       );
       if (dialog && !(await this._confirm(dialog))) return;
     }
+    await this._sendSave(msg);
+  }
+
+  /**
+   * Send a save. One that stops running the slot's snapshot scene comes
+   * back with needs_decision under the "ask" policy: nothing is saved yet,
+   * the clear dialog asks about the scene and sends the save again.
+   */
+  private async _sendSave(
+    msg: Record<string, unknown>,
+    decision?: string,
+  ): Promise<void> {
+    const live = this._editingLive;
     try {
-      const res = await this._hass!.callWS<{ absorbed?: string[] }>(msg);
+      const res = await this._hass!.callWS<{
+        absorbed?: string[];
+        needs_decision?: boolean;
+        artifacts?: Record<string, unknown>;
+      }>(decision ? { ...msg, decision, remember: this._clearRemember } : msg);
+      if (res?.needs_decision) {
+        this._clearRemember = false;
+        this._pendingSave = msg;
+        this._clearArtifacts = res.artifacts;
+        return;
+      }
       if ((res?.absorbed?.length ?? 0) > 1) {
         this.notify(
           `Moved ${res.absorbed!.length} events into the card; "${live?.alias}" is turned off.`
@@ -1156,6 +1182,8 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       }
       this._closeEditor();
     } catch (err) {
+      this._clearArtifacts = undefined;
+      this._pendingSave = undefined;
       this._draftError = (err as { message?: string }).message ?? String(err);
     }
   }
@@ -2332,7 +2360,14 @@ export class RemoteMapperCard extends LitElement implements EditHost {
         value: "new_remote_automation",
         label: "＋ Automation for the whole remote (one branch per event)",
       });
-    } else if (!slot?.shared_automation || slot.branch_missing) {
+    } else if (
+      (!slot?.shared_automation || slot.branch_missing) &&
+      // not for a linked button, whose native automation keeps firing on
+      // its own trigger, or a disabled one, which would run as a branch
+      !this._isLinked(slot) &&
+      !slot?.archived &&
+      !(!slot?.shared_automation && this._automationState(slot) === "off")
+    ) {
       createOptions.push({
         value: "new_remote_automation",
         label: "＋ Add this button to the remote automation",
@@ -2491,10 +2526,21 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       );
     }
     if (artifacts.automation) parts.push("its automation");
+    const saving = !!this._pendingSave;
+    const decide = (decision: string) =>
+      saving ? this._sendSave(this._pendingSave!, decision) : this._clearSlot(decision);
+    const scene =
+      (artifacts.scene as { entity_id?: string } | undefined)?.entity_id ?? "its scene";
     return html`
       <div class="decision">
-        <p><b>Also delete ${parts.join(" and ")}?</b></p>
-        <label class="hint">
+        ${saving
+          ? html`<p><b>Saving replaces ${scene}, this button's snapshot scene.</b></p>
+              <p class="hint">
+                Delete removes the scene from HA. Keep leaves it under Settings →
+                Scenes as a scene of your own; Re-snapshot stops updating it.
+              </p>`
+          : html`<p><b>Also delete ${parts.join(" and ")}?</b></p>`}
+        <label class="hint check-row">
           <input
             type="checkbox"
             .checked=${this._clearRemember}
@@ -2505,13 +2551,16 @@ export class RemoteMapperCard extends LitElement implements EditHost {
           Remember my choice
         </label>
         <div class="buttons">
-          <button class="danger" @click=${() => this._clearSlot("delete")}>
-            Delete
+          <button class="danger" @click=${() => decide("delete")}>
+            ${saving ? "Save, delete scene" : "Delete"}
           </button>
-          <button @click=${() => this._clearSlot("keep")}>Keep</button>
+          <button @click=${() => decide("keep")}>
+            ${saving ? "Save, keep scene" : "Keep"}
+          </button>
           <button
             @click=${() => {
               this._clearArtifacts = undefined;
+              this._pendingSave = undefined;
             }}
           >
             Cancel
@@ -3044,13 +3093,15 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       font-size: var(--ha-font-size-s, 12px);
     }
     .decision {
-      margin-top: 12px;
-      padding: 12px;
+      margin-top: var(--ha-space-3, 12px);
+      padding: var(--ha-space-3, 12px);
       border: 1px solid var(--warning-color, #ffa600);
-      border-radius: 8px;
+      border-radius: var(--ha-border-radius-md, 8px);
     }
     .decision p {
-      margin: 0 0 8px;
+      margin: 0 0 var(--ha-space-2, 8px);
+      font-size: var(--ha-font-size-m, 14px);
+      line-height: var(--ha-line-height-normal, 1.6);
     }
     .decision.move {
       border-color: var(--primary-color);
@@ -3178,8 +3229,8 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     .buttons {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 12px;
+      gap: var(--ha-space-2, 8px);
+      margin-top: var(--ha-space-3, 12px);
     }
     .buttons button {
       min-height: var(--ha-space-9, 36px);
