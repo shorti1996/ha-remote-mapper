@@ -3,7 +3,7 @@
 Notable changes per release. Unreleased entries collect on `master` and
 move under a version heading when `make release VERSION=x.y.z` runs.
 
-## Unreleased
+## 0.1.9 — 2026-09-26
 
 ### Fixed
 
