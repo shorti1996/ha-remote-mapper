@@ -5,6 +5,8 @@ move under a version heading when `make release VERSION=x.y.z` runs.
 
 ## Unreleased
 
+## 0.1.10 — 2026-09-27
+
 ### Changed
 
 - **The dashboard no longer jumps while the cards load.** Each card
