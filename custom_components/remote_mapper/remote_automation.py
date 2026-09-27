@@ -71,8 +71,15 @@ def _normalized(raw: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
-def _intrinsic_action(trigger: dict[str, Any]) -> str | None:
-    """What event a trigger matches by itself, ignoring its id."""
+def _intrinsic_action(
+    trigger: dict[str, Any], buttons: dict[str, str] | None = None
+) -> str | None:
+    """What event a trigger matches by itself, ignoring its id.
+
+    ``buttons`` is a Matter remote's ``{token: entity_id}`` map: an
+    ``event.received`` trigger on one of those entities resolves to the
+    namespaced ``token:event_type`` id.
+    """
     platform = trigger.get("trigger", trigger.get("platform"))
     if platform == "device":
         subtype = trigger.get("subtype")
@@ -82,18 +89,29 @@ def _intrinsic_action(trigger: dict[str, Any]) -> str | None:
         return payload if isinstance(payload, str) else None
     if platform == "event.received":
         events = _as_list((trigger.get("options") or {}).get("event_type"))
-        return str(events[0]) if len(events) == 1 else None
+        if len(events) != 1:
+            return None
+        prefix = ""
+        if buttons:
+            targets = _as_list((trigger.get("target") or {}).get("entity_id"))
+            by_entity = {eid: token for token, eid in buttons.items()}
+            if len(targets) != 1 or targets[0] not in by_entity:
+                return None
+            prefix = f"{by_entity[targets[0]]}:"
+        return f"{prefix}{events[0]}"
     return None
 
 
-def _trigger_ids_for(triggers: list[Any], action_id: str) -> set[str]:
+def _trigger_ids_for(
+    triggers: list[Any], action_id: str, buttons: dict[str, str] | None = None
+) -> set[str]:
     """Ids (explicit or positional) of the triggers standing for an event."""
     ids: set[str] = set()
     for index, trigger in enumerate(triggers):
         if not isinstance(trigger, dict):
             continue
         trigger_id = str(trigger.get("id", index))
-        if trigger_id == action_id or _intrinsic_action(trigger) == action_id:
+        if trigger_id == action_id or _intrinsic_action(trigger, buttons) == action_id:
             ids.add(trigger_id)
     return ids
 
@@ -162,13 +180,15 @@ def build_remote_payload(
     }
 
 
-def find_branch(payload: dict[str, Any], action_id: str) -> int | None:
+def find_branch(
+    payload: dict[str, Any], action_id: str, buttons: dict[str, str] | None = None
+) -> int | None:
     """Index of the branch for an event, or None."""
     choose = _choose_step(payload)
     if choose is None:
         return None
     ids = _trigger_ids_for(
-        _as_list(payload.get("triggers", payload.get("trigger"))), action_id
+        _as_list(payload.get("triggers", payload.get("trigger"))), action_id, buttons
     )
     if not ids:
         return None
@@ -445,43 +465,58 @@ async def async_move_branches(
     store: RemoteMapperStore,
     entry_id: str,
     moves: dict[str, str],
+    config_id: str | None = None,
 ) -> None:
     """Re-key branches to other events in one write: ``{source: target}``.
 
-    A target that is itself a source swaps: both branches keep their
-    trigger and condition and exchange sequence and alias. A one-way move
-    takes the source's trigger out and keys the branch to the target's
-    trigger, adding one when the automation has none for that event. The
-    store is not touched — the caller moves the slot records.
+    Works on the remote's shared automation (default) or on any linked
+    automation of this remote's shape (``config_id``). A target that is
+    itself a source swaps: both branches keep their trigger and condition
+    and exchange sequence and alias. A one-way move takes the source's
+    trigger out and keys the branch to the target's trigger, adding one
+    when the automation has none for that event. A flat automation (no
+    choose, the whole action list fires) moves by swapping its trigger.
+    The store is not touched — the caller moves the slot records.
     """
     from .adapters import get_adapter
 
     remote = store.get_remote(entry_id)
     if remote is None:
         raise HomeAssistantError(f"Unknown remote {entry_id}")
-    config_id = remote_automation_config_id(entry_id)
+    shared = config_id is None
+    config_id = config_id or remote_automation_config_id(entry_id)
     raw = await _get_config_store(hass).async_get(config_id)
     if raw is None:
-        raise HomeAssistantError("The shared automation no longer exists")
-    payload = _normalized(raw)
-    choose = _choose_step(payload)
-    if choose is None:
         raise HomeAssistantError(
-            "The shared automation was restructured in HA — move the branch there"
+            "The shared automation no longer exists"
+            if shared
+            else "The linked automation no longer exists"
         )
+    what = "the shared automation" if shared else "the linked automation"
+    buttons = remote["source_config"].get("buttons")
+    adapter = get_adapter(remote["source"])
+    payload = _normalized(raw)
     # Positional ids would shift after a removal — pin every id first
     for index, trigger in enumerate(payload["triggers"]):
         if isinstance(trigger, dict) and "id" not in trigger:
             trigger["id"] = str(index)
+    choose = _choose_step(payload)
+    if choose is None:
+        if shared:
+            raise HomeAssistantError(
+                "The shared automation was restructured in HA — move the branch there"
+            )
+        _move_flat_triggers(payload, moves, what, buttons, adapter, remote)
+        await _get_config_store(hass).async_upsert(config_id, payload)
+        return
     options = _as_list(choose.get("choose"))
     contents: dict[str, tuple[int, dict[str, Any]]] = {}
     for source in moves:
-        index = find_branch(payload, source)
+        index = find_branch(payload, source, buttons)
         if index is None:
-            raise HomeAssistantError(f"{source} has no branch in the shared automation")
+            raise HomeAssistantError(f"{source} has no branch in {what}")
         contents[source] = (index, options[index])
 
-    adapter = get_adapter(remote["source"])
     new_options = list(options)
     dropped: set[int] = set()
     removed_ids: set[str] = set()
@@ -496,8 +531,8 @@ async def async_move_branches(
                 **content,
             }
             continue
-        removed_ids |= _trigger_ids_for(payload["triggers"], source)
-        target_index = find_branch(payload, target)
+        removed_ids |= _trigger_ids_for(payload["triggers"], source, buttons)
+        target_index = find_branch(payload, target, buttons)
         if target_index is not None:
             # the automation already has a branch for the target (built in
             # HA, unknown to the card): it takes over the content
@@ -507,7 +542,7 @@ async def async_move_branches(
             }
             dropped.add(source_index)
             continue
-        existing = _trigger_ids_for(payload["triggers"], target)
+        existing = _trigger_ids_for(payload["triggers"], target, buttons)
         if existing:
             branch_id = sorted(existing)[0]
         else:
@@ -525,6 +560,39 @@ async def async_move_branches(
     ] + added_triggers
     choose["choose"] = [o for i, o in enumerate(new_options) if i not in dropped]
     await _get_config_store(hass).async_upsert(config_id, payload)
+
+
+def _move_flat_triggers(
+    payload: dict[str, Any],
+    moves: dict[str, str],
+    what: str,
+    buttons: dict[str, str] | None,
+    adapter: Any,
+    remote: dict[str, Any],
+) -> None:
+    """Flat automation: the source's triggers become the target's trigger.
+
+    The whole action list fires on any trigger, so the trigger is all
+    that moves. Other triggers stay, and an existing target trigger is
+    reused. In place, on the normalized payload.
+    """
+    if len(moves) != 1:
+        raise HomeAssistantError(
+            f"{what} fires as a whole: two of its events can't swap"
+        )
+    ((source, target),) = moves.items()
+    ids = _trigger_ids_for(payload["triggers"], source, buttons)
+    if not ids:
+        raise HomeAssistantError(f"{source} has no trigger in {what}")
+    kept = [
+        t
+        for t in payload["triggers"]
+        if not (isinstance(t, dict) and str(t.get("id")) in ids)
+    ]
+    if not _trigger_ids_for(kept, target, buttons):
+        trigger = adapter.build_trigger(target, remote["source_config"])
+        kept.append({**trigger, "id": target})
+    payload["triggers"] = kept
 
 
 async def async_detach_branch(

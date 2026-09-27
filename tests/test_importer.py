@@ -415,3 +415,103 @@ async def test_duplicate_trigger_automations_merge(
     fire_remote_action(hass, "1_double")
     await hass.async_block_till_done()
     assert [c.data["which"] for c in calls] == ["warm", "bright"]
+
+
+def _event_trigger(entity_id: str, event_type: str, trigger_id: str | None = None):
+    trigger = {
+        "trigger": "event.received",
+        "target": {"entity_id": entity_id},
+        "options": {"event_type": [event_type]},
+    }
+    if trigger_id is not None:
+        trigger["id"] = trigger_id
+    return trigger
+
+
+async def test_scan_matter_remote(
+    hass, hass_ws_client, device_registry, entity_registry
+) -> None:
+    """A Matter remote imports event.received automations on its buttons.
+
+    The handed-back shapes: one flat automation per event and one
+    choose-per-remote keyed on trigger ids, both on event entities.
+    """
+    owner = MockConfigEntry(domain="matter")
+    owner.add_to_hass(hass)
+    device = device_registry.async_get_or_create(
+        config_entry_id=owner.entry_id,
+        identifiers={("matter", "bilresa")},
+        name="BILRESA dual button orange",
+    )
+    b1 = entity_registry.async_get_or_create(
+        "event",
+        "matter",
+        "b1",
+        device_id=device.id,
+        suggested_object_id="bilresa_button_1",
+    ).entity_id
+    b2 = entity_registry.async_get_or_create(
+        "event",
+        "matter",
+        "b2",
+        device_id=device.id,
+        suggested_object_id="bilresa_button_2",
+    ).entity_id
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="BILRESA dual button orange",
+        unique_id=f"matter:{device.id}",
+        data={
+            "source": "matter",
+            "source_config": {
+                "device_id": device.id,
+                "buttons": {"button_1": b1, "button_2": b2},
+            },
+            "layout": {"actions": ["button_1:initial_press", "button_2:long_press"]},
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    await _setup_automations(
+        hass,
+        [
+            {
+                "id": "flat",
+                "alias": "Orange button 1",
+                "triggers": [_event_trigger(b1, "initial_press")],
+                "actions": SEQ_B1,
+            },
+            {
+                "id": "choose",
+                "alias": "Orange remote",
+                "triggers": [_event_trigger(b2, "long_press", "b2_long")],
+                "actions": [
+                    {
+                        "choose": [
+                            {
+                                "conditions": [
+                                    {"condition": "trigger", "id": "b2_long"}
+                                ],
+                                "sequence": SEQ_B2,
+                            }
+                        ]
+                    }
+                ],
+            },
+        ],
+    )
+
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {"type": f"{DOMAIN}/scan_import", "entry_id": entry.entry_id}
+    )
+    res = await client.receive_json()
+    assert res["success"], res
+    assert res["result"]["skipped"] == []
+    by_action = {p["action_id"]: p for p in res["result"]["proposals"]}
+    assert set(by_action) == {"button_1:initial_press", "button_2:long_press"}
+    assert by_action["button_1:initial_press"]["sequence"] == SEQ_B1
+    assert by_action["button_1:initial_press"]["name"] == "Orange button 1"
+    assert by_action["button_2:long_press"]["sequence"] == SEQ_B2
+    assert by_action["button_2:long_press"]["disable_source"] is True

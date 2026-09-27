@@ -40,7 +40,7 @@ const events: Array<{ type: string; detail: Record<string, unknown> }> = [];
 async function mount(props: Partial<RemoteMapperGrid>): Promise<void> {
   grid = document.createElement("remote-mapper-grid") as RemoteMapperGrid;
   Object.assign(grid, { buttons, layout, slots }, props);
-  for (const type of ["run-action", "open-button", "layout-changed"]) {
+  for (const type of ["run-action", "open-button", "layout-changed", "move-action"]) {
     grid.addEventListener(type, (e) =>
       events.push({ type, detail: (e as CustomEvent).detail as Record<string, unknown> })
     );
@@ -100,6 +100,51 @@ describe("edit mode", () => {
     tap(chip);
     chip.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
     expect(events).toEqual([{ type: "open-button", detail: { buttonId: "2" } }]);
+  });
+
+  it("all: dragging an event chip onto another event moves it", async () => {
+    await mount({ display: "all", editing: true });
+    const from = cell("1").querySelector('.chip[data-action="1_single"]')!;
+    const to = cell("1").querySelector('.chip[data-action="1_double"]')!;
+    grid.shadowRoot!.elementFromPoint = () => to;
+    pointer(from, "pointerdown", { clientX: 10, clientY: 10 });
+    pointer(from, "pointermove", { clientX: 10, clientY: 60 });
+    pointer(from, "pointerup", { clientX: 10, clientY: 60 });
+    expect(events).toEqual([
+      { type: "move-action", detail: { actionId: "1_single", targetId: "1_double" } },
+    ]);
+  });
+
+  it("all: a linked chip wears a badge, moves like any other and opens on tap", async () => {
+    await mount({
+      display: "all",
+      editing: true,
+      slots: { ...slots, "1_single": { ...slot(true), linked: true } },
+    });
+    const from = cell("1").querySelector('.chip[data-action="1_single"]')!;
+    const to = cell("1").querySelector('.chip[data-action="1_double"]')!;
+    expect(from.classList.contains("linked")).toBe(true);
+    expect(from.querySelector(".link-badge")).not.toBeNull();
+    expect(to.querySelector(".link-badge")).toBeNull();
+    grid.shadowRoot!.elementFromPoint = () => to;
+    pointer(from, "pointerdown", { clientX: 10, clientY: 10 });
+    pointer(from, "pointermove", { clientX: 10, clientY: 60 });
+    pointer(from, "pointerup", { clientX: 10, clientY: 60 });
+    expect(events).toEqual([
+      { type: "move-action", detail: { actionId: "1_single", targetId: "1_double" } },
+    ]);
+    events.length = 0;
+    tap(from);
+    expect(events).toEqual([{ type: "open-button", detail: { buttonId: "1" } }]);
+  });
+
+  it("assisted: a linked mark wears the badge only in edit mode", async () => {
+    const linked = { ...slots, "1_single": { ...slot(true), linked: true } };
+    await mount({ display: "assisted", editing: false, slots: linked });
+    expect(cell("1").querySelector(".kind .link-badge")).toBeNull();
+    grid.editing = true;
+    await grid.updateComplete;
+    expect(cell("1").querySelector('.kind[data-action="1_single"] .link-badge')).not.toBeNull();
   });
 
   it("dragging one button onto another swaps them", async () => {

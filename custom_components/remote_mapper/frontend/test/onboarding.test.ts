@@ -1,43 +1,59 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 import { describe, expect, it } from "vitest";
 
-import { advanceTip, nextTip, resetTips, skipTips, TIPS, tipsSeen } from "../src/onboarding";
+import {
+  clampSeen,
+  loadTipsSeen,
+  nextTip,
+  resetTips,
+  saveTipsSeen,
+  TIPS,
+} from "../src/onboarding";
 
-function memory() {
-  const m = new Map<string, string>();
-  return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => m.set(k, v) };
+/** A fake backend: one prefs record, every call logged. */
+function backend(tips_seen = 0) {
+  const calls: Record<string, unknown>[] = [];
+  const hass = {
+    callWS<T>(msg: Record<string, unknown>): Promise<T> {
+      calls.push(msg);
+      if (msg.type === "remote_mapper/set_prefs") tips_seen = msg.tips_seen as number;
+      return Promise.resolve({ tips_seen } as T);
+    },
+  };
+  return { hass, calls, seen: () => tips_seen };
 }
 
 describe("onboarding tips", () => {
   it("walks through every tip once, then stays quiet", () => {
-    const store = memory();
     for (let i = 0; i < TIPS.length; i++) {
-      expect(nextTip(store)).toEqual({ index: i, text: TIPS[i] });
-      advanceTip(store);
+      expect(nextTip(i)).toEqual({ index: i, text: TIPS[i] });
     }
-    expect(nextTip(store)).toBeUndefined();
-    advanceTip(store);
-    expect(tipsSeen(store)).toBe(TIPS.length);
+    expect(nextTip(TIPS.length)).toBeUndefined();
+    expect(nextTip(TIPS.length + 5)).toBeUndefined();
   });
 
-  it("skip ends the tour", () => {
-    const store = memory();
-    skipTips(store);
-    expect(nextTip(store)).toBeUndefined();
+  it("clamps junk and out-of-range counts", () => {
+    expect(clampSeen("banana")).toBe(0);
+    expect(clampSeen(-3)).toBe(0);
+    expect(clampSeen(99)).toBe(TIPS.length);
+    expect(clampSeen("2")).toBe(2);
   });
 
-  it("reset starts the tour over", () => {
-    const store = memory();
-    skipTips(store);
-    resetTips(store);
-    expect(nextTip(store)).toEqual({ index: 0, text: TIPS[0] });
+  it("loads and saves the count on the server", async () => {
+    const b = backend(2);
+    expect(await loadTipsSeen(b.hass)).toBe(2);
+    expect(await saveTipsSeen(b.hass, 99)).toBe(TIPS.length);
+    expect(b.seen()).toBe(TIPS.length);
+    expect(b.calls.map((c) => c.type)).toEqual([
+      "remote_mapper/get_prefs",
+      "remote_mapper/set_prefs",
+    ]);
   });
 
-  it("survives junk in storage and no storage at all", () => {
-    const store = memory();
-    store.setItem("remote_mapper_tips_seen", "banana");
-    expect(nextTip(store)?.index).toBe(0);
-    expect(nextTip(undefined)?.index).toBe(0);
-    advanceTip(undefined);
+  it("reset starts the tour over on the server", async () => {
+    const b = backend(TIPS.length);
+    await resetTips(b.hass);
+    expect(b.seen()).toBe(0);
+    expect(nextTip(await loadTipsSeen(b.hass))).toEqual({ index: 0, text: TIPS[0] });
   });
 });

@@ -105,6 +105,16 @@ class RemoteMapperConfigFlow(ConfigFlow, domain=DOMAIN):
             self.hass, {CONF_DEVICE_ID: self._device_id}
         )
 
+    def _event_entity_ids(self, device_id: str) -> list[str]:
+        """The device's enabled event.* entities (Matter: one per button)."""
+        return sorted(
+            entry.entity_id
+            for entry in er.async_entries_for_device(
+                er.async_get(self.hass), device_id, include_disabled_entities=False
+            )
+            if entry.domain == "event"
+        )
+
     def _derive_title(self) -> str:
         """Device registry name (user rename wins)."""
         device = dr.async_get(self.hass).async_get(self._device_id)
@@ -138,6 +148,11 @@ class RemoteMapperConfigFlow(ConfigFlow, domain=DOMAIN):
             await self.async_set_unique_id(self._device_id, raise_on_progress=False)
             self._abort_if_unique_id_configured()
             await self._async_probe()
+            # A Matter remote's buttons are event.* entities, so the probe
+            # finds nothing. Picked here by mistake, it would show
+            # "found 0"; continue on the Matter path with this device.
+            if not self._probed and self._event_entity_ids(self._device_id):
+                return await self.async_step_matter({CONF_DEVICE_ID: self._device_id})
             return await self.async_step_actions()
 
         return self.async_show_form(
@@ -158,13 +173,7 @@ class RemoteMapperConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             device_id = user_input[CONF_DEVICE_ID]
-            entity_ids = sorted(
-                entry.entity_id
-                for entry in er.async_entries_for_device(
-                    er.async_get(self.hass), device_id, include_disabled_entities=False
-                )
-                if entry.domain == "event"
-            )
+            entity_ids = self._event_entity_ids(device_id)
             if not entity_ids:
                 errors["base"] = "no_event_entities"
             else:

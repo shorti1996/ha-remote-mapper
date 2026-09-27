@@ -18,8 +18,6 @@ export interface MoveTarget {
   event: string;
   /** The target already has an action: moving swaps the two. */
   swapWith?: string;
-  /** Linked to a native automation — the backend refuses to move it. */
-  linked: boolean;
 }
 
 export interface MoveGroup {
@@ -31,13 +29,12 @@ export interface MoveGroup {
 /**
  * Buttons in reading order of the layout (row, then column), each with its
  * events except `current`. A set target carries the summary it would swap
- * with; a linked one is listed so the reader sees why it is not offered.
+ * with.
  */
 export function moveGroups(
   buttons: ButtonModel[],
   layout: GridLayout,
   slots: Record<string, SlotView>,
-  linked: Set<string>,
   current: string
 ): MoveGroup[] {
   const ordered = [...buttons].sort((a, b) => {
@@ -55,7 +52,6 @@ export function moveGroups(
         actionId: action.action_id,
         event: action.event,
         swapWith: view?.assigned ? view.summary : undefined,
-        linked: linked.has(action.action_id),
       });
     }
     if (targets.length) {
@@ -76,27 +72,25 @@ export interface DropHit {
 /**
  * Where a dragged action would land, or undefined when the drop is not
  * allowed. A mark or chip is that event; a pad is the same kind of event
- * on that button (1 single → 3 single). The source itself and linked
- * targets are not drop targets.
+ * on that button (1 single → 3 single). The source itself is not a drop
+ * target.
  */
 export function dropTargetFor(
   hit: DropHit,
   source: { actionId: string; kind: Kind },
-  buttons: ButtonModel[],
-  linked: Set<string>
+  buttons: ButtonModel[]
 ): string | undefined {
   let target = hit.actionId;
   if (!target && hit.buttonId) {
     const button = buttons.find((b) => b.id === hit.buttonId);
     target = button ? actionOfKind(button, source.kind)?.action_id : undefined;
   }
-  if (!target || target === source.actionId || linked.has(target)) return undefined;
+  if (!target || target === source.actionId) return undefined;
   return target;
 }
 
 /** Option text for one target. */
 export function moveTargetLabel(target: MoveTarget): string {
-  if (target.linked) return `${target.event} — linked, can't swap`;
   if (target.swapWith) return `${target.event} — swap with "${target.swapWith}"`;
   return target.event;
 }

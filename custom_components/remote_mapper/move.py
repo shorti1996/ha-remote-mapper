@@ -9,12 +9,14 @@ disabled flag); what is bound to the event id follows it:
   automation in HA);
 - a branch of the remote's shared automation is re-keyed to the new
   event's trigger;
+- a linked native automation of the same shape is edited the same way:
+  its branch is re-keyed, or a flat one gets the new event's trigger.
+  Any other shape is refused with the reason;
 - an owned snapshot scene keeps its id and entity set, only its owner
   record changes.
 
-A set target swaps: both slots move in one step. Linked slots are
-refused — the native automation fires on its own trigger, and pointing
-the card elsewhere would say one thing and do another.
+A set target swaps: both slots move in one step. The automations are
+edited first, so a refusal leaves the card untouched.
 """
 
 from __future__ import annotations
@@ -37,9 +39,12 @@ _LOGGER = logging.getLogger(__name__)
 KIND_PLAIN = "plain"
 KIND_OWNED = "owned"
 KIND_SHARED = "shared"
+KIND_LINKED = "linked"
 
 
 def _kind(slot: dict[str, Any]) -> str:
+    if is_linked(slot):
+        return KIND_LINKED
     if is_shared(slot):
         return KIND_SHARED
     if slot.get("materialized"):
@@ -71,29 +76,37 @@ async def async_move_slot(
     if source_slot is None:
         raise HomeAssistantError(f"{source} has nothing to move")
     target_slot = store.get_slot(entry_id, target)
-    for slot in (source_slot, target_slot):
-        if is_linked(slot):
-            raise HomeAssistantError(
-                "A linked automation fires on its own trigger; change the "
-                "trigger in HA instead of moving the link"
-            )
 
     moves: dict[str, str] = {source: target}
     if target_slot is not None:
         moves[target] = source
 
-    # 1. Detach: automations the card created go, their actions come back
-    #    into the record. Shared branches stay put until step 3.
+    # 1. Re-key the automations that stay: one write per automation. A
+    #    linked automation of another shape refuses here, before any
+    #    change, so the card keeps matching HA.
     kinds: dict[str, str] = {}
-    records: dict[str, dict[str, Any]] = {}
-    for src in moves:
+    by_automation: dict[str | None, dict[str, str]] = {}
+    for src, dst in moves.items():
         slot = store.get_slot(entry_id, src)
         kinds[src] = _kind(slot)
+        if kinds[src] == KIND_SHARED:
+            by_automation.setdefault(None, {})[src] = dst
+        elif kinds[src] == KIND_LINKED:
+            by_automation.setdefault(slot["automation_id"], {})[src] = dst
+    for config_id, branch_moves in by_automation.items():
+        await async_move_branches(
+            hass, store, entry_id, branch_moves, config_id=config_id
+        )
+
+    # 2. Detach: automations the card created go, their actions come back
+    #    into the record.
+    records: dict[str, dict[str, Any]] = {}
+    for src in moves:
         if kinds[src] == KIND_OWNED:
             await async_dematerialize(hass, store, entry_id, src, None)
         records[src] = dict(store.get_slot(entry_id, src))
 
-    # 2. The records change places.
+    # 3. The records change places.
     for src in moves:
         store.async_clear_slot(entry_id, src)
     for src, dst in moves.items():
@@ -104,10 +117,7 @@ async def async_move_slot(
         if scene_id := record.get("scene_id"):
             store.async_move_owned_scene(scene_id, f"{entry_id}/{dst}")
 
-    # 3. Re-attach under the new event ids.
-    branch_moves = {src: dst for src, dst in moves.items() if kinds[src] == KIND_SHARED}
-    if branch_moves:
-        await async_move_branches(hass, store, entry_id, branch_moves)
+    # 4. Re-create the card's own automations under the new event ids.
     for src, dst in moves.items():
         if kinds[src] == KIND_OWNED:
             # async_materialize switches an archived record's automation off

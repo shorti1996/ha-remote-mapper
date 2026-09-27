@@ -100,7 +100,9 @@ device, where every button shows what it does and lets you change it.
   YAML tab takes the full automation action syntax (`if`, `choose`,
   templates). Put it on the wrong event? In edit mode, drag its mark onto
   another event or button (*Move…* in the event editor does the same from
-  a list); a set event swaps.
+  a list); a set event swaps. An event linked to a native automation
+  (its mark wears a link badge) moves too: the card re-keys that
+  automation's branch, or its trigger, to the new event.
 
   [![Assign an action: tap a button's event, pick Toggle entity, pick the light, save](docs/demo/03-assign-action.gif)](docs/demo/full/03-assign-action.gif)
 

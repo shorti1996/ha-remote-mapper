@@ -13,7 +13,10 @@ button, in three steps. Install the integration first (see
 1. *Settings → Devices & services → Add integration*, search for
    **Remote Mapper**.
 2. Pick the source. For a Zigbee2MQTT or ZHA remote that is
-   *Device with triggers (Zigbee2MQTT, ZHA, …) — recommended*. The other
+   *Zigbee remote (Zigbee2MQTT, ZHA, …) — device triggers*; for a Matter
+   remote such as the IKEA BILRESA it is *Matter remote (IKEA BILRESA, …)*.
+   Picking the Zigbee entry for a Matter remote still works: the flow
+   notices the event entities and continues on the Matter path. The other
    sources are listed under [Supported remotes](../../README.md#supported-remotes).
 3. *Pick device*: search for the remote and select it.
 4. *Button actions* lists the action ids found on the device (`1_single`,

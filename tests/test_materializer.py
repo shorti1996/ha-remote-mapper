@@ -374,11 +374,22 @@ async def test_write_leaves_backup(hass, hass_ws_client, remote_device) -> None:
 
 
 async def test_orphan_reset_on_reload(hass, hass_ws_client, remote_device) -> None:
-    """Deleted-behind-our-back automation → slot reset at entry reload."""
+    """Deleted-behind-our-back automation → slot reset at entry reload.
+
+    The slot keeps its own copy of the actions, so it goes card-only; a
+    slot without one is cleared.
+    """
     entry = await _setup(hass, remote_device)
     store = hass.data[DOMAIN]["store"]
-    slot = {**default_slot(), "materialized": True, "automation_id": "gone_123"}
+    slot = {
+        **default_slot(),
+        "materialized": True,
+        "automation_id": "gone_123",
+        "sequence": SEQ,
+    }
     store.async_set_slot(entry.entry_id, "1_single", slot)
+    empty = {**default_slot(), "materialized": True, "automation_id": "gone_456"}
+    store.async_set_slot(entry.entry_id, "1_double", empty)
 
     assert await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
@@ -386,6 +397,8 @@ async def test_orphan_reset_on_reload(hass, hass_ws_client, remote_device) -> No
     slot = store.get_slot(entry.entry_id, "1_single")
     assert slot["materialized"] is False
     assert slot["automation_id"] is None
+    assert slot["sequence"] == SEQ
+    assert store.get_slot(entry.entry_id, "1_double") is None
 
 
 async def test_plain_save_on_materialized_slot_rejected(
@@ -448,3 +461,108 @@ def test_managed_alias_names_the_event() -> None:
     assert not is_managed_alias("Desk lamp")
     assert plain_alias(alias) == "Desk · Toggle lamp"
     assert plain_alias("[remote_mapper] Desk · 1_single") == "Desk · 1_single"
+
+
+async def _delete_like_ha_editor(hass, config_id: str) -> None:
+    """What HA's automation editor does on delete: rewrite the file and
+    drop the registry entity. No reload."""
+    from homeassistant.helpers import entity_registry as er
+    from homeassistant.util.yaml import dump
+
+    path = Path(hass.config.path("automations.yaml"))
+    items = [a for a in (load_yaml(str(path)) or []) if a.get("id") != config_id]
+    path.write_text(dump(items))
+    registry = er.async_get(hass)
+    entity_id = registry.async_get_entity_id("automation", "automation", config_id)
+    assert entity_id
+    registry.async_remove(entity_id)
+
+
+async def test_linked_slot_cleared_when_automation_deleted(
+    hass, hass_ws_client, remote_device
+) -> None:
+    """Deleting a linked automation in HA clears its slots right away."""
+    from custom_components.remote_mapper.materializer import (
+        _get_config_store,
+        async_link,
+    )
+
+    entry = await _setup(hass, remote_device)
+    store = hass.data[DOMAIN]["store"]
+    config_store = _get_config_store(hass)
+    await config_store.async_upsert(
+        "native_big",
+        {
+            "alias": "Big switch",
+            "triggers": [
+                {
+                    "trigger": "device",
+                    "domain": "mqtt",
+                    "device_id": remote_device,
+                    "type": "action",
+                    "subtype": "1_single",
+                    "id": "single",
+                }
+            ],
+            "actions": [
+                {
+                    "choose": [
+                        {
+                            "conditions": [{"condition": "trigger", "id": "single"}],
+                            "sequence": SEQ,
+                        }
+                    ]
+                }
+            ],
+        },
+    )
+    await async_link(hass, store, entry.entry_id, "1_single", "native_big")
+    await async_link(hass, store, entry.entry_id, "1_double", "native_big")
+    events = []
+    hass.bus.async_listen("remote_mapper_updated", lambda e: events.append(e.data))
+
+    await _delete_like_ha_editor(hass, "native_big")
+    await hass.async_block_till_done()
+
+    assert store.get_slot(entry.entry_id, "1_single") is None
+    assert store.get_slot(entry.entry_id, "1_double") is None
+    assert [e["kind"] for e in events] == ["orphans_reset"]
+    assert sorted(events[0]["action_ids"]) == ["1_double", "1_single"]
+
+
+async def test_shared_automation_deleted_clears_branches(
+    hass, hass_ws_client, remote_device
+) -> None:
+    """The remote's shared automation deleted in HA: its branches go."""
+    from custom_components.remote_mapper.remote_automation import (
+        remote_automation_config_id,
+    )
+
+    entry = await _setup(hass, remote_device)
+    client = await hass_ws_client(hass)
+    store = hass.data[DOMAIN]["store"]
+    await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/save_slot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_single",
+            "sequence": SEQ,
+        },
+    )
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/create_automation",
+            "entry_id": entry.entry_id,
+            "action_id": "1_single",
+            "scope": "remote",
+        },
+    )
+    assert res["success"], res
+    assert store.get_slot(entry.entry_id, "1_double")["shared_automation"] is True
+
+    await _delete_like_ha_editor(hass, remote_automation_config_id(entry.entry_id))
+    await hass.async_block_till_done()
+
+    assert store.get_remote(entry.entry_id)["slots"] == {}

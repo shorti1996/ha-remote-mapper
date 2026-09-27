@@ -4,8 +4,8 @@
       "user": {
         "title": "Add remote",
         "menu_options": {
-          "device": "Device with triggers (Zigbee2MQTT, ZHA, …) — recommended",
-          "matter": "Matter / multi-button remote (one event entity per button)",
+          "device": "Zigbee remote (Zigbee2MQTT, ZHA, …) — device triggers",
+          "matter": "Matter remote (IKEA BILRESA, …) — one event entity per button",
           "z2m_topic": "Zigbee2MQTT raw topic",
           "event_entity": "Event entity (event.*_action)",
           "mqtt_generic": "Generic MQTT topic + template"

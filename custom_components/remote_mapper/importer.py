@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Import assistant — absorb existing button automations into slots.
 
-Two observed shapes (plan §5):
+Triggers are matched by the remote's source: device triggers on its
+device, or ``event.received`` on its button entities (Matter, single
+event entity). Two observed shapes (plan §5):
 
 - **Shape A**: one automation, N device triggers with `id:`, a single
   `choose` keyed on `condition: trigger` → one slot per trigger id,
@@ -27,10 +29,17 @@ from homeassistant.components.automation import (
 )
 from homeassistant.components.automation import (
     automations_with_device,
+    automations_with_entity,
 )
 from homeassistant.const import ATTR_ENTITY_ID
 
-from .const import DOMAIN, MANAGED_DESCRIPTION_MARKER
+from .const import (
+    CONF_BUTTONS,
+    CONF_DEVICE_ID,
+    CONF_ENTITY_ID,
+    DOMAIN,
+    MANAGED_DESCRIPTION_MARKER,
+)
 from .naming import is_managed_alias
 
 if TYPE_CHECKING:
@@ -58,21 +67,74 @@ def _normalized(raw: dict[str, Any]) -> tuple[list[dict], list[dict], list[dict]
     return triggers, conditions, actions
 
 
-def _is_our_device_trigger(trigger: dict[str, Any], device_id: str) -> bool:
-    platform = trigger.get("trigger", trigger.get("platform"))
-    return platform == "device" and trigger.get("device_id") == device_id
+class TriggerMatcher:
+    """Which triggers belong to a remote, and which event each one stands for.
 
+    Device-trigger remotes: ``platform: device`` on the source device,
+    action id = subtype. Event-entity remotes (Matter, single event
+    entity): ``event.received`` targeting a button entity, action id =
+    ``{button_token}:{event_type}`` (Matter) or the event type alone.
+    """
 
-def _trigger_id_map(triggers: list[dict[str, Any]], device_id: str) -> dict[str, str]:
-    """Map trigger id (explicit or positional) → subtype (= action_id)."""
-    id_map: dict[str, str] = {}
-    for idx, trigger in enumerate(triggers):
-        if not _is_our_device_trigger(trigger, device_id):
-            continue
-        if (subtype := trigger.get("subtype")) is None:
-            continue
-        id_map[str(trigger.get("id", idx))] = str(subtype)
-    return id_map
+    def __init__(self, source_config: dict[str, Any]) -> None:
+        """Derive the match keys from the remote's source config."""
+        self.device_id: str | None = source_config.get(CONF_DEVICE_ID)
+        # entity_id -> action-id prefix ("" for the single event entity)
+        self.entity_prefix: dict[str, str] = {}
+        if buttons := source_config.get(CONF_BUTTONS):
+            self.entity_prefix = {eid: f"{token}:" for token, eid in buttons.items()}
+        elif entity_id := source_config.get(CONF_ENTITY_ID):
+            self.entity_prefix = {entity_id: ""}
+
+    def automations(self, hass: HomeAssistant) -> list[str]:
+        """Every automation referencing the device or a button entity."""
+        seen: dict[str, None] = {}
+        if self.device_id:
+            for entity_id in automations_with_device(hass, self.device_id):
+                seen.setdefault(entity_id, None)
+        for button in self.entity_prefix:
+            for entity_id in automations_with_entity(hass, button):
+                seen.setdefault(entity_id, None)
+        return list(seen)
+
+    def is_ours(self, trigger: dict[str, Any]) -> bool:
+        """True when the trigger fires on this remote (any event)."""
+        platform = trigger.get("trigger", trigger.get("platform"))
+        if platform == "device":
+            return trigger.get("device_id") == self.device_id
+        if platform == "event.received":
+            return self._target_entity(trigger) in self.entity_prefix
+        return False
+
+    def action_id(self, trigger: dict[str, Any]) -> str | None:
+        """The action id the trigger stands for; None when unresolvable."""
+        platform = trigger.get("trigger", trigger.get("platform"))
+        if platform == "device" and trigger.get("device_id") == self.device_id:
+            subtype = trigger.get("subtype")
+            return str(subtype) if subtype is not None else None
+        if platform == "event.received":
+            prefix = self.entity_prefix.get(self._target_entity(trigger))
+            events = _as_list((trigger.get("options") or {}).get("event_type"))
+            if prefix is None or len(events) != 1:
+                return None
+            return f"{prefix}{events[0]}"
+        return None
+
+    @staticmethod
+    def _target_entity(trigger: dict[str, Any]) -> str | None:
+        entities = _as_list((trigger.get("target") or {}).get("entity_id"))
+        return str(entities[0]) if len(entities) == 1 else None
+
+    def trigger_id_map(self, triggers: list[dict[str, Any]]) -> dict[str, str]:
+        """Map trigger id (explicit or positional) → action id."""
+        id_map: dict[str, str] = {}
+        for idx, trigger in enumerate(triggers):
+            if not isinstance(trigger, dict):
+                continue
+            if (action_id := self.action_id(trigger)) is None:
+                continue
+            id_map[str(trigger.get("id", idx))] = action_id
+        return id_map
 
 
 def _branch_trigger_ids(option: dict[str, Any]) -> list[str] | None:
@@ -92,11 +154,13 @@ def _branch_trigger_ids(option: dict[str, Any]) -> list[str] | None:
 class ImportScanner:
     """Scan a remote's device for importable automations."""
 
-    def __init__(self, hass: HomeAssistant, entry_id: str, device_id: str) -> None:
+    def __init__(
+        self, hass: HomeAssistant, entry_id: str, source_config: dict[str, Any]
+    ) -> None:
         """Initialize."""
         self.hass = hass
         self.entry_id = entry_id
-        self.device_id = device_id
+        self.matcher = TriggerMatcher(source_config)
         self.proposals: list[dict[str, Any]] = []
         self.skipped: list[dict[str, Any]] = []
 
@@ -106,7 +170,7 @@ class ImportScanner:
         if component is None:
             return {"proposals": [], "skipped": []}
 
-        for entity_id in automations_with_device(self.hass, self.device_id):
+        for entity_id in self.matcher.automations(self.hass):
             entity = component.get_entity(entity_id)
             if entity is None or entity.raw_config is None:
                 self._skip(entity_id, None, "no_raw_config")
@@ -177,11 +241,13 @@ class ImportScanner:
     ) -> None:
         triggers, conditions, actions = _normalized(raw)
         config_id = raw.get("id")  # absent in hand-written yaml without id:
-        id_map = _trigger_id_map(triggers, self.device_id)
+        id_map = self.matcher.trigger_id_map(triggers)
         if not id_map:
             self._skip(entity_id, alias, "no_subtype_triggers")
             return
-        mixed = any(not _is_our_device_trigger(t, self.device_id) for t in triggers)
+        mixed = any(
+            not (isinstance(t, dict) and self.matcher.is_ours(t)) for t in triggers
+        )
         if conditions:
             self._skip(entity_id, alias, "top_level_conditions")
             return

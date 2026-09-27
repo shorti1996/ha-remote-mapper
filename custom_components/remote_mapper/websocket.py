@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
 from homeassistant.components import websocket_api
+from homeassistant.core import callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.script import async_validate_actions_config
 from homeassistant.util.yaml import parse_yaml
@@ -121,6 +122,31 @@ async def ws_ping(
 ) -> None:
     """Handshake: card verifies the backend is present."""
     connection.send_result(msg["id"], {"version": INTEGRATION_VERSION})
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/get_prefs"})
+@callback
+def ws_get_prefs(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    """This user's UI preferences: tips_seen (how many first-run tips)."""
+    prefs = _store(hass).get_user_prefs(connection.user.id)
+    connection.send_result(msg["id"], {"tips_seen": int(prefs.get("tips_seen", 0))})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/set_prefs",
+        vol.Required("tips_seen"): vol.All(int, vol.Range(min=0)),
+    }
+)
+@callback
+def ws_set_prefs(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    """Remember this user's UI preferences on the server, per HA user."""
+    _store(hass).async_set_user_prefs(connection.user.id, tips_seen=msg["tips_seen"])
+    connection.send_result(msg["id"], {"tips_seen": msg["tips_seen"]})
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/list_remotes"})
@@ -988,13 +1014,13 @@ async def ws_scan_import(
     if remote is None:
         connection.send_error(msg["id"], ERR_NOT_FOUND, "Unknown remote")
         return
-    device_id = remote.get("source_config", {}).get("device_id")
-    if not device_id:
+    source_config = remote.get("source_config", {})
+    if not (source_config.get("device_id") or source_config.get("entity_id")):
         connection.send_error(
-            msg["id"], ERR_NOT_FOUND, "Import needs a device-based remote"
+            msg["id"], ERR_NOT_FOUND, "Import needs a device- or entity-based remote"
         )
         return
-    scanner = ImportScanner(hass, msg["entry_id"], device_id)
+    scanner = ImportScanner(hass, msg["entry_id"], source_config)
     connection.send_result(msg["id"], scanner.scan(store))
 
 
@@ -1108,6 +1134,8 @@ def async_register_websocket_commands(hass: HomeAssistant) -> None:
         ws_archive_slot,
         ws_get_options,
         ws_reset_options,
+        ws_get_prefs,
+        ws_set_prefs,
         ws_move_slot,
         ws_save_layout,
         ws_probe_device,

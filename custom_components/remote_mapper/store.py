@@ -77,6 +77,18 @@ class RemoteMapperStore:
         """Return the remote record, or None."""
         return self.data["remotes"].get(entry_id)
 
+    # ── per-user UI preferences (survive a cleared browser cache) ─────
+
+    def get_user_prefs(self, user_id: str) -> dict[str, Any]:
+        """The user's remembered UI choices, e.g. how many tips were seen."""
+        return dict(self.data.get("users", {}).get(user_id, {}))
+
+    def async_set_user_prefs(self, user_id: str, **prefs: Any) -> None:
+        """Merge the given choices into the user's record."""
+        users = self.data.setdefault("users", {})
+        users.setdefault(user_id, {}).update(prefs)
+        self.async_schedule_save()
+
     def async_ensure_remote(
         self,
         entry_id: str,

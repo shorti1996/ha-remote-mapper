@@ -142,6 +142,31 @@ async def test_matter_flow_collects_all_buttons(hass, matter_device) -> None:
     assert data["layout"]["actions"][:4] == [f"button_1:{t}" for t in EVENT_TYPES]
 
 
+async def test_device_step_redirects_matter_remote(hass, matter_device) -> None:
+    """A Matter remote picked under "Zigbee remote" lands on the Matter path."""
+    device_id, (b1, b2) = matter_device
+    _idle(hass, b1)
+    _idle(hass, b2)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "device"}
+    )
+    assert result["step_id"] == "device"
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"device_id": device_id}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"]["source"] == "matter"
+    assert result["data"]["source_config"]["buttons"] == {
+        "button_1": b1,
+        "button_2": b2,
+    }
+    assert len(result["data"]["layout"]["actions"]) == 8
+
+
 async def test_matter_flow_no_event_entities(hass, device_registry) -> None:
     """A device without event entities shows an error, not an entry."""
     owner = MockConfigEntry(domain="matter")

@@ -7,10 +7,11 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
-from homeassistant.core import CoreState
+from homeassistant.core import CoreState, Event, callback
 from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.entity_registry import EVENT_ENTITY_REGISTRY_UPDATED
 
 from .adapters import get_adapter
 from .card_resource import JSModuleRegistration
@@ -31,6 +32,10 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
+
+# automation.EVENT_AUTOMATION_RELOADED; the component is not a declared
+# dependency, so its module is not imported at load time
+EVENT_AUTOMATION_RELOADED = "automation_reloaded"
 
 # Config entries only — nothing to configure in configuration.yaml (hassfest)
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -129,7 +134,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(dispatcher.async_detach)
     hass.data[DOMAIN][entry.entry_id] = {"dispatcher": dispatcher}
 
-    async def _post_setup(_event: Any = None) -> None:
+    async def _check_orphans(_event: Any = None) -> None:
         from .const import EVENT_UPDATED
         from .materializer import async_check_orphans
 
@@ -143,7 +148,35 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     "action_ids": orphaned,
                 },
             )
+
+    async def _post_setup(_event: Any = None) -> None:
+        await _check_orphans()
         await async_refresh_actions(hass, store, entry)
+
+    # An automation deleted in HA's editor drops its entity from the
+    # registry (no reload); one removed from automations.yaml shows up at
+    # the next reload. Either way the slots that pointed at it settle
+    # right away, not at the next start.
+    @callback
+    def _automation_removed(event: Event) -> None:
+        from .materializer import _get_config_store
+
+        entity_id = str(event.data.get("entity_id", ""))
+        if event.data.get("action") != "remove" or not entity_id.startswith(
+            "automation."
+        ):
+            return
+        # our own delete: the caller writes the slot's new state next
+        if _get_config_store(hass).is_own_removal(entity_id):
+            return
+        entry.async_create_task(hass, _check_orphans())
+
+    entry.async_on_unload(
+        hass.bus.async_listen(EVENT_AUTOMATION_RELOADED, _check_orphans)
+    )
+    entry.async_on_unload(
+        hass.bus.async_listen(EVENT_ENTITY_REGISTRY_UPDATED, _automation_removed)
+    )
 
     # Deferred: the automation component (and lazy MQTT discovery) may
     # not be ready at our setup; the yaml fallback keeps it safe anyway.

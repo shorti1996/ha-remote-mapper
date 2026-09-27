@@ -535,3 +535,25 @@ async def test_get_and_reset_options(hass, hass_ws_client, remote_device) -> Non
 
     res = await _ws(client, {"type": f"{DOMAIN}/get_options", "entry_id": "nope"})
     assert res["error"]["code"] == "not_found"
+
+
+async def test_user_prefs_survive_on_the_server(
+    hass, hass_ws_client, remote_device
+) -> None:
+    """Tips progress is stored per HA user, not in the browser."""
+    await _setup_remote(hass, remote_device)
+    client = await hass_ws_client(hass)
+
+    res = await _ws(client, {"type": f"{DOMAIN}/get_prefs"})
+    assert res["result"] == {"tips_seen": 0}
+
+    res = await _ws(client, {"type": f"{DOMAIN}/set_prefs", "tips_seen": 3})
+    assert res["success"], res
+    res = await _ws(client, {"type": f"{DOMAIN}/get_prefs"})
+    assert res["result"] == {"tips_seen": 3}
+
+    store = hass.data[DOMAIN]["store"]
+    assert list(store.data["users"].values()) == [{"tips_seen": 3}]
+
+    res = await _ws(client, {"type": f"{DOMAIN}/set_prefs", "tips_seen": -1})
+    assert not res["success"]

@@ -41,7 +41,7 @@ export interface SlotView {
   summary: string;
   error: string | null;
   stale: boolean;
-  /** Linked to a native automation: the backend refuses to move it. */
+  /** Linked to a native automation: wears a link badge in edit mode. */
   linked?: boolean;
 }
 
@@ -413,14 +413,10 @@ export class RemoteMapperGrid extends LitElement {
     const el = this._elementAt(e.clientX, e.clientY);
     const mark = el?.closest("[data-action]") as HTMLElement | null;
     const cell = el?.closest(".cell.btn") as HTMLElement | null;
-    const linked = new Set(
-      Object.keys(this.slots).filter((id) => this.slots[id]?.linked)
-    );
     this._actionDrop = dropTargetFor(
       { actionId: mark?.dataset.action, buttonId: cell?.dataset.button },
       { actionId: drag.action.action_id, kind: drag.action.kind },
-      this.buttons,
-      linked
+      this.buttons
     );
   }
 
@@ -575,9 +571,11 @@ export class RemoteMapperGrid extends LitElement {
           const slot = this.slots[a.action_id];
           const on = slot?.assigned && !slot.archived;
           const h = this._markHandlers(a);
+          const linked = this.editing && !!slot?.linked;
           const classes = [
             "kind",
             on ? "on" : "",
+            linked ? "linked" : "",
             this.flash === a.action_id ? "flash" : "",
             this._actionDrop === a.action_id ? "drop" : "",
             this._actionDrag?.moved && this._actionDrag.action.action_id === a.action_id
@@ -587,12 +585,14 @@ export class RemoteMapperGrid extends LitElement {
           return html`<span
             class=${classes}
             data-action=${a.action_id}
-            title="${a.event} (${KIND_TITLE[a.kind]}): ${slot?.summary ?? "not set"}"
+            title="${a.event} (${KIND_TITLE[a.kind]}): ${slot?.summary ?? "not set"}${linked ? " — linked" : ""}"
             @pointerdown=${h.pointerdown}
             @pointermove=${h.pointermove}
             @pointerup=${h.pointerup}
             @pointercancel=${h.pointercancel}
-            >${renderMark(this.kindIcons[a.kind])}</span
+            >${renderMark(this.kindIcons[a.kind])}${linked
+              ? html`<ha-icon class="link-badge" icon="mdi:link-variant"></ha-icon>`
+              : nothing}</span
           >`;
         })}
       </span>
@@ -609,10 +609,12 @@ export class RemoteMapperGrid extends LitElement {
         ${actions.map((a) => {
           const slot = this.slots[a.action_id];
           const h = this._markHandlers(a);
+          const linked = this.editing && !!slot?.linked;
           const classes = [
             "chip",
             slot?.assigned ? "on" : "",
             slot?.archived ? "archived" : "",
+            linked ? "linked" : "",
             this.flash === a.action_id ? "flash" : "",
             this._actionDrop === a.action_id ? "drop" : "",
             this._actionDrag?.moved && this._actionDrag.action.action_id === a.action_id
@@ -623,7 +625,7 @@ export class RemoteMapperGrid extends LitElement {
             <button
               class=${classes}
               data-action=${a.action_id}
-              title="${a.event} (${KIND_TITLE[a.kind]}): ${slot?.summary ?? "not set"}"
+              title="${a.event} (${KIND_TITLE[a.kind]}): ${slot?.summary ?? "not set"}${linked ? " — linked" : ""}"
               @pointerdown=${h.pointerdown ??
               ((e: PointerEvent) => this._chipPressStart(e, a.action_id))}
               @pointermove=${h.pointermove}
@@ -648,6 +650,9 @@ export class RemoteMapperGrid extends LitElement {
               <span class="text">${slot?.summary ?? "not set"}</span>
               ${slot?.error ? html`<span class="err" title=${slot.error}>!</span>` : nothing}
               ${slot?.stale ? html`<span class="stale" title="Source no longer reports this action">stale</span>` : nothing}
+              ${linked
+                ? html`<ha-icon class="link-badge" icon="mdi:link-variant" title="linked"></ha-icon>`
+                : nothing}
             </button>
           `;
         })}
@@ -829,6 +834,21 @@ export class RemoteMapperGrid extends LitElement {
       width: var(--ha-space-9, 36px);
       height: var(--ha-space-9, 36px);
       font-size: var(--ha-font-size-m, 14px);
+    }
+    .kind.linked {
+      position: relative;
+    }
+    .link-badge {
+      --mdc-icon-size: var(--ha-space-3, 12px);
+      color: var(--secondary-text-color);
+      flex: none;
+    }
+    .kind .link-badge {
+      position: absolute;
+      right: calc(-1 * var(--ha-space-1, 4px));
+      bottom: calc(-1 * var(--ha-space-1, 4px));
+      border-radius: var(--ha-border-radius-circle, 50%);
+      background: var(--rm-bg);
     }
     .kind.dragging,
     .chip.dragging {

@@ -19,7 +19,7 @@ import "./card-editor";
 import "./grid-picker";
 import "./remote-grid";
 import { clearGridDraft, getGridDraft, setGridDraft } from "./grid-drafts";
-import { advanceTip, nextTip, skipTips, TIPS, TIPS_RESET_EVENT } from "./onboarding";
+import { loadTipsSeen, nextTip, saveTipsSeen, TIPS, TIPS_RESET_EVENT } from "./onboarding";
 import {
   absorbsOnSave,
   disableConfirm,
@@ -75,6 +75,7 @@ import {
 import { errorText } from "./errors";
 import { moveGroups, moveTargetLabel } from "./move";
 import { inferName } from "./naming";
+import { clearRemoteCache, ONLY_REMOTE, readRemoteCache, writeRemoteCache } from "./remote-cache";
 import type { SlotView } from "./remote-grid";
 
 const CARD_TAG = "remote-mapper-card";
@@ -291,6 +292,8 @@ function quickSequence(mode: QuickMode, entity: string, option: string): unknown
 export class RemoteMapperCard extends LitElement implements EditHost {
   @state() private _remote?: RemoteData;
   @state() private _remoteChoices?: RemoteListItem[];
+  /** _remote is last visit's copy, drawn for size while the fetch runs. */
+  @state() private _stale = false;
   @state() private _error?: string;
   @state() private _flash?: string;
   @state() private _hostWidth = 0;
@@ -298,12 +301,30 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   // grid layout (plan 04): draft-then-commit, like the canvas session
   /** Set by HA inside the card-config dialog: the card is a preview there. */
   @property({ type: Boolean }) public preview = false;
-  /** Bumped when an onboarding tip is dismissed so the banner re-renders. */
-  @state() private _tipsRev = 0;
+  /** Tips this user has seen (server side); undefined until loaded. */
+  @state() private _tipsSeen?: number;
   /** The card editor's "Show again": the banner comes back on every open card. */
   private _onTipsReset = (): void => {
-    this._tipsRev++;
+    void this._loadTips();
   };
+
+  private async _loadTips(): Promise<void> {
+    if (!this._hass) return;
+    try {
+      this._tipsSeen = await loadTipsSeen(this._hass);
+    } catch {
+      /* no backend yet: no banner */
+    }
+  }
+
+  private async _setTipsSeen(seen: number): Promise<void> {
+    this._tipsSeen = seen; // the banner moves on right away
+    try {
+      await saveTipsSeen(this._hass!, seen);
+    } catch {
+      /* the server did not take it: the tip shows again next load */
+    }
+  }
   @state() private _gridEditing = false;
   @state() private _gridDraft?: GridLayout;
   @state() private _pickerOpen = false;
@@ -406,6 +427,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       this._fetchStarted = true;
       void this._initialize();
     }
+    if (this._tipsSeen === undefined && !this.preview) void this._loadTips();
   }
 
   public setConfig(config: RemoteMapperCardConfig): void {
@@ -473,6 +495,15 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   }
 
   private async _initialize(): Promise<void> {
+    // Draw last visit's copy at once so the dashboard lays out at the
+    // final size; the live fetch replaces it.
+    if (!this._remote && !this.preview) {
+      const cached = readRemoteCache<RemoteData>(this._entryId ?? ONLY_REMOTE);
+      if (cached) {
+        this._remote = cached;
+        this._stale = true;
+      }
+    }
     try {
       if (!this._entryId) {
         const res = await this._hass!.callWS<{ remotes: RemoteListItem[] }>({
@@ -481,6 +512,8 @@ export class RemoteMapperCard extends LitElement implements EditHost {
         if (res.remotes.length === 1) {
           this._entryId = res.remotes[0].entry_id;
         } else {
+          this._dropStale();
+          clearRemoteCache(ONLY_REMOTE);
           this._remoteChoices = res.remotes;
           return;
         }
@@ -489,7 +522,15 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       this._resumeGridEdit();
       await this._subscribe();
     } catch (err) {
+      this._dropStale();
       this._error = errorText(err);
+    }
+  }
+
+  private _dropStale(): void {
+    if (this._stale) {
+      this._remote = undefined;
+      this._stale = false;
     }
   }
 
@@ -523,8 +564,12 @@ export class RemoteMapperCard extends LitElement implements EditHost {
         type: "remote_mapper/get_remote",
         entry_id: this._entryId,
       });
+      this._stale = false;
       this._error = undefined;
+      writeRemoteCache(this._remote, !this._config?.entry_id);
     } catch (err) {
+      this._dropStale();
+      if (this._entryId) clearRemoteCache(this._entryId);
       this._error = errorText(err);
     }
   }
@@ -1034,6 +1079,33 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     );
   }
 
+  /**
+   * The whole-remote automation takes every card-built event with it.
+   * Name them and ask first; true when nothing moves or the user agrees.
+   */
+  private async _confirmRemoteAutomation(): Promise<boolean> {
+    const slots = this._remote?.slots ?? {};
+    const moving = Object.keys(slots).filter((id) => {
+      const slot = slots[id];
+      return (
+        id !== this._editingAction &&
+        !slot.materialized &&
+        !slot.archived &&
+        (slot.sequence?.length ?? 0) > 0
+      );
+    });
+    if (!moving.length) return true;
+    const names = moving.map((id) => `${this._eventName(id)} (${this._slotSummary(slots[id])})`);
+    return this._confirm({
+      title: "Move these events into one automation?",
+      text:
+        `${names.join(", ")} will run as branches of the remote's automation ` +
+        "instead of from the card. To take one back later, open the event " +
+        'and untick "Keep as a branch of the remote automation".',
+      confirmText: "Create automation",
+    });
+  }
+
   /** "Create new" modes: make the thing, bind it, and (automations) go edit it. */
   private async _createNew(): Promise<void> {
     const name = this._draftName.trim() || null;
@@ -1052,6 +1124,13 @@ export class RemoteMapperCard extends LitElement implements EditHost {
           ...(name ? { name } : {}),
         });
         this._closeEditor();
+        return;
+      }
+      if (
+        this._quickMode === "new_remote_automation" &&
+        !this._remote?.remote_automation &&
+        !(await this._confirmRemoteAutomation())
+      ) {
         return;
       }
       const res = await this._hass!.callWS<{ edit_url: string }>({
@@ -1493,7 +1572,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
 
     const editing = !this.preview && this._edit.active;
     return html`
-      <ha-card>
+      <ha-card class=${this._stale ? "cached" : ""}>
         ${this._renderStaleBundle()}
         ${this._renderOnboarding()}
         <div class="header">
@@ -1534,7 +1613,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     const layout = this._gridLayout()!;
     const buttons = remote.buttons ?? [];
     return html`
-      <ha-card>
+      <ha-card class=${this._stale ? "cached" : ""}>
         ${this._renderStaleBundle()}
         ${this._renderOnboarding()}
         <div class="header">
@@ -2130,9 +2209,8 @@ export class RemoteMapperCard extends LitElement implements EditHost {
               ? html`
                   <button
                     title=${this._isLinked(slot)
-                      ? "A linked automation fires on its own trigger; change the trigger in HA"
+                      ? "Move this action to another event or button (the linked automation's trigger follows)"
                       : "Move this action to another event or button"}
-                    ?disabled=${this._isLinked(slot)}
                     @click=${() => {
                       this._moveOpen = !this._moveOpen;
                       this._draftError = undefined;
@@ -2163,14 +2241,10 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   private _renderMovePanel(slot: SlotRecord): TemplateResult {
     const remote = this._remote!;
     const layout = this._gridLayout()!;
-    const linked = new Set(
-      Object.keys(remote.slots).filter((id) => this._isLinked(remote.slots[id]))
-    );
     const groups = moveGroups(
       remote.buttons ?? [],
       layout,
       this._slotViews(),
-      linked,
       this._editingAction!
     );
     const chosen = groups.flatMap((g) => g.targets).find((t) => t.actionId === this._moveTarget);
@@ -2199,7 +2273,6 @@ export class RemoteMapperCard extends LitElement implements EditHost {
               ${g.targets.map(
                 (t) => html`<option
                   value=${t.actionId}
-                  ?disabled=${t.linked}
                   ?selected=${t.actionId === this._moveTarget}
                 >
                   ${moveTargetLabel(t)}
@@ -2255,9 +2328,9 @@ export class RemoteMapperCard extends LitElement implements EditHost {
 
   /** First-run tips, one at a time, in the same strip as the update banner. */
   private _renderOnboarding(): TemplateResult | typeof nothing {
-    if (this.preview) return nothing;
-    void this._tipsRev; // re-render after a tap
-    const tip = nextTip();
+    if (this.preview || this._tipsSeen === undefined) return nothing;
+    const seen = this._tipsSeen;
+    const tip = nextTip(seen);
     if (!tip) return nothing;
     return html`
       <div class="tipbar">
@@ -2265,22 +2338,11 @@ export class RemoteMapperCard extends LitElement implements EditHost {
           ><b>Tip ${tip.index + 1}/${TIPS.length}</b> ${tip.text}</span
         >
         <span class="tipbar-buttons">
-          <button
-            @click=${() => {
-              advanceTip();
-              this._tipsRev++;
-            }}
-          >
+          <button @click=${() => void this._setTipsSeen(seen + 1)}>
             ${tip.index + 1 < TIPS.length ? "Next" : "Got it"}
           </button>
           ${tip.index + 1 < TIPS.length
-            ? html`<button
-                class="quiet"
-                @click=${() => {
-                  skipTips();
-                  this._tipsRev++;
-                }}
-              >
+            ? html`<button class="quiet" @click=${() => void this._setTipsSeen(TIPS.length)}>
                 Skip
               </button>`
             : nothing}
@@ -2752,6 +2814,18 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     }
     .content {
       padding: 0 16px 16px;
+    }
+    /* last visit's copy, drawn for size until the live data fades in */
+    .content,
+    remote-mapper-grid,
+    .header-buttons {
+      transition: opacity 300ms ease-out;
+    }
+    ha-card.cached .content,
+    ha-card.cached remote-mapper-grid,
+    ha-card.cached .header-buttons {
+      opacity: 0.5;
+      pointer-events: none;
     }
     .viewport {
       position: relative;

@@ -337,7 +337,7 @@ async def test_move_snapshot_scene(hass, hass_ws_client, remote_device) -> None:
 
 
 async def test_move_refusals(hass, hass_ws_client, remote_device) -> None:
-    """Empty source, unknown target, same event and linked slots are refused."""
+    """Empty source, unknown target and same event are refused."""
     entry = await _setup(hass, remote_device)
     client = await hass_ws_client(hass)
     store = hass.data[DOMAIN]["store"]
@@ -353,11 +353,197 @@ async def test_move_refusals(hass, hass_ws_client, remote_device) -> None:
 
     res = await _move(client, entry, "1_single", "1_single")
     assert not res["success"]
+    assert store.get_slot(entry.entry_id, "1_single")["sequence"] == SEQ_A
 
-    linked = default_slot()
-    linked.update({"materialized": True, "automation_id": "native", "owned": False})
-    store.async_set_slot(entry.entry_id, "1_double", linked)
+
+def _native_trigger(device_id: str, subtype: str, trigger_id: str) -> dict:
+    return {
+        "trigger": "device",
+        "domain": "mqtt",
+        "device_id": device_id,
+        "type": "action",
+        "subtype": subtype,
+        "id": trigger_id,
+    }
+
+
+async def _native(hass, config_id: str, payload: dict) -> None:
+    from custom_components.remote_mapper.materializer import _get_config_store
+
+    await _get_config_store(hass).async_upsert(config_id, payload)
+    await hass.async_block_till_done()
+
+
+async def _link(hass, entry, action_id: str, config_id: str) -> None:
+    from custom_components.remote_mapper.materializer import async_link
+
+    await async_link(
+        hass, hass.data[DOMAIN]["store"], entry.entry_id, action_id, config_id
+    )
+
+
+async def test_move_linked_branch(hass, hass_ws_client, remote_device) -> None:
+    """A linked choose automation: its branch is re-keyed, the link follows."""
+    entry = await _setup(hass, remote_device)
+    client = await hass_ws_client(hass)
+    store = hass.data[DOMAIN]["store"]
+    await _native(
+        hass,
+        "native_a",
+        {
+            "alias": "Kitchen remote",
+            "triggers": [
+                _native_trigger(remote_device, "1_single", "single"),
+                _native_trigger(remote_device, "1_double", "double"),
+            ],
+            "actions": [
+                {
+                    "choose": [
+                        {
+                            "conditions": [{"condition": "trigger", "id": "single"}],
+                            "sequence": SEQ_A,
+                        },
+                        {
+                            "conditions": [{"condition": "trigger", "id": "double"}],
+                            "sequence": SEQ_B,
+                        },
+                    ]
+                }
+            ],
+        },
+    )
+    await _link(hass, entry, "1_single", "native_a")
+    await _link(hass, entry, "1_double", "native_a")
+
+    res = await _move(client, entry, "1_single", "2_single")
+    assert res["success"], res
+    assert res["result"]["swapped"] is False
+
+    raw = next(a for a in _automations(hass) if a["id"] == "native_a")
+    assert sorted(t["subtype"] for t in raw["triggers"]) == ["1_double", "2_single"]
+    branches = {
+        b["conditions"][0]["id"]: b["sequence"] for b in raw["actions"][0]["choose"]
+    }
+    assert branches["2_single"] == SEQ_A
+    assert branches["double"] == SEQ_B
+    assert store.get_slot(entry.entry_id, "1_single") is None
+    moved = store.get_slot(entry.entry_id, "2_single")
+    assert moved["automation_id"] == "native_a"
+    assert moved["owned"] is False
+
+
+async def test_move_linked_flat(hass, hass_ws_client, remote_device) -> None:
+    """A linked flat automation gets the new event's trigger."""
+    calls = async_mock_service(hass, "test", "automation")
+    entry = await _setup(hass, remote_device)
+    client = await hass_ws_client(hass)
+    await _native(
+        hass,
+        "native_flat",
+        {
+            "alias": "Toggle kitchen",
+            "triggers": [_native_trigger(remote_device, "1_single", "single")],
+            "actions": SEQ_A,
+        },
+    )
+    await _link(hass, entry, "1_single", "native_flat")
+
+    res = await _move(client, entry, "1_single", "1_double")
+    assert res["success"], res
+    raw = next(a for a in _automations(hass) if a["id"] == "native_flat")
+    assert [t["subtype"] for t in raw["triggers"]] == ["1_double"]
+    assert raw["actions"] == SEQ_A
+    store = hass.data[DOMAIN]["store"]
+    assert store.get_slot(entry.entry_id, "1_double")["automation_id"] == "native_flat"
+
+    fire_remote_action(hass, "1_double")
+    await hass.async_block_till_done()
+    assert [c.data["via"] for c in calls] == ["a"]
+
+
+async def test_swap_linked_with_plain(hass, hass_ws_client, remote_device) -> None:
+    """Linked branch ↔ card-built slot: the branch re-keys, the record swaps."""
+    entry = await _setup(hass, remote_device)
+    client = await hass_ws_client(hass)
+    store = hass.data[DOMAIN]["store"]
+    await _native(
+        hass,
+        "native_a",
+        {
+            "alias": "Kitchen remote",
+            "triggers": [_native_trigger(remote_device, "1_single", "single")],
+            "actions": [
+                {
+                    "choose": [
+                        {
+                            "conditions": [{"condition": "trigger", "id": "single"}],
+                            "sequence": SEQ_A,
+                        }
+                    ]
+                }
+            ],
+        },
+    )
+    await _link(hass, entry, "1_single", "native_a")
+    await _save(client, entry, "1_double", SEQ_B)
+
+    res = await _move(client, entry, "1_single", "1_double")
+    assert res["success"], res
+    assert res["result"]["swapped"] is True
+
+    raw = next(a for a in _automations(hass) if a["id"] == "native_a")
+    assert [t["subtype"] for t in raw["triggers"]] == ["1_double"]
+    assert raw["actions"][0]["choose"][0]["sequence"] == SEQ_A
+    assert store.get_slot(entry.entry_id, "1_double")["automation_id"] == "native_a"
+    plain = store.get_slot(entry.entry_id, "1_single")
+    assert plain["sequence"] == SEQ_B
+    assert not plain.get("materialized")
+
+
+async def test_move_linked_refuses_other_shapes(
+    hass, hass_ws_client, remote_device
+) -> None:
+    """A linked automation the card can't re-key is refused, nothing changes.
+
+    A choose keyed on trigger ids where the event's trigger has no branch.
+    """
+    entry = await _setup(hass, remote_device)
+    client = await hass_ws_client(hass)
+    store = hass.data[DOMAIN]["store"]
+    await _native(
+        hass,
+        "native_odd",
+        {
+            "alias": "Odd",
+            "triggers": [
+                _native_trigger(remote_device, "1_single", "single"),
+                {"trigger": "state", "entity_id": "light.x", "id": "light"},
+            ],
+            "actions": [
+                {
+                    "choose": [
+                        {
+                            "conditions": [{"condition": "trigger", "id": "light"}],
+                            "sequence": SEQ_A,
+                        }
+                    ]
+                }
+            ],
+        },
+    )
+    await _link(hass, entry, "1_single", "native_odd")
+    await _save(client, entry, "1_double", SEQ_B)
+
     res = await _move(client, entry, "1_single", "1_double")
     assert not res["success"]
-    assert "linked" in res["error"]["message"]
-    assert store.get_slot(entry.entry_id, "1_single")["sequence"] == SEQ_A
+    assert "the linked automation" in res["error"]["message"]
+    assert store.get_slot(entry.entry_id, "1_single")["automation_id"] == "native_odd"
+    assert store.get_slot(entry.entry_id, "1_double")["sequence"] == SEQ_B
+
+    # a link whose automation is gone
+    gone = default_slot()
+    gone.update({"materialized": True, "automation_id": "gone", "owned": False})
+    store.async_set_slot(entry.entry_id, "2_single", gone)
+    res = await _move(client, entry, "2_single", "1_double")
+    assert not res["success"]
+    assert "no longer exists" in res["error"]["message"]

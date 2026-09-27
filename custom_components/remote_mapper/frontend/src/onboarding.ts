@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 /**
  * First-run tips shown in a banner at the top of the card, one at a time,
- * until the person taps through or skips them. Progress is per browser
- * (localStorage), which is the right scope: the tips are about this UI.
+ * until the person taps through or skips them. Progress is kept on the
+ * server per HA user (remote_mapper/get_prefs, set_prefs), so a cleared
+ * browser cache or another device does not start the tour over.
  */
 
 export const TIPS: readonly string[] = [
@@ -12,61 +13,41 @@ export const TIPS: readonly string[] = [
   "Press a button on the physical remote and its event lights up here. In edit mode, Refresh picks up newly discovered events.",
 ];
 
-const KEY = "remote_mapper_tips_seen";
-
-interface StorageLike {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
+interface PrefsHass {
+  callWS<T>(msg: Record<string, unknown>): Promise<T>;
 }
 
-function storage(): StorageLike | undefined {
-  try {
-    return globalThis.localStorage;
-  } catch {
-    return undefined;
-  }
+/** A stored count, clamped to 0…TIPS.length; junk reads as 0. */
+export function clampSeen(value: unknown): number {
+  const n = typeof value === "number" ? value : parseInt(String(value ?? "0"), 10);
+  return Math.min(Math.max(Number.isFinite(n) ? n : 0, 0), TIPS.length);
 }
 
-/** How many tips this browser has already seen (clamped to TIPS.length). */
-export function tipsSeen(store: StorageLike | undefined = storage()): number {
-  try {
-    const n = parseInt(store?.getItem(KEY) ?? "0", 10);
-    return Math.min(Math.max(Number.isFinite(n) ? n : 0, 0), TIPS.length);
-  } catch {
-    return 0;
-  }
-}
-
-/** The next unseen tip, or undefined when all were seen. */
-export function nextTip(store?: StorageLike): { index: number; text: string } | undefined {
-  const i = tipsSeen(store);
+/** The next unseen tip after `seen` tips, or undefined when all were seen. */
+export function nextTip(seen: number): { index: number; text: string } | undefined {
+  const i = clampSeen(seen);
   return i < TIPS.length ? { index: i, text: TIPS[i] } : undefined;
 }
 
-function remember(n: number, store: StorageLike | undefined): void {
-  try {
-    store?.setItem(KEY, String(n));
-  } catch {
-    /* private window / blocked storage: the tip just shows again next time */
-  }
+/** How many tips this user has seen, from the server. */
+export async function loadTipsSeen(hass: PrefsHass): Promise<number> {
+  const res = await hass.callWS<{ tips_seen: number }>({ type: "remote_mapper/get_prefs" });
+  return clampSeen(res.tips_seen);
 }
 
-/** Mark the current tip as seen. */
-export function advanceTip(store: StorageLike | undefined = storage()): void {
-  remember(Math.min(tipsSeen(store) + 1, TIPS.length), store);
-}
-
-/** Mark every tip as seen. */
-export function skipTips(store: StorageLike | undefined = storage()): void {
-  remember(TIPS.length, store);
+/** Remember the count on the server; returns the value stored. */
+export async function saveTipsSeen(hass: PrefsHass, seen: number): Promise<number> {
+  const value = clampSeen(seen);
+  await hass.callWS({ type: "remote_mapper/set_prefs", tips_seen: value });
+  return value;
 }
 
 /** Fired on window when the tips are reset, so open cards show them again. */
 export const TIPS_RESET_EVENT = "remote_mapper_tips_reset";
 
-/** Start the tour over in this browser. */
-export function resetTips(store: StorageLike | undefined = storage()): void {
-  remember(0, store);
+/** Start the tour over for this user; open cards in this window follow. */
+export async function resetTips(hass: PrefsHass): Promise<void> {
+  await saveTipsSeen(hass, 0);
   try {
     globalThis.dispatchEvent?.(new Event(TIPS_RESET_EVENT));
   } catch {

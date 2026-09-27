@@ -75,6 +75,8 @@ class AutomationConfigStore:
         self.hass = hass
         self._lock = asyncio.Lock()
         self._path = hass.config.path(AUTOMATION_CONFIG_PATH)
+        # entity ids removed by async_delete, pending is_own_removal
+        self.own_removals: set[str] = set()
 
     def _read_sync(self) -> list[dict[str, Any]]:
         try:
@@ -151,6 +153,22 @@ class AutomationConfigStore:
                 AUTOMATION_DOMAIN, "turn_on", {"entity_id": entity_id}, blocking=True
             )
 
+    async def async_exists(self, config_id: str) -> bool:
+        """Registered as an automation entity, or present in the yaml file.
+
+        HA's editor deletes by dropping the registry entity; the live
+        entity lingers until its removal task runs, so ``async_get`` still
+        finds it for a moment. The registry says "gone" right away.
+        """
+        registry = er.async_get(self.hass)
+        if registry.async_get_entity_id(
+            AUTOMATION_DOMAIN, AUTOMATION_DOMAIN, config_id
+        ):
+            return True
+        async with self._lock:
+            data = await self.hass.async_add_executor_job(self._read_sync)
+        return any(item.get(CONF_ID) == config_id for item in data)
+
     async def async_delete(self, config_id: str) -> bool:
         """Remove entry from yaml + drop the registry entity."""
         removed = False
@@ -164,8 +182,20 @@ class AutomationConfigStore:
         if entity_id := registry.async_get_entity_id(
             AUTOMATION_DOMAIN, AUTOMATION_DOMAIN, config_id
         ):
+            self.own_removals.add(entity_id)
             registry.async_remove(entity_id)
         return removed
+
+    def is_own_removal(self, entity_id: str) -> bool:
+        """True once for an entity this store just removed itself.
+
+        The caller is mid-operation and writes the slot's new state next;
+        the orphan check must not clear it in between.
+        """
+        if entity_id in self.own_removals:
+            self.own_removals.discard(entity_id)
+            return True
+        return False
 
 
 def _get_config_store(hass: HomeAssistant) -> AutomationConfigStore:
@@ -557,24 +587,34 @@ async def async_dematerialize(
 async def async_check_orphans(
     hass: HomeAssistant, store: RemoteMapperStore, entry_id: str
 ) -> list[str]:
-    """Reset slots whose automation vanished (deleted behind our back)."""
+    """Settle slots whose automation vanished (deleted behind our back).
+
+    A slot with its own copy of the actions (a per-event automation the
+    card built) goes back to card-only. A slot whose actions lived only
+    in the automation (linked, or a branch of the remote's shared one)
+    is cleared. Runs at start and after every automation reload.
+    """
     remote = store.get_remote(entry_id)
     if remote is None:
         return []
     orphaned: list[str] = []
-    for action_id, slot in remote.get("slots", {}).items():
+    for action_id, slot in list(remote.get("slots", {}).items()):
         if not slot.get("materialized"):
             continue
         config_id = slot.get("automation_id")
-        if config_id and await _get_config_store(hass).async_get(config_id):
+        if config_id and await _get_config_store(hass).async_exists(config_id):
             continue
-        slot["materialized"] = False
-        slot["automation_id"] = None
-        store.async_set_slot(entry_id, action_id, slot)
+        if is_linked(slot) or slot.get("shared_automation") or not slot.get("sequence"):
+            store.async_clear_slot(entry_id, action_id)
+        else:
+            slot["materialized"] = False
+            slot["automation_id"] = None
+            store.async_set_slot(entry_id, action_id, slot)
         orphaned.append(action_id)
     if orphaned:
         _LOGGER.warning(
-            "Remote %s: automations for %s vanished — slots reset to card-only",
+            "Remote %s: automations for %s vanished — slots with their own "
+            "actions reset to card-only, the rest cleared",
             entry_id,
             orphaned,
         )

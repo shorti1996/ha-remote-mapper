@@ -3,6 +3,62 @@
 Notable changes per release. Unreleased entries collect on `master` and
 move under a version heading when `make release VERSION=x.y.z` runs.
 
+## Unreleased
+
+### Changed
+
+- **The dashboard no longer jumps while the cards load.** Each card
+  keeps the remote it last showed in the browser and draws that copy,
+  dimmed, at its final size the moment the page opens; the live data
+  replaces it when the fetch answers. Before, every card started as a
+  two-line "Loading…" box and pushed the page around as it grew.
+
+- **The first-run tips stay dismissed.** Tips progress is kept on the
+  server per Home Assistant user, so it survives a cleared browser cache
+  and is the same on every device. Before, it lived in the browser and
+  the tour started over whenever that was wiped. "Show again" in the
+  card editor resets it for the user.
+
+- **"Automation for the whole remote" asks before it takes existing
+  events along.** The dialog names every card-built event that would
+  become a branch and says how to take one back (open the event, untick
+  "Keep as a branch"). Before, they moved without a word.
+
+- **Deleting an automation in HA frees its events at once.** Events
+  linked to it, or branches of the remote's shared automation, are
+  cleared the moment HA's editor deletes it (or the automations reload);
+  a per-event automation the card built leaves its copy of the actions
+  in the card. Before, the events kept pointing at the deleted
+  automation, shown as "empty branch", until the next Home Assistant
+  start, and a shared branch stayed as an empty event even then.
+
+- **Import works for Matter and event-entity remotes.** The scan matched
+  device triggers only. A Matter remote's automations trigger on
+  `event.received` for a button entity, so a handed-back one was skipped
+  on re-import. The scan now finds automations by the remote's button
+  entities and reads each `event.received` trigger as its `button:event`
+  slot.
+
+- **A Matter remote picked under the Zigbee source still gets added.**
+  A Matter remote (IKEA BILRESA, …) has no device triggers, so the
+  "Device with triggers — recommended" entry found 0 actions and refused
+  it. The device step now notices the remote's event entities and
+  continues on the Matter path. The menu entries are renamed to
+  "Zigbee remote (Zigbee2MQTT, ZHA, …)" and "Matter remote (IKEA
+  BILRESA, …)" so the right one is found by name.
+
+- **A linked event can be moved.** Moving it edits the native automation
+  the way the card edits its own: a branch of a choose keyed on trigger
+  ids is re-keyed to the new event, a flat automation gets the new
+  event's trigger. Swaps with card-built, shared or other linked events
+  work too. Any other shape is refused before anything changes, and the
+  error names what was found. In edit mode a linked mark wears a link
+  badge. Before, every linked event was locked with "change the trigger
+  in HA".
+- **Matter events resolve inside native automations.** An
+  `event.received` trigger on a button entity now maps to its
+  `button:event` slot when the card reads or edits a linked automation.
+
 ## 0.1.9 — 2026-09-26
 
 ### Fixed

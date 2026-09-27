@@ -10,7 +10,7 @@ import { customElement, property, state } from "lit/decorators.js";
 
 import { ensureHaForm } from "./canvas/ha-loader";
 import { KIND_ICON, KIND_TITLE, KINDS } from "./model";
-import { resetTips, tipsSeen } from "./onboarding";
+import { loadTipsSeen, resetTips } from "./onboarding";
 import {
   applyEditorValue,
   ASSISTED_TRIGGERS,
@@ -81,9 +81,9 @@ export class RemoteMapperCardEditor extends LitElement {
   @state() private _remotes?: RemoteListItem[];
   @state() private _formOk = false;
   private _fetching = false;
-  // Reset section: the remote's remembered choices + this browser's tips
+  // Reset section: the remote's remembered choices + this user's tips
   @state() private _options?: RemoteOptions;
-  @state() private _tipsRev = 0;
+  @state() private _tipsSeen?: number;
   private _optionsFor?: string;
 
   public setConfig(config: RemoteMapperCardConfig): void {
@@ -151,13 +151,21 @@ export class RemoteMapperCardEditor extends LitElement {
         });
     }
     this._fetchOptions();
+    if (this._tipsSeen === undefined && this.hass) {
+      void loadTipsSeen(this.hass)
+        .then((seen) => {
+          this._tipsSeen = seen;
+        })
+        .catch(() => {
+          /* no backend: the tips row stays hidden */
+        });
+    }
   }
 
   /** Forget remembered choices; each button says what it undoes. */
   private _renderReset() {
     const options = this._options;
-    const seen = tipsSeen();
-    void this._tipsRev;
+    const seen = this._tipsSeen ?? 0;
     if (!options && !seen) return nothing;
     return html`
       <div class="reset">
@@ -192,14 +200,16 @@ export class RemoteMapperCardEditor extends LitElement {
           : nothing}
         <div class="reset-row">
           <span class="hint">
-            Tips at the top of the card, in this browser:
+            Tips at the top of the card:
             <b>${seen ? "seen" : "showing"}</b>
           </span>
           <button
             ?disabled=${!seen}
             @click=${() => {
-              resetTips();
-              this._tipsRev++;
+              if (!this.hass) return;
+              void resetTips(this.hass).then(() => {
+                this._tipsSeen = 0;
+              });
             }}
           >
             Show again

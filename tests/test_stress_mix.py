@@ -129,10 +129,20 @@ async def test_own_linked_native_and_remote_side_by_side(
     base |= {"2_single": ["native"], "2_double": ["card"]}
     await rig.check({**base, "1_single": ["a", "extra"]}, tap={"1_single": ["a"]})
 
-    res = await rig.move("2_single", "2_hold", ok=False)
-    assert "linked" in res["error"]["message"]
-    res = await rig.move("1_single", "2_single", ok=False)
-    assert "linked" in res["error"]["message"]
+    # linked flat native: its trigger follows the move, then swaps with a
+    # shared branch (branch re-keyed, native re-triggered), then back
+    await rig.move("2_single", "2_hold")
+    assert rig.slot("2_hold")["automation_id"] == "native_linked"
+    moved = {k: v for k, v in base.items() if k != "2_single"} | {"2_hold": ["native"]}
+    await rig.check({**moved, "1_single": ["a", "extra"]}, tap={"1_single": ["a"]})
+    await rig.move("2_hold", "2_single")
+    await rig.move("1_single", "2_single")  # shared branch ↔ linked native
+    assert rig.slot("1_single")["automation_id"] == "native_linked"
+    assert rig.slot("2_single").get("shared_automation")
+    swapped = {**base, "1_single": ["native", "extra"], "2_single": ["a"]}
+    await rig.check(swapped, tap={"1_single": ["native"]})
+    await rig.move("2_single", "1_single")
+    await rig.check({**base, "1_single": ["a", "extra"]}, tap={"1_single": ["a"]})
 
     await rig.move("1_hold", "1_double")  # own automation ↔ branch
     assert not rig.slot("1_double").get("shared_automation")
