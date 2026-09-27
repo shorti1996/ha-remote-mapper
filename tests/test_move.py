@@ -547,3 +547,122 @@ async def test_move_linked_refuses_other_shapes(
     res = await _move(client, entry, "2_single", "1_double")
     assert not res["success"]
     assert "no longer exists" in res["error"]["message"]
+
+
+async def test_move_owned_automation_twice_leaves_nothing_behind(
+    hass, hass_ws_client, remote_device
+) -> None:
+    """Save, convert to an automation, move, move again: one slot, one automation.
+
+    The user's flow: the action was a plain card slot first, then turned
+    into its own automation, then dragged along the events.
+    """
+    entry = await _setup(hass, remote_device)
+    client = await hass_ws_client(hass)
+    store = hass.data[DOMAIN]["store"]
+    await _save(client, entry, "1_single", SEQ_A)
+    await _save(client, entry, "1_single", SEQ_A, materialized=True)
+
+    res = await _move(client, entry, "1_single", "1_double")
+    assert res["success"], res
+    await hass.async_block_till_done()
+    res = await _move(client, entry, "1_double", "2_single")
+    assert res["success"], res
+    await hass.async_block_till_done()
+
+    assert store.get_slot(entry.entry_id, "1_single") is None
+    assert store.get_slot(entry.entry_id, "1_double") is None
+    moved = store.get_slot(entry.entry_id, "2_single")
+    assert moved["materialized"] is True
+    assert moved["automation_id"] == automation_config_id(entry.entry_id, "2_single")
+    assert [a["id"] for a in _automations(hass)] == [moved["automation_id"]]
+
+
+async def test_move_owned_automation_matter(
+    hass, hass_ws_client, device_registry, entity_registry
+) -> None:
+    """Same flow on a Matter remote, whose action ids carry a colon."""
+    assert await async_setup_component(hass, "automation", {})
+    owner = MockConfigEntry(domain="matter")
+    owner.add_to_hass(hass)
+    device = device_registry.async_get_or_create(
+        config_entry_id=owner.entry_id, identifiers={("matter", "bil")}, name="BIL"
+    )
+    b1 = entity_registry.async_get_or_create(
+        "event", "matter", "b1", device_id=device.id, suggested_object_id="bil_button_1"
+    ).entity_id
+    hass.states.async_set(
+        b1,
+        "2026-07-20T23:40:00+00:00",
+        {"event_types": ["multi_press_1", "multi_press_2", "long_press"]},
+    )
+    events = [f"button_1:{e}" for e in ("multi_press_1", "multi_press_2", "long_press")]
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="BIL",
+        unique_id=f"matter:{device.id}",
+        data={
+            "source": "matter",
+            "source_config": {"device_id": device.id, "buttons": {"button_1": b1}},
+            "layout": {"actions": events},
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    client = await hass_ws_client(hass)
+    store = hass.data[DOMAIN]["store"]
+
+    await _save(client, entry, events[0], SEQ_A)
+    await _save(client, entry, events[0], SEQ_A, materialized=True)
+    res = await _move(client, entry, events[0], events[1])
+    assert res["success"], res
+    await hass.async_block_till_done()
+    res = await _move(client, entry, events[1], events[2])
+    assert res["success"], res
+    await hass.async_block_till_done()
+
+    assert store.get_slot(entry.entry_id, events[0]) is None
+    assert store.get_slot(entry.entry_id, events[1]) is None
+    moved = store.get_slot(entry.entry_id, events[2])
+    assert moved["materialized"] is True
+    assert [a["id"] for a in _automations(hass)] == [moved["automation_id"]]
+
+
+async def test_orphan_check_racing_a_move_does_not_resurrect_the_slot(
+    hass, hass_ws_client, remote_device
+) -> None:
+    """The check awaits a file read while a move deletes the automation.
+
+    On resume it must not write its stale slot object back: the source
+    slot is gone, its actions travelled to the target.
+    """
+    import asyncio
+
+    from custom_components.remote_mapper.materializer import AutomationConfigStore
+
+    entry = await _setup(hass, remote_device)
+    client = await hass_ws_client(hass)
+    store = hass.data[DOMAIN]["store"]
+    await _save(client, entry, "1_single", SEQ_A, materialized=True)
+    await hass.async_block_till_done()
+
+    original = AutomationConfigStore.async_exists
+
+    async def slow_exists(self, config_id: str) -> bool:
+        await asyncio.sleep(0.5)
+        return await original(self, config_id)
+
+    with patch.object(AutomationConfigStore, "async_exists", slow_exists):
+        hass.bus.async_fire("automation_reloaded")  # starts the check
+        await asyncio.sleep(0)  # it is now inside slow_exists
+        res = await _move(client, entry, "1_single", "1_double")
+        assert res["success"], res
+        await hass.async_block_till_done()
+        await asyncio.sleep(0.6)
+        await hass.async_block_till_done()
+
+    assert store.get_slot(entry.entry_id, "1_single") is None
+    moved = store.get_slot(entry.entry_id, "1_double")
+    assert moved["materialized"] is True
+    assert moved["sequence"] == SEQ_A

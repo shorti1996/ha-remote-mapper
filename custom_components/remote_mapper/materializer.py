@@ -604,6 +604,16 @@ async def async_check_orphans(
         config_id = slot.get("automation_id")
         if config_id and await _get_config_store(hass).async_exists(config_id):
             continue
+        # A move or an untick may have rewritten the slot during the
+        # await above: act only on the slot as it is now, and only while
+        # it still points at the vanished automation.
+        slot = store.get_slot(entry_id, action_id)
+        if (
+            slot is None
+            or not slot.get("materialized")
+            or slot.get("automation_id") != config_id
+        ):
+            continue
         if is_linked(slot) or slot.get("shared_automation") or not slot.get("sequence"):
             store.async_clear_slot(entry_id, action_id)
         else:

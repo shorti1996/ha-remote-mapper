@@ -7,6 +7,16 @@ move under a version heading when `make release VERSION=x.y.z` runs.
 
 ## 0.1.10 — 2026-09-27
 
+### Fixed
+
+- **Moving an event's automation left a plain copy behind.** After
+  "convert to automation" and a move, the old event kept the actions as
+  a card slot, so a chain of moves smeared the action across events.
+  The check that settles vanished automations was racing the move: it
+  read the slot, waited for the automations file, and then wrote its
+  stale copy back after the move had cleared the slot. It now re-reads
+  the slot after waiting and leaves anything a move rewrote alone.
+
 ### Changed
 
 - **The dashboard no longer jumps while the cards load.** Each card
