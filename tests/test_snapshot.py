@@ -473,7 +473,11 @@ async def _lamp_device(hass, device_registry, entity_registry, entry) -> str:
         entity_category=EntityCategory.DIAGNOSTIC,
     )
     entity_registry.async_get_or_create(
-        "sensor", "test", "lamp_power", device_id=device.id, suggested_object_id="lamp_power"
+        "sensor",
+        "test",
+        "lamp_power",
+        device_id=device.id,
+        suggested_object_id="lamp_power",
     )
     for entity_id in (
         "light.lamp",
@@ -587,7 +591,9 @@ async def test_scene_deleted_in_ha_frees_the_slot(
     registry entity (no reload). The event must read "not set" again and
     the ownership record must go, instead of pointing at a dead scene."""
     hass.states.async_set("light.a", "on")
-    entry = await _setup(hass, remote_device, options={"snapshot_entities": ["light.a"]})
+    entry = await _setup(
+        hass, remote_device, options={"snapshot_entities": ["light.a"]}
+    )
     client = await hass_ws_client(hass)
     res = await _ws(
         client,
