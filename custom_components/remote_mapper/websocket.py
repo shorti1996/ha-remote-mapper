@@ -178,7 +178,7 @@ async def ws_get_remote(
     if entry is None or remote is None:
         connection.send_error(msg["id"], ERR_NOT_FOUND, "Unknown remote")
         return
-    from .const import CONF_SNAPSHOT_ENTITIES
+    from .const import CONF_SNAPSHOT_DEVICES, CONF_SNAPSHOT_ENTITIES
     from .materializer import EDIT_URL, async_get_live_view, automation_entity_id
     from .remote_automation import async_exists, remote_automation_config_id
 
@@ -223,6 +223,7 @@ async def ws_get_remote(
             "stale_actions": remote.get("stale_actions", []),
             "remote_automation": shared,
             "snapshot_entities": list(entry.options.get(CONF_SNAPSHOT_ENTITIES, [])),
+            "snapshot_devices": list(entry.options.get(CONF_SNAPSHOT_DEVICES, [])),
             # The card compares this with its own build to offer a reload
             "version": INTEGRATION_VERSION,
         },
@@ -588,10 +589,13 @@ async def ws_clear_slot(
         vol.Required("entry_id"): str,
         vol.Required("action_id"): str,
         vol.Optional("name"): str,
+        # Entities captured on their own, and devices captured whole; when
+        # neither is given the remote's default lists apply
         vol.Optional("entities"): [str],
+        vol.Optional("devices"): [str],
         vol.Optional("re_snapshot", default=False): bool,
-        # Save the captured entities as the remote's default set (a
-        # re-snapshot saves the scene's own set)
+        # Save the lists as the remote's defaults (a re-snapshot saves the
+        # scene's own lists)
         vol.Optional("remember_entities", default=False): bool,
     }
 )
@@ -601,10 +605,10 @@ async def ws_create_snapshot(
 ) -> None:
     """Snapshot current state → persistent scene bound to the slot.
 
-    Entity list defaults to the remote's snapshot_entities option
-    (applied server-side); re_snapshot reuses the owned scene's set.
+    The lists default to the remote's snapshot_entities/snapshot_devices
+    options (applied server-side); re_snapshot reuses the owned scene's.
     """
-    from .const import CONF_SNAPSHOT_ENTITIES
+    from .const import CONF_SNAPSHOT_DEVICES, CONF_SNAPSHOT_ENTITIES
     from .snapshot import async_create_snapshot
 
     store = _store(hass)
@@ -613,9 +617,11 @@ async def ws_create_snapshot(
         connection.send_error(msg["id"], ERR_NOT_FOUND, "Unknown remote")
         return
 
-    entities = msg.get("entities") or list(
-        entry.options.get(CONF_SNAPSHOT_ENTITIES, [])
-    )
+    entities = list(msg.get("entities") or [])
+    devices = list(msg.get("devices") or [])
+    if not entities and not devices:
+        entities = list(entry.options.get(CONF_SNAPSHOT_ENTITIES, []))
+        devices = list(entry.options.get(CONF_SNAPSHOT_DEVICES, []))
     name = msg.get("name") or f"{remote_name(hass, entry)} {msg['action_id']}"
 
     from .materializer import async_materialize, is_linked
@@ -639,6 +645,7 @@ async def ws_create_snapshot(
             entities,
             name,
             re_snapshot=msg["re_snapshot"],
+            device_ids=devices,
         )
         # The automation stays canonical: push the scene call where it runs.
         # A re-snapshot keeps the scene's id, so what calls it is unchanged.
@@ -660,7 +667,11 @@ async def ws_create_snapshot(
     if msg["remember_entities"]:
         hass.config_entries.async_update_entry(
             entry,
-            options={**entry.options, CONF_SNAPSHOT_ENTITIES: list(result["entities"])},
+            options={
+                **entry.options,
+                CONF_SNAPSHOT_ENTITIES: list(result["picked_entities"]),
+                CONF_SNAPSHOT_DEVICES: list(result["devices"]),
+            },
         )
     _fire_updated(hass, msg["entry_id"], "snapshot_created")
     connection.send_result(msg["id"], result)
@@ -831,7 +842,7 @@ async def ws_get_options(
 ) -> None:
     """Remembered per-remote choices, for the card editor's Reset section."""
     from .cleanup import get_policy
-    from .const import CONF_SNAPSHOT_ENTITIES
+    from .const import CONF_SNAPSHOT_DEVICES, CONF_SNAPSHOT_ENTITIES
 
     entry = hass.config_entries.async_get_entry(msg["entry_id"])
     if entry is None:
@@ -842,6 +853,7 @@ async def ws_get_options(
         {
             "cleanup_policy": get_policy(entry),
             "snapshot_entities": list(entry.options.get(CONF_SNAPSHOT_ENTITIES, [])),
+            "snapshot_devices": list(entry.options.get(CONF_SNAPSHOT_DEVICES, [])),
         },
     )
 
@@ -852,7 +864,7 @@ async def ws_get_options(
         vol.Required("entry_id"): str,
         # back to "ask" before deleting an owned scene/automation
         vol.Optional("cleanup_policy", default=False): bool,
-        # forget the remote's default snapshot entity set
+        # forget the remote's default snapshot lists (entities and devices)
         vol.Optional("snapshot_entities", default=False): bool,
     }
 )
@@ -861,7 +873,11 @@ async def ws_reset_options(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
 ) -> None:
     """Forget remembered choices (the options flow can also change them)."""
-    from .const import CONF_OWNED_SCENE_CLEANUP, CONF_SNAPSHOT_ENTITIES
+    from .const import (
+        CONF_OWNED_SCENE_CLEANUP,
+        CONF_SNAPSHOT_DEVICES,
+        CONF_SNAPSHOT_ENTITIES,
+    )
 
     entry = hass.config_entries.async_get_entry(msg["entry_id"])
     if entry is None:
@@ -872,6 +888,7 @@ async def ws_reset_options(
         options.pop(CONF_OWNED_SCENE_CLEANUP, None)
     if msg["snapshot_entities"]:
         options.pop(CONF_SNAPSHOT_ENTITIES, None)
+        options.pop(CONF_SNAPSHOT_DEVICES, None)
     hass.config_entries.async_update_entry(entry, options=options)
     _fire_updated(hass, msg["entry_id"], "options_reset")
     connection.send_result(msg["id"], {})

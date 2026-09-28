@@ -504,6 +504,7 @@ async def test_get_and_reset_options(hass, hass_ws_client, remote_device) -> Non
     assert res["result"] == {
         "cleanup_policy": "always_delete",
         "snapshot_entities": ["light.a"],
+        "snapshot_devices": [],
     }
 
     res = await _ws(
@@ -530,7 +531,11 @@ async def test_get_and_reset_options(hass, hass_ws_client, remote_device) -> Non
     res = await _ws(
         client, {"type": f"{DOMAIN}/get_options", "entry_id": entry.entry_id}
     )
-    assert res["result"] == {"cleanup_policy": "ask", "snapshot_entities": []}
+    assert res["result"] == {
+        "cleanup_policy": "ask",
+        "snapshot_entities": [],
+        "snapshot_devices": [],
+    }
     assert [e.data["kind"] for e in events] == ["options_reset", "options_reset"]
 
     res = await _ws(client, {"type": f"{DOMAIN}/get_options", "entry_id": "nope"})

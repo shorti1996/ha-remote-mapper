@@ -34,6 +34,7 @@ from .const import (
     CONF_ENTITY_ID,
     CONF_LAYOUT,
     CONF_OWNED_SCENE_CLEANUP,
+    CONF_SNAPSHOT_DEVICES,
     CONF_SNAPSHOT_ENTITIES,
     CONF_SOURCE,
     CONF_SOURCE_CONFIG,
@@ -62,6 +63,10 @@ class RemoteMapperOptionsFlow(OptionsFlow):
                         CONF_SNAPSHOT_ENTITIES,
                         default=list(options.get(CONF_SNAPSHOT_ENTITIES, [])),
                     ): selector({"entity": {"multiple": True}}),
+                    vol.Optional(
+                        CONF_SNAPSHOT_DEVICES,
+                        default=list(options.get(CONF_SNAPSHOT_DEVICES, [])),
+                    ): selector({"device": {"multiple": True}}),
                     vol.Optional(
                         CONF_OWNED_SCENE_CLEANUP,
                         default=options.get(CONF_OWNED_SCENE_CLEANUP, CLEANUP_ASK),

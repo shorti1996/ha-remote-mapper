@@ -73,7 +73,8 @@
       "init": {
         "title": "Remote options",
         "data": {
-          "snapshot_entities": "Default snapshot entities (\"this remote controls…\")",
+          "snapshot_entities": "Default snapshot entities (captured on their own)",
+          "snapshot_devices": "Default snapshot devices (captured whole)",
           "owned_scene_cleanup": "When clearing a slot with an owned scene/automation"
         },
         "data_description": {

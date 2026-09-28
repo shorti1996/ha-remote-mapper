@@ -153,6 +153,7 @@ interface RemoteData {
   remote_automation?: { config_id: string; entity_id: string | null; edit_url: string } | null;
   /** Default entity set for snapshots (remote options). */
   snapshot_entities?: string[];
+  snapshot_devices?: string[];
   /** Integration version; newer than CARD_VERSION = this tab runs a stale bundle. */
   version?: string;
 }
@@ -369,6 +370,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   @state() private _quickOption = "";
   // "new scene" mode: entities to capture + save them as the remote default
   @state() private _snapEntities: string[] = [];
+  @state() private _snapDevices: string[] = [];
   @state() private _snapRemember = false;
   @state() private _draft = "";
   @state() private _draftName = "";
@@ -967,7 +969,8 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     this._quickOption = quick.option;
     // The switch states a fact: on when the list shown is the saved default
     this._snapEntities = [...(this._remote?.snapshot_entities ?? [])];
-    this._snapRemember = this._snapEntities.length > 0;
+    this._snapDevices = [...(this._remote?.snapshot_devices ?? [])];
+    this._snapRemember = this._snapEntities.length > 0 || this._snapDevices.length > 0;
     this._editorTab = quick.mode === "custom" && sequence.length ? "yaml" : "quick";
     this._draft = JSON.stringify(sequence, null, 2);
     this._draftName = slot?.name ?? "";
@@ -1112,8 +1115,8 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     const name = this._draftName.trim() || null;
     try {
       if (this._quickMode === "new_scene") {
-        if (!this._snapEntities.length) {
-          this._draftError = "Pick at least one entity to capture";
+        if (!this._snapEntities.length && !this._snapDevices.length) {
+          this._draftError = "Pick at least one device or entity to capture";
           return;
         }
         await this._hass!.callWS({
@@ -1121,6 +1124,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
           entry_id: this._entryId,
           action_id: this._editingAction,
           entities: this._snapEntities,
+          devices: this._snapDevices,
           remember_entities: this._snapRemember,
           ...(name ? { name } : {}),
         });
@@ -2463,10 +2467,11 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     ];
     let createHint: string | undefined;
     if (this._quickMode === "new_scene") {
+      schema.push({ name: "devices", selector: { device: { multiple: true } } });
       schema.push({ name: "entities", selector: { entity: { multiple: true } } });
       schema.push({ name: "remember", selector: { boolean: {} } });
       createHint =
-        "Set the room the way you like it first. Capture stores the current state of these entities as a scene bound to this event; Re-snapshot later updates it in place. With the switch on, the captured list is what new snapshots start from.";
+        "Set the room the way you like it first. A device is captured whole, the way HA's scene editor adds one; an entity is captured on its own. Capture stores their current state as a scene bound to this event; Re-snapshot later updates it in place. With the switch on, these lists are what new snapshots start from.";
     } else if (this._quickMode === "new_automation") {
       createHint =
         "Creates an automation with this event as its trigger and no actions, then opens HA's editor so you can fill it in. The card shows what you put there.";
@@ -2513,7 +2518,8 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     const labels: Record<string, string> = {
       mode: "Action",
       option: "Preset",
-      entities: "Entities to capture",
+      devices: "Devices to capture (whole)",
+      entities: "Entities to capture (on their own)",
       remember: "Use as this remote's default entity list",
       entity: this._quickMode === "link" ? "Automation" : "Entity",
     };
@@ -2525,6 +2531,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
           entity: this._quickEntity,
           option: this._quickOption,
           entities: this._snapEntities,
+          devices: this._snapDevices,
           remember: this._snapRemember,
         }}
         .schema=${schema}
@@ -2535,6 +2542,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
             entity: string;
             option?: string;
             entities?: string[];
+            devices?: string[];
             remember?: boolean;
           };
           if (value.mode !== this._quickMode) {
@@ -2543,6 +2551,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
             this._quickOption = "";
           } else if (CREATE_MODES.has(this._quickMode)) {
             this._snapEntities = value.entities ?? [];
+            this._snapDevices = value.devices ?? [];
             this._snapRemember = !!value.remember;
           } else if (value.entity !== this._quickEntity) {
             // Entity changed → its preset list differs, drop the old option.

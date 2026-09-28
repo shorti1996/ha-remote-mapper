@@ -185,13 +185,27 @@ class RemoteMapperStore:
         return self.data["owned_scenes"].get(scene_id)
 
     def async_register_owned_scene(
-        self, scene_id: str, created_for: str, entities: list[str]
+        self,
+        scene_id: str,
+        created_for: str,
+        entities: list[str],
+        devices: list[str] | None = None,
+        picked_entities: list[str] | None = None,
     ) -> None:
-        """Record ownership; entities enable in-place re-snapshot."""
+        """Record ownership; the lists enable in-place re-snapshot.
+
+        ``entities`` is everything captured; ``devices`` and
+        ``picked_entities`` are what the user chose (a device is re-read
+        on re-snapshot). Records from before 0.1.11 have only ``entities``.
+        """
         self.data["owned_scenes"][scene_id] = {
             "created_for": created_for,
             "created_at": dt_util.utcnow().isoformat(),
             "entities": entities,
+            "devices": list(devices or []),
+            "picked_entities": list(
+                entities if picked_entities is None else picked_entities
+            ),
         }
         self.async_schedule_save()
 

@@ -63,6 +63,17 @@ interface RemoteListItem {
 interface RemoteOptions {
   cleanup_policy: "ask" | "always_delete" | "never_delete";
   snapshot_entities: string[];
+  snapshot_devices: string[];
+}
+
+/** "2 devices, 3 entities", either half alone, or "none". */
+function snapshotDefaults(options: RemoteOptions): string {
+  const parts: string[] = [];
+  const devices = options.snapshot_devices?.length ?? 0;
+  const entities = options.snapshot_entities.length;
+  if (devices) parts.push(`${devices} device${devices === 1 ? "" : "s"}`);
+  if (entities) parts.push(`${entities} entit${entities === 1 ? "y" : "ies"}`);
+  return parts.length ? parts.join(", ") : "none";
 }
 
 const POLICY_TEXT: Record<RemoteOptions["cleanup_policy"], string> = {
@@ -186,11 +197,11 @@ export class RemoteMapperCardEditor extends LitElement {
               </div>
               <div class="reset-row">
                 <span class="hint">
-                  Default entities for <i>Scene from current state</i>:
-                  <b>${options.snapshot_entities.length ? options.snapshot_entities.length : "none"}</b>
+                  Defaults for <i>Scene from current state</i>:
+                  <b>${snapshotDefaults(options)}</b>
                 </span>
                 <button
-                  ?disabled=${!options.snapshot_entities.length}
+                  ?disabled=${!options.snapshot_entities.length && !options.snapshot_devices.length}
                   @click=${() => void this._reset("snapshot_entities")}
                 >
                   Forget

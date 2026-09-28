@@ -60,6 +60,7 @@ ADAPTER_MATTER: Final = "matter"
 
 # Options keys
 CONF_SNAPSHOT_ENTITIES: Final = "snapshot_entities"
+CONF_SNAPSHOT_DEVICES: Final = "snapshot_devices"
 CONF_OWNED_SCENE_CLEANUP: Final = "owned_scene_cleanup"
 
 CLEANUP_ASK: Final = "ask"

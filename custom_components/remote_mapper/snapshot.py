@@ -15,6 +15,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
@@ -45,6 +46,51 @@ _ATTR_DENYLIST = {
     "last_updated",
     "context",
 }
+
+
+# Domains HA's scene editor leaves out when a whole device is added
+# (frontend src/data/scene.ts SCENE_IGNORED_DOMAINS, 2026-09)
+_DEVICE_IGNORED_DOMAINS = frozenset(
+    {
+        "binary_sensor",
+        "button",
+        "configuration",
+        "device_tracker",
+        "event",
+        "image_processing",
+        "infrared",
+        "input_button",
+        "persistent_notification",
+        "person",
+        "radio_frequency",
+        "scene",
+        "schedule",
+        "script",
+        "sensor",
+        "sun",
+        "update",
+        "weather",
+        "zone",
+    }
+)
+
+
+def device_entities(hass: HomeAssistant, device_ids: list[str]) -> list[str]:
+    """A device's capturable entities, picked the way HA's scene editor does.
+
+    Enabled, not hidden, no entity category, domain not on HA's ignore
+    list. Order: devices as given, entities as the registry lists them.
+    """
+    registry = er.async_get(hass)
+    out: list[str] = []
+    for device_id in device_ids:
+        for entry in er.async_entries_for_device(registry, device_id):
+            if entry.hidden_by or entry.entity_category:
+                continue
+            if entry.domain in _DEVICE_IGNORED_DOMAINS:
+                continue
+            out.append(entry.entity_id)
+    return out
 
 
 def scene_config_id(entry_id: str, action_id: str) -> str:
@@ -114,12 +160,20 @@ async def async_create_snapshot(
     entity_ids: list[str],
     name: str,
     re_snapshot: bool = False,
+    device_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Capture states into a persistent scene bound to the slot.
+
+    ``device_ids`` capture whole devices (every capturable entity, as HA's
+    scene editor picks them); ``entity_ids`` capture just those entities
+    and are marked ``entity_only`` so HA's editor shows them alone, not
+    their device. A re-snapshot keeps both lists and re-expands the
+    devices, so an entity a device gained since is captured too.
 
     A re-snapshot changes only the scene's states: the slot, and the
     automation or branch calling the scene, keep their actions.
     """
+    device_ids = list(device_ids or [])
     # A slot moved from another event keeps its scene: reuse that id so a
     # capture updates it instead of leaving an orphan behind.
     existing = store.get_slot(entry_id, action_id)
@@ -134,15 +188,26 @@ async def async_create_snapshot(
         )
 
     if re_snapshot:
-        entity_ids = store.get_owned_scene(config_id)["entities"]
+        record = store.get_owned_scene(config_id)
+        device_ids = list(record.get("devices", []))
+        entity_ids = list(record.get("picked_entities", record["entities"]))
 
-    entities = capture_entities(hass, entity_ids)
+    from_devices = device_entities(hass, device_ids)
+    entities = capture_entities(hass, list(dict.fromkeys([*from_devices, *entity_ids])))
     if not entities:
         raise HomeAssistantError("No capturable entities for snapshot")
+    # An entity picked on its own shows alone in HA's scene editor; one
+    # that came with its device shows under the device, like HA writes it
+    metadata = {
+        entity_id: {"entity_only": True}
+        for entity_id in entity_ids
+        if entity_id in entities and entity_id not in from_devices
+    }
 
-    await get_scene_config_store(hass).async_upsert(
-        config_id, {"name": name, "entities": entities}
-    )
+    payload: dict[str, Any] = {"name": name, "entities": entities}
+    if metadata:
+        payload["metadata"] = metadata
+    await get_scene_config_store(hass).async_upsert(config_id, payload)
 
     entity_id = scene_entity_id(hass, config_id)
     if entity_id is None:
@@ -152,6 +217,8 @@ async def async_create_snapshot(
         config_id,
         created_for=f"{entry_id}/{action_id}",
         entities=list(entities),
+        devices=device_ids,
+        picked_entities=[e for e in entity_ids if e in entities],
     )
 
     if not re_snapshot:
@@ -167,5 +234,7 @@ async def async_create_snapshot(
         "scene_id": config_id,
         "scene_entity_id": entity_id,
         "entities": list(entities),
+        "devices": device_ids,
+        "picked_entities": [e for e in entity_ids if e in entities],
         "created_at": dt_util.utcnow().isoformat(),
     }

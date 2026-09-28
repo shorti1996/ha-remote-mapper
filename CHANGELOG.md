@@ -5,6 +5,18 @@ move under a version heading when `make release VERSION=x.y.z` runs.
 
 ## Unreleased
 
+### Added
+
+- **Capture whole devices, or single entities, like HA's scene editor.**
+  *Scene from current state* gets a device picker next to the entity one.
+  A device is captured with every entity HA's editor would add (enabled,
+  not hidden, no config or diagnostic category, domain not on HA's
+  ignore list); an entity picked on its own is written with
+  `entity_only` metadata, so HA's editor shows it alone instead of its
+  whole device. Re-snapshot re-reads the devices, so an entity a device
+  gained since is captured too. The remote's defaults keep both lists;
+  the options flow has the device list as well.
+
 ### Fixed
 
 - **"Remember these as this remote's default" looked forgotten.** The

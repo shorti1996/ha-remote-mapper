@@ -437,3 +437,143 @@ async def test_snapshot_without_entities_fails_clearly(
     assert not res["success"]
     assert "No capturable entities" in res["error"]["message"]
     assert _scenes_yaml(hass) == []
+
+
+async def _lamp_device(hass, device_registry, entity_registry, entry) -> str:
+    """A device with a light, a hidden switch, a diagnostic sensor, a button."""
+    from homeassistant.helpers.device_registry import DeviceEntryType
+    from homeassistant.helpers.entity import EntityCategory
+    from homeassistant.helpers.entity_registry import RegistryEntryHider
+
+    device = device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={("test", "lamp")},
+        entry_type=DeviceEntryType.SERVICE,
+    )
+    entity_registry.async_get_or_create(
+        "light", "test", "lamp_main", device_id=device.id, suggested_object_id="lamp"
+    )
+    entity_registry.async_get_or_create(
+        "light", "test", "lamp_seg", device_id=device.id, suggested_object_id="seg"
+    )
+    entity_registry.async_get_or_create(
+        "switch",
+        "test",
+        "lamp_hidden",
+        device_id=device.id,
+        suggested_object_id="lamp_hidden",
+        hidden_by=RegistryEntryHider.USER,
+    )
+    entity_registry.async_get_or_create(
+        "switch",
+        "test",
+        "lamp_diag",
+        device_id=device.id,
+        suggested_object_id="lamp_diag",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    )
+    entity_registry.async_get_or_create(
+        "sensor", "test", "lamp_power", device_id=device.id, suggested_object_id="lamp_power"
+    )
+    for entity_id in (
+        "light.lamp",
+        "light.seg",
+        "switch.lamp_hidden",
+        "switch.lamp_diag",
+        "sensor.lamp_power",
+    ):
+        hass.states.async_set(entity_id, "on")
+    return device.id
+
+
+async def test_snapshot_devices_capture_whole_and_entities_alone(
+    hass, hass_ws_client, remote_device, device_registry, entity_registry
+) -> None:
+    """A device captures as HA's editor would; a picked entity is entity_only."""
+    hass.states.async_set("light.solo", "off")
+    entry = await _setup(hass, remote_device)
+    device_id = await _lamp_device(hass, device_registry, entity_registry, entry)
+    client = await hass_ws_client(hass)
+
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/create_snapshot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_single",
+            "devices": [device_id],
+            "entities": ["light.solo", "light.seg"],
+            "remember_entities": True,
+        },
+    )
+    assert res["success"], res
+    assert res["result"]["entities"] == ["light.lamp", "light.seg", "light.solo"]
+    assert res["result"]["devices"] == [device_id]
+    assert res["result"]["picked_entities"] == ["light.solo", "light.seg"]
+
+    scene = _scenes_yaml(hass)[0]
+    assert set(scene["entities"]) == {"light.lamp", "light.seg", "light.solo"}
+    # light.seg came with its device, so only light.solo stands alone
+    assert scene["metadata"] == {"light.solo": {"entity_only": True}}
+    assert entry.options["snapshot_devices"] == [device_id]
+    assert entry.options["snapshot_entities"] == ["light.solo", "light.seg"]
+
+
+async def test_re_snapshot_re_expands_devices(
+    hass, hass_ws_client, remote_device, device_registry, entity_registry
+) -> None:
+    """A re-snapshot re-reads the device: an entity it gained is captured."""
+    entry = await _setup(hass, remote_device)
+    device_id = await _lamp_device(hass, device_registry, entity_registry, entry)
+    client = await hass_ws_client(hass)
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/create_snapshot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_single",
+            "devices": [device_id],
+        },
+    )
+    assert res["success"], res
+    assert "metadata" not in _scenes_yaml(hass)[0]
+
+    entity_registry.async_get_or_create(
+        "light", "test", "lamp_new", device_id=device_id, suggested_object_id="lamp_new"
+    )
+    hass.states.async_set("light.lamp_new", "off")
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/create_snapshot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_single",
+            "re_snapshot": True,
+        },
+    )
+    assert res["success"], res
+    scenes = _scenes_yaml(hass)
+    assert len(scenes) == 1
+    assert set(scenes[0]["entities"]) == {"light.lamp", "light.seg", "light.lamp_new"}
+
+
+async def test_default_devices_apply_when_nothing_picked(
+    hass, hass_ws_client, remote_device, device_registry, entity_registry
+) -> None:
+    """The remote's default device list is used like the entity one."""
+    entry = await _setup(hass, remote_device)
+    device_id = await _lamp_device(hass, device_registry, entity_registry, entry)
+    hass.config_entries.async_update_entry(
+        entry, options={"snapshot_devices": [device_id]}
+    )
+    client = await hass_ws_client(hass)
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/create_snapshot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_single",
+        },
+    )
+    assert res["success"], res
+    assert res["result"]["entities"] == ["light.lamp", "light.seg"]
