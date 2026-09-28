@@ -5,6 +5,8 @@ move under a version heading when `make release VERSION=x.y.z` runs.
 
 ## Unreleased
 
+## 0.1.11 — 2026-09-28
+
 ### Added
 
 - **Capture whole devices, or single entities, like HA's scene editor.**
