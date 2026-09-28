@@ -11,3 +11,5 @@ creating a new automation instead of keeping the linked one~~ (fixed 2026-09-23)
 and show the onboarding tips again~~ (done 2026-09-25: "Start over" section in the card editor)
 8. ~~Possibility to change the default action labels (1, 2, hourglass) to mdi:icons~~ (done 2026-09-25: "Event marks" in the card editor, event_icons in YAML)
 9. For unsupported remotes: possibility to group actions into a button. Maybe also for auto-mapped remotes in case something's wrong.
+10. Move actions between remotes. Possibility to swap remotes, including between remotes with different numbers of buttons. Remember about one-branch automations vs giant switch-cases.
+11. Handle knobs (see the drawing)
