@@ -577,3 +577,39 @@ async def test_default_devices_apply_when_nothing_picked(
     )
     assert res["success"], res
     assert res["result"]["entities"] == ["light.lamp", "light.seg"]
+
+
+async def test_scene_deleted_in_ha_frees_the_slot(
+    hass, hass_ws_client, remote_device, entity_registry
+) -> None:
+    """User flow: Capture on an event, then delete the scene in HA's scene
+    editor. HA's editor drops the entry from scenes.yaml and removes the
+    registry entity (no reload). The event must read "not set" again and
+    the ownership record must go, instead of pointing at a dead scene."""
+    hass.states.async_set("light.a", "on")
+    entry = await _setup(hass, remote_device, options={"snapshot_entities": ["light.a"]})
+    client = await hass_ws_client(hass)
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/create_snapshot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_single",
+        },
+    )
+    assert res["success"], res
+    scene_id = res["result"]["scene_id"]
+    scene_entity = res["result"]["scene_entity_id"]
+    store = hass.data[DOMAIN]["store"]
+    assert store.get_slot(entry.entry_id, "1_single")["scene_id"] == scene_id
+
+    # What HA's config API does on DELETE /api/config/scene/config/<id>
+    path = Path(hass.config.path("scenes.yaml"))
+    from homeassistant.util.yaml import dump
+
+    path.write_text(dump([s for s in _scenes_yaml(hass) if s["id"] != scene_id]))
+    entity_registry.async_remove(scene_entity)
+    await hass.async_block_till_done()
+
+    assert store.get_slot(entry.entry_id, "1_single") is None
+    assert store.get_owned_scene(scene_id) is None

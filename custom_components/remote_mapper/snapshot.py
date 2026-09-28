@@ -238,3 +238,107 @@ async def async_create_snapshot(
         "picked_entities": [e for e in entity_ids if e in entities],
         "created_at": dt_util.utcnow().isoformat(),
     }
+
+
+def _single_scene_call(actions: Any) -> str | None:
+    """The scene entity id when ``actions`` is just one scene.turn_on."""
+    if not isinstance(actions, list) or len(actions) != 1:
+        return None
+    step = actions[0]
+    if (
+        not isinstance(step, dict)
+        or step.get("action", step.get("service")) != "scene.turn_on"
+    ):
+        return None
+    target = step.get("target") or {}
+    entity_id = target.get("entity_id", step.get("entity_id"))
+    if isinstance(entity_id, list) and len(entity_id) == 1:
+        entity_id = entity_id[0]
+    return (
+        entity_id
+        if isinstance(entity_id, str) and entity_id.startswith("scene.")
+        else None
+    )
+
+
+def _scene_exists(hass: HomeAssistant, entity_id: str) -> bool:
+    return er.async_get(hass).async_get(entity_id) is not None or (
+        hass.states.get(entity_id) is not None
+    )
+
+
+async def async_settle_gone_scenes(
+    hass: HomeAssistant,
+    store: RemoteMapperStore,
+    entry_id: str,
+    removed: str | None = None,
+) -> list[str]:
+    """Free the events whose scene was deleted behind our back.
+
+    HA's scene editor drops the scenes.yaml entry and removes the registry
+    entity, so the event would keep calling a scene that no longer exists.
+    An event that does nothing but call the vanished scene goes back to
+    "not set": its per-event automation or branch of the remote's shared
+    one is removed with it, and the ownership record goes. An event with
+    more actions than the scene call keeps them and is left alone.
+
+    ``removed`` is the entity id from the registry event; without it (at
+    start) only owned snapshot scenes are checked, since a hand-made yaml
+    scene need not have a registry entry at all.
+    """
+    from .cleanup import DECISION_DELETE, async_cleanup_artifacts, collect_artifacts
+    from .materializer import async_get_live_view, is_linked
+    from .remote_automation import async_remove_branch, is_shared
+
+    remote = store.get_remote(entry_id)
+    if remote is None:
+        return []
+    scenes = get_scene_config_store(hass)
+    freed: list[str] = []
+    for action_id, slot in list(remote.get("slots", {}).items()):
+        if is_linked(slot):
+            continue  # not ours: HA's automation keeps its dead call
+        owned_id = slot.get("scene_id")
+        if owned_id:
+            if scene_entity_id(hass, owned_id) is not None:
+                continue
+            if await scenes.async_get(owned_id) is not None:
+                continue
+        elif removed is None:
+            continue
+        if slot.get("materialized"):
+            live = await async_get_live_view(hass, slot, action_id)
+            actions = live["actions"] if live else None
+        else:
+            actions = slot.get("sequence")
+        # An automation that vanished with the scene has nothing to keep
+        if actions is not None:
+            called = _single_scene_call(actions)
+            if called is None:
+                continue
+            if removed is not None and called != removed:
+                continue
+            if removed is None and _scene_exists(hass, called):
+                continue
+        elif not owned_id:
+            continue
+        # The awaits above may have let a move or an edit rewrite the slot
+        current = store.get_slot(entry_id, action_id)
+        if current is None or current.get("scene_id") != owned_id:
+            continue
+        artifacts = collect_artifacts(hass, store, entry_id, action_id)
+        artifacts.pop("scene", None)
+        await async_cleanup_artifacts(hass, store, artifacts, DECISION_DELETE)
+        if is_shared(current):
+            await async_remove_branch(hass, entry_id, action_id)
+        if owned_id:
+            store.async_drop_owned_scene(owned_id)
+        store.async_clear_slot(entry_id, action_id)
+        freed.append(action_id)
+    if freed:
+        _LOGGER.warning(
+            "Remote %s: scenes for %s were deleted in HA — the events are free again",
+            entry_id,
+            freed,
+        )
+    return freed

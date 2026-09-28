@@ -41,6 +41,8 @@ class SceneConfigStore:
         """Initialize."""
         self.hass = hass
         self._lock = asyncio.Lock()
+        # entity ids removed by async_delete, pending is_own_removal
+        self.own_removals: set[str] = set()
         self._path = hass.config.path(SCENE_CONFIG_PATH)
 
     def _read_sync(self) -> list[dict[str, Any]]:
@@ -106,8 +108,20 @@ class SceneConfigStore:
         if entity_id := registry.async_get_entity_id(
             SCENE_DOMAIN, HOMEASSISTANT_PLATFORM, config_id
         ):
+            self.own_removals.add(entity_id)
             registry.async_remove(entity_id)
         return removed
+
+    def is_own_removal(self, entity_id: str) -> bool:
+        """True once for an entity this store just removed itself.
+
+        The caller is mid-operation and writes the slot's new state next;
+        the gone-scene check must not clear it in between.
+        """
+        if entity_id in self.own_removals:
+            self.own_removals.discard(entity_id)
+            return True
+        return False
 
 
 def get_scene_config_store(hass: HomeAssistant) -> SceneConfigStore:

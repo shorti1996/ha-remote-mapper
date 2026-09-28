@@ -149,27 +149,49 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 },
             )
 
+    async def _gone_scenes(removed: str | None = None) -> None:
+        from .const import EVENT_UPDATED
+        from .snapshot import async_settle_gone_scenes
+
+        freed = await async_settle_gone_scenes(hass, store, entry.entry_id, removed)
+        if freed:
+            hass.bus.async_fire(
+                EVENT_UPDATED,
+                {
+                    "entry_id": entry.entry_id,
+                    "kind": "scenes_gone",
+                    "action_ids": freed,
+                },
+            )
+
     async def _post_setup(_event: Any = None) -> None:
         await _check_orphans()
+        await _gone_scenes()
         await async_refresh_actions(hass, store, entry)
 
     # An automation deleted in HA's editor drops its entity from the
     # registry (no reload); one removed from automations.yaml shows up at
     # the next reload. Either way the slots that pointed at it settle
     # right away, not at the next start.
+    # HA's scene editor deletes the same way: the slot that called the
+    # scene is freed right away.
     @callback
     def _automation_removed(event: Event) -> None:
         from .materializer import _get_config_store
+        from .scene_api import get_scene_config_store
 
         entity_id = str(event.data.get("entity_id", ""))
-        if event.data.get("action") != "remove" or not entity_id.startswith(
-            "automation."
-        ):
+        if event.data.get("action") != "remove":
             return
-        # our own delete: the caller writes the slot's new state next
-        if _get_config_store(hass).is_own_removal(entity_id):
-            return
-        entry.async_create_task(hass, _check_orphans())
+        if entity_id.startswith("automation."):
+            # our own delete: the caller writes the slot's new state next
+            if _get_config_store(hass).is_own_removal(entity_id):
+                return
+            entry.async_create_task(hass, _check_orphans())
+        elif entity_id.startswith("scene."):
+            if get_scene_config_store(hass).is_own_removal(entity_id):
+                return
+            entry.async_create_task(hass, _gone_scenes(entity_id))
 
     entry.async_on_unload(
         hass.bus.async_listen(EVENT_AUTOMATION_RELOADED, _check_orphans)
