@@ -1903,7 +1903,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                         enabled ? "mdi:robot" : "mdi:robot-off",
                         enabled
                           ? `Imported original is ENABLED — it also runs on this press: ${label}`
-                          : `Open the disabled original: ${label}. The card runs its own copy — edit it with the pencil here. Edits to the original in HA count only after Hand back, or after Clear and importing it as linked.`,
+                          : `Open the disabled original: ${label}. The card runs its own copy — edit it with the pencil here. Edits to the original in HA take effect after Hand back, or after Clear and importing it as linked.`,
                         () => this._navigate(`/config/automation/edit/${src.config_id}`),
                         { active: enabled }
                       );

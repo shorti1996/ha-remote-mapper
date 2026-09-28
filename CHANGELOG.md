@@ -22,8 +22,8 @@ move under a version heading when `make release VERSION=x.y.z` runs.
 - **Deleting a snapshot scene in HA left the event pointing at it.** The
   card only watched for automations that vanished, so an event whose
   scene was deleted in HA's scene editor kept showing the dead scene's
-  entity id and could not be reused without Clear. Now a scene removed
-  in HA frees the event right away, together with its per-event
+  entity id and needed Clear before it took a new action. Now a scene
+  removed in HA frees the event right away, together with its per-event
   automation or branch of the remote's shared one. An event with more
   actions than the scene call keeps them.
 - **"Remember these as this remote's default" looked forgotten.** The
@@ -36,8 +36,8 @@ move under a version heading when `make release VERSION=x.y.z` runs.
 
 - **The disabled original's tooltip says where to edit.** For an
   absorbed import the robot button now explains that the card runs its
-  own copy, the pencil edits it, and HA edits to the original count only
-  after Hand back, or after Clear and a linked import.
+  own copy, the pencil edits it, and HA edits to the original take
+  effect after Hand back, or after Clear and a linked import.
 - **Event marks keep their size in edit mode.** The circles used to grow
   from 24 px to 36 px when editing, so the whole grid jumped. They stay
   one size; the drag grab area still grows invisibly to a 40 px touch

@@ -297,7 +297,7 @@ async def async_settle_gone_scenes(
     freed: list[str] = []
     for action_id, slot in list(remote.get("slots", {}).items()):
         if is_linked(slot):
-            continue  # not ours: HA's automation keeps its dead call
+            continue  # linked: the native automation is the user's to edit
         owned_id = slot.get("scene_id")
         if owned_id:
             if scene_entity_id(hass, owned_id) is not None:
