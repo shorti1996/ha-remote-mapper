@@ -384,6 +384,42 @@ async def test_snapshot_with_explicit_entities_remembers_default(
     assert entry.options["snapshot_entities"] == ["light.c"]
 
 
+async def test_re_snapshot_remembers_scene_entities(
+    hass, hass_ws_client, remote_device
+) -> None:
+    """remember_entities on a re-snapshot saves the scene's own set."""
+    hass.states.async_set("light.a", "on")
+    hass.states.async_set("light.c", "off")
+    entry = await _setup(
+        hass, remote_device, options={"snapshot_entities": ["light.a"]}
+    )
+    client = await hass_ws_client(hass)
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/create_snapshot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_single",
+            "entities": ["light.c"],
+        },
+    )
+    assert res["success"], res
+    assert entry.options["snapshot_entities"] == ["light.a"]
+
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/create_snapshot",
+            "entry_id": entry.entry_id,
+            "action_id": "1_single",
+            "re_snapshot": True,
+            "remember_entities": True,
+        },
+    )
+    assert res["success"], res
+    assert entry.options["snapshot_entities"] == ["light.c"]
+
+
 async def test_snapshot_without_entities_fails_clearly(
     hass, hass_ws_client, remote_device
 ) -> None:

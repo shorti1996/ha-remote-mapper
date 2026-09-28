@@ -5,6 +5,28 @@ move under a version heading when `make release VERSION=x.y.z` runs.
 
 ## Unreleased
 
+### Fixed
+
+- **"Remember these as this remote's default" looked forgotten.** The
+  switch was off on every open although the list it prefilled was the
+  saved default, and Re-snapshot ignored it. It now reads "Use as this
+  remote's default entity list", is on when the shown list is the
+  default, and Re-snapshot with it on saves the scene's entity set.
+
+### Changed
+
+- **The disabled original's tooltip says where to edit.** For an
+  absorbed import the robot button now explains that the card runs its
+  own copy, the pencil edits it, and HA edits to the original count only
+  after Hand back, or after Clear and a linked import.
+- **Event marks keep their size in edit mode.** The circles used to grow
+  from 24 px to 36 px when editing, so the whole grid jumped. They stay
+  one size; the drag grab area still grows invisibly to a 40 px touch
+  target.
+- **The chain badge is explained.** When an action lives in your own
+  automation (imported with *Keep linked*), the edit-mode tips gain a
+  line saying the badge means edits and moves change that automation.
+
 ## 0.1.10 — 2026-09-27
 
 ### Fixed

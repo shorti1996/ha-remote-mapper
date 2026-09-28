@@ -819,7 +819,6 @@ export class RemoteMapperGrid extends LitElement {
       --mdc-icon-size: var(--ha-space-4, 16px);
       display: inline-flex;
     }
-    .grid.editing .kind .mark-icon,
     .circle .mark-icon {
       --mdc-icon-size: var(--ha-space-5, 20px);
     }
@@ -830,13 +829,15 @@ export class RemoteMapperGrid extends LitElement {
       touch-action: none;
       cursor: grab;
     }
-    .grid.editing .kind {
-      width: var(--ha-space-9, 36px);
-      height: var(--ha-space-9, 36px);
-      font-size: var(--ha-font-size-m, 14px);
-    }
-    .kind.linked {
+    /* The circle keeps its size so the grid does not jump; the grab area
+       grows invisibly to a touch target (24px + 2*8px = 40px) */
+    .kind {
       position: relative;
+    }
+    .grid.editing .kind::before {
+      content: "";
+      position: absolute;
+      inset: calc(-1 * var(--ha-space-2, 8px));
     }
     .link-badge {
       --mdc-icon-size: var(--ha-space-3, 12px);

@@ -965,8 +965,9 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       this._quickEntity = slot?.automation_entity_id ?? "";
     }
     this._quickOption = quick.option;
+    // The switch states a fact: on when the list shown is the saved default
     this._snapEntities = [...(this._remote?.snapshot_entities ?? [])];
-    this._snapRemember = false;
+    this._snapRemember = this._snapEntities.length > 0;
     this._editorTab = quick.mode === "custom" && sequence.length ? "yaml" : "quick";
     this._draft = JSON.stringify(sequence, null, 2);
     this._draftName = slot?.name ?? "";
@@ -1347,6 +1348,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
         entry_id: this._entryId,
         action_id: this._editingAction,
         re_snapshot: reSnapshot,
+        remember_entities: this._snapRemember,
       });
       this._closeEditor();
     } catch (err) {
@@ -1662,6 +1664,12 @@ export class RemoteMapperCard extends LitElement implements EditHost {
           ? html`<p class="hint grid-hint">· Tap a button to rename it or edit its events</p>
             <p class="hint grid-hint">· Drag a button onto another cell to swap</p>
             <p class="hint grid-hint">· Drag an event mark onto another event or button to move its action</p>
+            ${Object.values(this._slotViews()).some((v) => v.linked)
+              ? html`<p class="hint grid-hint">
+                  · <ha-icon class="hint-icon" icon="mdi:link-variant"></ha-icon> marks an action kept in
+                  your own automation; edits and moves change that automation
+                </p>`
+              : nothing}
             <p class="hint grid-hint">· Event edits save right away; ✓ saves the layout, ✕ discards it</p>`
           : nothing}
         ${buttons.length === 0
@@ -1891,7 +1899,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                         enabled ? "mdi:robot" : "mdi:robot-off",
                         enabled
                           ? `Imported original is ENABLED — it also runs on this press: ${label}`
-                          : `Open the imported original (disabled): ${label}`,
+                          : `Open the disabled original: ${label}. The card runs its own copy — edit it with the pencil here. Edits to the original in HA count only after Hand back, or after Clear and importing it as linked.`,
                         () => this._navigate(`/config/automation/edit/${src.config_id}`),
                         { active: enabled }
                       );
@@ -2458,7 +2466,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       schema.push({ name: "entities", selector: { entity: { multiple: true } } });
       schema.push({ name: "remember", selector: { boolean: {} } });
       createHint =
-        "Set the room the way you like it first. Capture stores the current state of these entities as a scene bound to this event; Re-snapshot later updates it in place.";
+        "Set the room the way you like it first. Capture stores the current state of these entities as a scene bound to this event; Re-snapshot later updates it in place. With the switch on, the captured list is what new snapshots start from.";
     } else if (this._quickMode === "new_automation") {
       createHint =
         "Creates an automation with this event as its trigger and no actions, then opens HA's editor so you can fill it in. The card shows what you put there.";
@@ -2506,7 +2514,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       mode: "Action",
       option: "Preset",
       entities: "Entities to capture",
-      remember: "Remember these as this remote's default",
+      remember: "Use as this remote's default entity list",
       entity: this._quickMode === "link" ? "Automation" : "Entity",
     };
     return html`
@@ -3005,6 +3013,10 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     }
     .grid-hint:last-child {
       margin-bottom: 0;
+    }
+    .grid-hint .hint-icon {
+      --mdc-icon-size: var(--ha-font-size-m, 14px);
+      vertical-align: text-bottom;
     }
     .event-list {
       list-style: none;

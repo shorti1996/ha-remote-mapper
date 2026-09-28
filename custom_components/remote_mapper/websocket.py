@@ -590,7 +590,8 @@ async def ws_clear_slot(
         vol.Optional("name"): str,
         vol.Optional("entities"): [str],
         vol.Optional("re_snapshot", default=False): bool,
-        # Save the given entities as the remote's default set
+        # Save the captured entities as the remote's default set (a
+        # re-snapshot saves the scene's own set)
         vol.Optional("remember_entities", default=False): bool,
     }
 )
@@ -615,10 +616,6 @@ async def ws_create_snapshot(
     entities = msg.get("entities") or list(
         entry.options.get(CONF_SNAPSHOT_ENTITIES, [])
     )
-    if msg["remember_entities"] and msg.get("entities"):
-        hass.config_entries.async_update_entry(
-            entry, options={**entry.options, CONF_SNAPSHOT_ENTITIES: list(entities)}
-        )
     name = msg.get("name") or f"{remote_name(hass, entry)} {msg['action_id']}"
 
     from .materializer import async_materialize, is_linked
@@ -660,6 +657,11 @@ async def ws_create_snapshot(
     except Exception as err:
         connection.send_error(msg["id"], ERR_INVALID_SEQUENCE, str(err))
         return
+    if msg["remember_entities"]:
+        hass.config_entries.async_update_entry(
+            entry,
+            options={**entry.options, CONF_SNAPSHOT_ENTITIES: list(result["entities"])},
+        )
     _fire_updated(hass, msg["entry_id"], "snapshot_created")
     connection.send_result(msg["id"], result)
 
