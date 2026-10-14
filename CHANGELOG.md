@@ -5,6 +5,16 @@ move under a version heading when `make release VERSION=x.y.z` runs.
 
 ## Unreleased
 
+### Fixed
+
+- **The card's messages never appeared.** "Found new actions", "Moved …",
+  "Handed back: …" and the save, refresh and move errors were sent as a
+  `hass-notification` event on `window`, and HA only listens on its own
+  root element. They now show at the bottom of the card they belong to
+  for 6 s, or until tapped, so with several remote cards on a dashboard
+  it is clear which one a message is about. The editor's "Reset failed"
+  uses HA's own toast.
+
 ## 0.1.11 — 2026-09-28
 
 ### Added

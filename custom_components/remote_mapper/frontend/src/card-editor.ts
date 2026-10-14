@@ -134,9 +134,13 @@ export class RemoteMapperCardEditor extends LitElement {
       this._optionsFor = undefined;
       this._fetchOptions();
     } catch (err) {
-      window.dispatchEvent(
+      // HA's toast; it listens on its root element, so the event has to
+      // bubble out of this shadow root (a window dispatch never reaches it)
+      this.dispatchEvent(
         new CustomEvent("hass-notification", {
           detail: { message: `Reset failed: ${(err as { message?: string }).message ?? String(err)}` },
+          bubbles: true,
+          composed: true,
         })
       );
     }

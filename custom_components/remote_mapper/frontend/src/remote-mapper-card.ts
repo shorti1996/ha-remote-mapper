@@ -83,6 +83,8 @@ const CARD_TAG = "remote-mapper-card";
 const ADD_REMOTE_PATH = "/_my_redirect/config_flow_start?domain=remote_mapper";
 const UPDATED_EVENT = "remote_mapper_updated";
 const ACTION_EVENT = "remote_mapper_action";
+/** How long a notify() message stays; long enough to read "Handed back: …". */
+const TOAST_MS = 6000;
 
 const LAYOUT_SCHEMA_VERSION = 1;
 const TILE_W = 100;
@@ -297,6 +299,8 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   @state() private _stale = false;
   @state() private _error?: string;
   @state() private _flash?: string;
+  /** Message from notify(), shown at the bottom of this card. */
+  @state() private _toast?: string;
   @state() private _hostWidth = 0;
 
   // grid layout (plan 04): draft-then-commit, like the canvas session
@@ -410,6 +414,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   private _unsubEvents?: () => void;
   private _unsubActions?: () => void;
   private _flashTimer?: ReturnType<typeof setTimeout>;
+  private _toastTimer?: ReturnType<typeof setTimeout>;
   private _fetchStarted = false;
   private _edit = new EditController(this);
   private _resizeObserver?: ResizeObserver;
@@ -494,6 +499,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     clearTimeout(this._tipTimer);
     clearTimeout(this._tipHideTimer);
     this._tip = undefined;
+    this._dismissToast();
   }
 
   private async _initialize(): Promise<void> {
@@ -699,11 +705,29 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     return window.confirm(`${opts.title}\n\n${opts.text}`);
   }
 
+  /**
+   * Shows the message at the bottom of this card for TOAST_MS; a tap
+   * dismisses it. Inside the card rather than HA's own toast: a dashboard
+   * can hold several remote cards, and a screen-wide toast would not say
+   * which one it is about.
+   */
   public notify(message: string): void {
-    // native HA toast (DDC layout-persistence pattern)
-    window.dispatchEvent(
-      new CustomEvent("hass-notification", { detail: { message } })
-    );
+    this._toast = message;
+    if (this._toastTimer !== undefined) clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(() => this._dismissToast(), TOAST_MS);
+  }
+
+  private _dismissToast = (): void => {
+    if (this._toastTimer !== undefined) clearTimeout(this._toastTimer);
+    this._toastTimer = undefined;
+    this._toast = undefined;
+  };
+
+  private _renderToast(): TemplateResult | typeof nothing {
+    if (!this._toast) return nothing;
+    return html`<div class="toast" role="status" @click=${this._dismissToast}>
+      ${this._toast}
+    </div>`;
   }
 
   // ── layout helpers ─────────────────────────────────────────────────
@@ -1609,6 +1633,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
         ${this._editingAction !== undefined ? this._renderEditor() : nothing}
         ${this._importScan ? this._renderImport() : nothing}
         ${this._releaseOpen ? this._renderRelease() : nothing}
+        ${this._renderToast()}
       </ha-card>
     `;
   }
@@ -1721,6 +1746,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
         ${this._editingAction !== undefined ? this._renderEditor() : nothing}
         ${this._importScan ? this._renderImport() : nothing}
         ${this._releaseOpen ? this._renderRelease() : nothing}
+        ${this._renderToast()}
       </ha-card>
     `;
   }
@@ -2827,6 +2853,32 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       from {
         opacity: 0;
         transform: translateY(-4px);
+      }
+    }
+    /* notify(): inverse colours like HA's own toast, pinned to this card */
+    ha-card {
+      position: relative;
+    }
+    .toast {
+      position: absolute;
+      left: var(--ha-space-2, 8px);
+      right: var(--ha-space-2, 8px);
+      bottom: var(--ha-space-2, 8px);
+      z-index: 31; /* above the canvas and .modal-backdrop (30) */
+      padding: var(--ha-space-3, 12px) var(--ha-space-4, 16px);
+      border-radius: var(--ha-border-radius-md, 8px);
+      background: var(--primary-text-color);
+      color: var(--card-background-color, #fff);
+      font-size: var(--ha-font-size-m, 14px);
+      line-height: var(--ha-line-height-normal, 1.4);
+      box-shadow: var(--ha-box-shadow-m, 0 2px 8px rgba(0, 0, 0, 0.35));
+      cursor: pointer;
+      animation: rm-toast 150ms ease-out;
+    }
+    @keyframes rm-toast {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
       }
     }
     .content {
