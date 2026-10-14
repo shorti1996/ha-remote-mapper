@@ -129,24 +129,38 @@ async def ws_ping(
 def ws_get_prefs(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
 ) -> None:
-    """This user's UI preferences: tips_seen (how many first-run tips)."""
-    prefs = _store(hass).get_user_prefs(connection.user.id)
-    connection.send_result(msg["id"], {"tips_seen": int(prefs.get("tips_seen", 0))})
+    """This user's UI preferences: tips_seen (how many first-run tips) and
+    drag_hint_seen (the one-time toast on the first event-mark drag)."""
+    connection.send_result(msg["id"], _prefs_view(hass, connection.user.id))
+
+
+def _prefs_view(hass: HomeAssistant, user_id: str) -> dict[str, Any]:
+    prefs = _store(hass).get_user_prefs(user_id)
+    return {
+        "tips_seen": int(prefs.get("tips_seen", 0)),
+        "drag_hint_seen": bool(prefs.get("drag_hint_seen", False)),
+    }
 
 
 @websocket_api.websocket_command(
     {
         vol.Required("type"): f"{DOMAIN}/set_prefs",
-        vol.Required("tips_seen"): vol.All(int, vol.Range(min=0)),
+        vol.Optional("tips_seen"): vol.All(int, vol.Range(min=0)),
+        vol.Optional("drag_hint_seen"): bool,
     }
 )
 @callback
 def ws_set_prefs(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
 ) -> None:
-    """Remember this user's UI preferences on the server, per HA user."""
-    _store(hass).async_set_user_prefs(connection.user.id, tips_seen=msg["tips_seen"])
-    connection.send_result(msg["id"], {"tips_seen": msg["tips_seen"]})
+    """Remember this user's UI preferences on the server, per HA user.
+
+    Only the keys given change; the result is the whole record.
+    """
+    given = {k: msg[k] for k in ("tips_seen", "drag_hint_seen") if k in msg}
+    if given:
+        _store(hass).async_set_user_prefs(connection.user.id, **given)
+    connection.send_result(msg["id"], _prefs_view(hass, connection.user.id))
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/list_remotes"})
@@ -900,19 +914,26 @@ async def ws_reset_options(
         vol.Required("entry_id"): str,
         vol.Required("action_id"): str,
         vol.Required("target_action_id"): str,
+        # An event of another remote (plan ai/08); default: the same remote
+        vol.Optional("target_entry_id"): str,
     }
 )
 @websocket_api.async_response
 async def ws_move_slot(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
 ) -> None:
-    """Move a slot to another event of the remote; a set target swaps."""
+    """Move a slot to another event, of this or another remote; a set target swaps."""
     from .move import async_move_slot
 
     store = _store(hass)
     entry = hass.config_entries.async_get_entry(msg["entry_id"])
     if entry is None or store.get_remote(msg["entry_id"]) is None:
         connection.send_error(msg["id"], ERR_NOT_FOUND, "Unknown remote")
+        return
+    target_entry_id = msg.get("target_entry_id") or msg["entry_id"]
+    target_entry = hass.config_entries.async_get_entry(target_entry_id)
+    if target_entry is None or store.get_remote(target_entry_id) is None:
+        connection.send_error(msg["id"], ERR_NOT_FOUND, "Unknown target remote")
         return
     try:
         result = await async_move_slot(
@@ -922,11 +943,15 @@ async def ws_move_slot(
             msg["action_id"],
             msg["target_action_id"],
             remote_name(hass, entry),
+            target_entry_id=target_entry_id,
+            target_title=remote_name(hass, target_entry),
         )
     except Exception as err:
         connection.send_error(msg["id"], ERR_INVALID_SEQUENCE, str(err))
         return
     _fire_updated(hass, msg["entry_id"], "slot_moved")
+    if target_entry_id != msg["entry_id"]:
+        _fire_updated(hass, target_entry_id, "slot_moved")
     connection.send_result(msg["id"], result)
 
 

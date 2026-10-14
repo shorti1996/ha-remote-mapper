@@ -595,6 +595,63 @@ def _move_flat_triggers(
     payload["triggers"] = kept
 
 
+async def async_retarget_linked(
+    hass: HomeAssistant,
+    store: RemoteMapperStore,
+    config_id: str,
+    source_entry_id: str,
+    source: str,
+    target_entry_id: str,
+    target: str,
+    check_only: bool = False,
+) -> None:
+    """Point a linked automation at an event of another remote.
+
+    Only a flat automation (no ``choose``) that fires on nothing but the
+    source event moves: its triggers become the target remote's trigger
+    for the target event. A per-remote automation keeps one trigger per
+    event of its remote, and a flat one with more triggers still fires
+    for the source remote; re-keying either would leave an automation
+    spanning two devices, which blocks every later absorb. Both are
+    refused. ``check_only`` runs the refusals without the write, so a
+    move of several slots can refuse before it changes anything.
+    """
+    from .adapters import get_adapter
+
+    src = store.get_remote(source_entry_id)
+    dst = store.get_remote(target_entry_id)
+    if src is None or dst is None:
+        raise HomeAssistantError("Unknown remote")
+    raw = await _get_config_store(hass).async_get(config_id)
+    if raw is None:
+        raise HomeAssistantError("The linked automation no longer exists")
+    alias = raw.get("alias") or config_id
+    payload = _normalized(raw)
+    if _choose_step(payload) is not None:
+        raise HomeAssistantError(
+            f'"{alias}" is built for this remote, one branch per event. Link it '
+            "from the other remote, or change its trigger in HA."
+        )
+    for index, trigger in enumerate(payload["triggers"]):
+        if isinstance(trigger, dict) and "id" not in trigger:
+            trigger["id"] = str(index)
+    ids = _trigger_ids_for(
+        payload["triggers"], source, src["source_config"].get("buttons")
+    )
+    if not ids:
+        raise HomeAssistantError(f'{source} has no trigger in "{alias}"')
+    if len(ids) != len(payload["triggers"]):
+        raise HomeAssistantError(
+            f'"{alias}" also fires on other events of this remote. Change its '
+            "triggers in HA, or link it from the other remote."
+        )
+    if check_only:
+        return
+    trigger = get_adapter(dst["source"]).build_trigger(target, dst["source_config"])
+    payload["triggers"] = [{**trigger, "id": target}]
+    await _get_config_store(hass).async_upsert(config_id, payload)
+
+
 async def async_detach_branch(
     hass: HomeAssistant,
     store: RemoteMapperStore,

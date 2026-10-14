@@ -115,6 +115,27 @@ describe("edit mode", () => {
     ]);
   });
 
+  it("a mark drag never looks like a card drag to HA's sections view", async () => {
+    // HA's grid section hides every card's edit overlay from a `drag-start`
+    // it hears from its card sorter until a `drag-end`; a composed event of
+    // that name from a card leaves the dashboard editor unable to open any
+    // card on the view.
+    await mount({ display: "all", editing: true });
+    const heard: string[] = [];
+    document.body.addEventListener("drag-start", () => heard.push("drag-start"));
+    grid.addEventListener("mark-drag-start", (e) =>
+      heard.push(`mark-drag-start:${(e as CustomEvent).detail.actionId}`)
+    );
+    const from = cell("1").querySelector('.chip[data-action="1_single"]')!;
+    const to = cell("1").querySelector('.chip[data-action="1_double"]')!;
+    grid.shadowRoot!.elementFromPoint = () => to;
+    pointer(from, "pointerdown", { clientX: 10, clientY: 10 });
+    pointer(from, "pointermove", { clientX: 10, clientY: 60 });
+    pointer(from, "pointermove", { clientX: 10, clientY: 70 });
+    pointer(from, "pointerup", { clientX: 10, clientY: 70 });
+    expect(heard).toEqual(["mark-drag-start:1_single"]);
+  });
+
   it("all: a linked chip wears a badge, moves like any other and opens on tap", async () => {
     await mount({
       display: "all",

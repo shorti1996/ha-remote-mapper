@@ -2,7 +2,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { ButtonModel, GridLayout } from "../src/model";
-import { dropTargetFor, moveGroups, moveTargetLabel } from "../src/move";
+import {
+  deepElementAt,
+  dropTargetFor,
+  moveGroups,
+  moveTargetLabel,
+  otherRemoteGroups,
+} from "../src/move";
 import type { SlotView } from "../src/remote-grid";
 
 const buttons: ButtonModel[] = [
@@ -57,6 +63,57 @@ describe("moveGroups", () => {
     const groups = moveGroups(buttons, layout, {}, "2_single");
     expect(groups.map((g) => g.buttonId)).toEqual(["1"]);
   });
+
+  it("belongs to the current remote unless told otherwise", () => {
+    expect(moveGroups(buttons, layout, {}, "1_single")[0].entryId).toBe("");
+  });
+});
+
+describe("otherRemoteGroups", () => {
+  const wall = { entry_id: "wall", title: "Wall", buttons, grid_layout: layout };
+  const bed = {
+    entry_id: "bed",
+    title: "Bedside",
+    buttons: [buttons[1]],
+    grid_layout: null,
+  };
+
+  it("lists every event of every other remote, labelled with the remote", () => {
+    const groups = otherRemoteGroups([wall, bed], () => ({}));
+    expect(groups.map((g) => [g.entryId, g.label])).toEqual([
+      ["wall", "Wall · Left"],
+      ["wall", "Wall · 1"],
+      ["bed", "Bedside · 2"],
+    ]);
+    expect(groups[1].targets.map((t) => t.actionId)).toEqual(["1_single", "1_double"]);
+  });
+
+  it("asks each remote for its own slot summaries", () => {
+    const groups = otherRemoteGroups([wall, bed], (r) =>
+      r.entry_id === "bed" ? { "2_single": view("Fan") } : {}
+    );
+    expect(groups[0].targets[0].swapWith).toBeUndefined();
+    expect(groups[2].targets[0].swapWith).toBe("Fan");
+  });
+});
+
+describe("deepElementAt", () => {
+  type Stub = { shadowRoot?: { elementFromPoint: () => Stub | null } | null };
+  const leaf: Stub = { shadowRoot: null };
+  const card: Stub = { shadowRoot: { elementFromPoint: () => leaf } };
+  const view: Stub = { shadowRoot: { elementFromPoint: () => card } };
+  const root = (hit: Stub | null) =>
+    ({ elementFromPoint: () => hit }) as unknown as DocumentOrShadowRoot;
+
+  it("drills through every open shadow root to the deepest element", () => {
+    expect(deepElementAt(root(view as never), 0, 0)).toBe(leaf);
+  });
+
+  it("stops at a root whose tree has nothing at the point", () => {
+    const empty: Stub = { shadowRoot: { elementFromPoint: () => null } };
+    expect(deepElementAt(root(empty as never), 0, 0)).toBe(empty);
+    expect(deepElementAt(root(null), 0, 0)).toBeNull();
+  });
 });
 
 describe("dropTargetFor", () => {
@@ -77,6 +134,11 @@ describe("dropTargetFor", () => {
     expect(dropTargetFor({ actionId: "1_single" }, source, buttons)).toBeUndefined();
     expect(dropTargetFor({ buttonId: "1" }, source, buttons)).toBeUndefined();
     expect(dropTargetFor({}, source, buttons)).toBeUndefined();
+  });
+
+  it("takes a same-named event when the source is on another remote", () => {
+    expect(dropTargetFor({ actionId: "1_single" }, { kind: "single" }, buttons)).toBe("1_single");
+    expect(dropTargetFor({ buttonId: "1" }, { kind: "single" }, buttons)).toBe("1_single");
   });
 });
 

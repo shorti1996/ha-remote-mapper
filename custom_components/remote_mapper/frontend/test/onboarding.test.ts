@@ -3,24 +3,29 @@ import { describe, expect, it } from "vitest";
 
 import {
   clampSeen,
+  loadPrefs,
   loadTipsSeen,
   nextTip,
   resetTips,
+  saveDragHintSeen,
   saveTipsSeen,
   TIPS,
 } from "../src/onboarding";
 
 /** A fake backend: one prefs record, every call logged. */
-function backend(tips_seen = 0) {
+function backend(tips_seen = 0, drag_hint_seen = false) {
   const calls: Record<string, unknown>[] = [];
   const hass = {
     callWS<T>(msg: Record<string, unknown>): Promise<T> {
       calls.push(msg);
-      if (msg.type === "remote_mapper/set_prefs") tips_seen = msg.tips_seen as number;
-      return Promise.resolve({ tips_seen } as T);
+      if (msg.type === "remote_mapper/set_prefs") {
+        if ("tips_seen" in msg) tips_seen = msg.tips_seen as number;
+        if ("drag_hint_seen" in msg) drag_hint_seen = msg.drag_hint_seen as boolean;
+      }
+      return Promise.resolve({ tips_seen, drag_hint_seen } as T);
     },
   };
-  return { hass, calls, seen: () => tips_seen };
+  return { hass, calls, seen: () => tips_seen, dragSeen: () => drag_hint_seen };
 }
 
 describe("onboarding tips", () => {
@@ -50,10 +55,25 @@ describe("onboarding tips", () => {
     ]);
   });
 
-  it("reset starts the tour over on the server", async () => {
-    const b = backend(TIPS.length);
+  it("reset starts the tour over on the server, drag hint included", async () => {
+    const b = backend(TIPS.length, true);
     await resetTips(b.hass);
     expect(b.seen()).toBe(0);
+    expect(b.dragSeen()).toBe(false);
     expect(nextTip(await loadTipsSeen(b.hass))).toEqual({ index: 0, text: TIPS[0] });
+  });
+
+  it("keeps the drag hint flag next to the tips, one key at a time", async () => {
+    const b = backend(2);
+    expect(await loadPrefs(b.hass)).toEqual({ tipsSeen: 2, dragHintSeen: false });
+    await saveDragHintSeen(b.hass);
+    expect(await loadPrefs(b.hass)).toEqual({ tipsSeen: 2, dragHintSeen: true });
+    const set = b.calls.find((c) => c.type === "remote_mapper/set_prefs");
+    expect(set).toEqual({ type: "remote_mapper/set_prefs", drag_hint_seen: true });
+  });
+
+  it("reads an older backend without the flag as not seen", async () => {
+    const hass = { callWS: <T>() => Promise.resolve({ tips_seen: 1 } as T) };
+    expect(await loadPrefs(hass)).toEqual({ tipsSeen: 1, dragHintSeen: false });
   });
 });

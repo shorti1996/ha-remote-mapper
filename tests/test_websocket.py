@@ -550,15 +550,21 @@ async def test_user_prefs_survive_on_the_server(
     client = await hass_ws_client(hass)
 
     res = await _ws(client, {"type": f"{DOMAIN}/get_prefs"})
-    assert res["result"] == {"tips_seen": 0}
+    assert res["result"] == {"tips_seen": 0, "drag_hint_seen": False}
 
     res = await _ws(client, {"type": f"{DOMAIN}/set_prefs", "tips_seen": 3})
     assert res["success"], res
+    assert res["result"] == {"tips_seen": 3, "drag_hint_seen": False}
+    # one key at a time: the other is kept
+    res = await _ws(client, {"type": f"{DOMAIN}/set_prefs", "drag_hint_seen": True})
+    assert res["result"] == {"tips_seen": 3, "drag_hint_seen": True}
     res = await _ws(client, {"type": f"{DOMAIN}/get_prefs"})
-    assert res["result"] == {"tips_seen": 3}
+    assert res["result"] == {"tips_seen": 3, "drag_hint_seen": True}
 
     store = hass.data[DOMAIN]["store"]
-    assert list(store.data["users"].values()) == [{"tips_seen": 3}]
+    assert list(store.data["users"].values()) == [
+        {"tips_seen": 3, "drag_hint_seen": True}
+    ]
 
     res = await _ws(client, {"type": f"{DOMAIN}/set_prefs", "tips_seen": -1})
     assert not res["success"]

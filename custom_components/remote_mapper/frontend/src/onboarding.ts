@@ -13,8 +13,34 @@ export const TIPS: readonly string[] = [
   "Press a button on the physical remote and its event lights up here. In edit mode, Refresh picks up newly discovered events.",
 ];
 
+/**
+ * Shown once, as a toast, the first time an event mark is dragged: where
+ * it can go. Reset together with the tips.
+ */
+export const DRAG_HINT =
+  "Drop it on another event or button to move the action there. With another " +
+  "remote's card in edit mode too, drop it on that card to move it to that remote.";
+
 interface PrefsHass {
   callWS<T>(msg: Record<string, unknown>): Promise<T>;
+}
+
+export interface Prefs {
+  tipsSeen: number;
+  dragHintSeen: boolean;
+}
+
+/** Both remembered choices, from the server. */
+export async function loadPrefs(hass: PrefsHass): Promise<Prefs> {
+  const res = await hass.callWS<{ tips_seen: number; drag_hint_seen?: boolean }>({
+    type: "remote_mapper/get_prefs",
+  });
+  return { tipsSeen: clampSeen(res.tips_seen), dragHintSeen: !!res.drag_hint_seen };
+}
+
+/** Remember that the drag hint was shown. */
+export async function saveDragHintSeen(hass: PrefsHass, seen = true): Promise<void> {
+  await hass.callWS({ type: "remote_mapper/set_prefs", drag_hint_seen: seen });
 }
 
 /** A stored count, clamped to 0…TIPS.length; junk reads as 0. */
@@ -47,7 +73,7 @@ export const TIPS_RESET_EVENT = "remote_mapper_tips_reset";
 
 /** Start the tour over for this user; open cards in this window follow. */
 export async function resetTips(hass: PrefsHass): Promise<void> {
-  await saveTipsSeen(hass, 0);
+  await hass.callWS({ type: "remote_mapper/set_prefs", tips_seen: 0, drag_hint_seen: false });
   try {
     globalThis.dispatchEvent?.(new Event(TIPS_RESET_EVENT));
   } catch {

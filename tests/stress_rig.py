@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -33,9 +34,11 @@ from custom_components.remote_mapper.remote_automation import (
     remote_automation_config_id,
 )
 
-from .conftest import REMOTE_IDENTIFIER, REMOTE_TOPIC, fire_remote_action
+from .conftest import REMOTE_IDENTIFIER, REMOTE_TOPIC
 
 EVENTS = ["1_single", "1_double", "1_hold", "2_single", "2_double", "2_hold"]
+# a second remote (make_rig_b): raw Z2M MQTT, same six event names
+TOPIC_B = "zigbee2mqtt/remote_b"
 # random walks: seeds and steps per file; `make test-deep` runs 100 and 80
 WALK_SEEDS = int(os.environ.get("STRESS_SEEDS", "3"))
 WALK_STEPS = int(os.environ.get("STRESS_STEPS", "50"))
@@ -115,13 +118,28 @@ def device_trigger(device_id: str, subtype: str, trigger_id: str | None = None):
 
 
 class Rig:
-    """One remote with six events, driven over the card's websocket API."""
+    """One remote with six events, driven over the card's websocket API.
 
-    def __init__(self, hass, client, entry, device_id: str) -> None:
+    ``topic`` and ``payload`` are how a press reaches HA: the device
+    remote's discovery topic with the bare action, a raw-MQTT remote's
+    topic with Z2M's JSON.
+    """
+
+    def __init__(
+        self,
+        hass,
+        client,
+        entry,
+        device_id: str,
+        topic: str = REMOTE_TOPIC,
+        payload: Callable[[str], str] = str,
+    ) -> None:
         self.hass = hass
         self.client = client
         self.entry = entry
         self.device_id = device_id
+        self.topic = topic
+        self.payload = payload
         self.log: list[str] = []
         self.effects: list[str] = []
         async_mock_service(hass, "test", "automation")
@@ -206,11 +224,18 @@ class Rig:
         self.log.append(f"button_automation {event}")
         return await self.ws(self._msg("create_automation", event, scope="button"))
 
-    async def move(self, source: str, target: str, ok: bool = True) -> dict:
-        self.log.append(f"move {source} -> {target}")
-        return await self.ws(
-            self._msg("move_slot", source, target_action_id=target), ok
-        )
+    async def move(
+        self, source: str, target: str, ok: bool = True, to: Rig | None = None
+    ) -> dict:
+        """Move within this remote, or to an event of rig ``to``."""
+        extra: dict[str, Any] = {"target_action_id": target}
+        if to is not None:
+            extra["target_entry_id"] = to.entry_id
+            self.log.append(f"move {source} -> {to.entry.title}/{target}")
+            to.log.append(f"move {self.entry.title}/{source} -> {target}")
+        else:
+            self.log.append(f"move {source} -> {target}")
+        return await self.ws(self._msg("move_slot", source, **extra), ok)
 
     async def clear(self, event: str, decision: str = "delete") -> dict:
         self.log.append(f"clear {event} ({decision})")
@@ -220,9 +245,17 @@ class Rig:
         self.log.append(f"untick {event}")
         return await self.ws(self._msg("save_slot", event, materialized=False))
 
-    async def link(self, event: str, entity_id: str) -> dict:
+    async def link(self, event: str, entity_id: str, decision: str = "delete") -> dict:
+        """Link a native automation; a slot's snapshot scene is asked about
+        first, as on save, and ``decision`` answers."""
         self.log.append(f"link {event} {entity_id}")
-        return await self.ws(self._msg("save_slot", event, link_entity_id=entity_id))
+        extra: dict[str, Any] = {"link_entity_id": entity_id}
+        res = await self.ws(self._msg("save_slot", event, **extra))
+        if res["result"].get("needs_decision"):
+            self.log.append(f"  -> {decision} the replaced scene")
+            extra["decision"] = decision
+            res = await self.ws(self._msg("save_slot", event, **extra))
+        return res
 
     async def archive(self, event: str, archived: bool, ok: bool = True) -> dict:
         self.log.append(f"archive {event} {archived}")
@@ -254,7 +287,7 @@ class Rig:
 
     async def press(self, event: str) -> list[str]:
         start = len(self.effects)
-        fire_remote_action(self.hass, event)
+        async_fire_mqtt_message(self.hass, self.topic, self.payload(event))
         await self.hass.async_block_till_done()
         return sorted(self.effects[start:])
 
@@ -351,3 +384,29 @@ async def make_rig(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     return Rig(hass, await hass_ws_client(hass), entry, device_id)
+
+
+async def make_rig_b(rig: Rig) -> Rig:
+    """A second remote next to ``rig``: raw Z2M MQTT on its own topic, the
+    same six event names, sharing the websocket client and the helpers."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Remote B",
+        unique_id=f"z2m_mqtt:{TOPIC_B}",
+        data={
+            "source": "z2m_mqtt",
+            "source_config": {"topic": TOPIC_B},
+            "layout": {"actions": list(EVENTS)},
+        },
+    )
+    entry.add_to_hass(rig.hass)
+    assert await rig.hass.config_entries.async_setup(entry.entry_id)
+    await rig.hass.async_block_till_done()
+    return Rig(
+        rig.hass,
+        rig.client,
+        entry,
+        "",
+        topic=TOPIC_B,
+        payload=lambda event: json.dumps({"action": event}),
+    )

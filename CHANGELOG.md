@@ -5,6 +5,26 @@ move under a version heading when `make release VERSION=x.y.z` runs.
 
 ## Unreleased
 
+### Added
+
+- **Move actions between remotes.** *Move…* in the event editor lists
+  every event of every other remote after this remote's own, and in edit
+  mode an event mark dragged onto another remote's card (in edit mode
+  too) lands there, after a question that names both remotes. The
+  record travels with its name, disabled flag and snapshot scene (the
+  scene keeps its id, ownership follows). An automation the card created
+  is made again with the other remote's trigger; a branch of the remote
+  automation is detached and joins the other remote's shared automation,
+  or runs from the card there; a linked one-trigger automation gets the
+  other remote's trigger. A linked per-remote automation (one branch per
+  event) is refused: re-keying one branch would leave it spanning two
+  devices. An absorbed import's trail stays with the source remote, which
+  turns the original back on when handed back. `move_slot` takes
+  `target_entry_id`; both remotes' cards refresh. The Move… panel says
+  the drag exists, and the first drag of a mark shows a one-time toast
+  with where it can go (`drag_hint_seen` in the user's prefs, reset by
+  "Start over" with the tips).
+
 ### Fixed
 
 - **The card's messages never appeared.** "Found new actions", "Moved …",

@@ -10,9 +10,16 @@
  *                               (chips included) opens the button sheet —
  *                               the same path in every display mode
  *   layout-changed {layout}     edit mode: cells swapped
- *   move-action    {actionId, targetId}
+ *   mark-drag-start {actionId} edit mode: an event mark is being dragged
+ *                               (once per drag, as it leaves its place).
+ *                               Never a bare `drag-start`: HA's sections
+ *                               view takes that for its own card sorter
+ *                               and hides every card's edit overlay
+ *   move-action    {actionId, targetId, target?}
  *                               edit mode: an event mark was dropped on
- *                               another event (or a pad: same kind there)
+ *                               another event (or a pad: same kind there);
+ *                               `target` names the other remote's card it
+ *                               landed on (plan ai/08), else it is this one
  */
 import { css, html, LitElement, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -33,7 +40,7 @@ import {
   type Kind,
 } from "./model";
 import { renderMark } from "./mark";
-import { dropTargetFor } from "./move";
+import { deepElementAt, dropTargetFor, hostOf, type DropHit } from "./move";
 
 export interface SlotView {
   assigned: boolean;
@@ -43,6 +50,16 @@ export interface SlotView {
   stale: boolean;
   /** Linked to a native automation: wears a link badge in edit mode. */
   linked?: boolean;
+}
+
+/** Where a mark dropped on another remote's card lands (move-action). */
+export interface ForeignTarget {
+  entryId: string;
+  title: string;
+  /** Button label and event, as that card names them. */
+  label: string;
+  /** What is set there now, for the swap question. */
+  swapWith?: string;
 }
 
 /** Edit mode: an event mark being dragged to another event. */
@@ -93,6 +110,11 @@ export class RemoteMapperGrid extends LitElement {
   @property({ attribute: false }) public slots: Record<string, SlotView> = {};
   @property() public display: DisplayMode = "assisted";
   @property({ type: Boolean }) public editing = false;
+  /** This card's remote; a mark dragged in from another card needs both. */
+  @property() public entryId = "";
+  @property() public remoteTitle = "";
+  /** Event a mark dragged on another card would land on here (its ring). */
+  @property({ attribute: false }) public externalDrop?: string;
   /** Action id currently flashing (after a run). */
   @property() public flash?: string;
   /** assisted: auto (per pointer type), tap (toggle) or press (hold, slide, lift). */
@@ -129,6 +151,8 @@ export class RemoteMapperGrid extends LitElement {
   @state() private _actionDrag?: ActionDragState;
   /** Action id the dragged mark would land on. */
   @state() private _actionDrop?: string;
+  /** Another remote's grid under the dragged mark, and the event there. */
+  private _foreign?: { grid: RemoteMapperGrid; target?: string };
 
   private _recognizers = new Map<string, TapRecognizer>();
 
@@ -153,6 +177,7 @@ export class RemoteMapperGrid extends LitElement {
       this._dropTarget = undefined;
       this._actionDrag = undefined;
       this._actionDrop = undefined;
+      this._leaveForeign();
       for (const rec of this._recognizers.values()) rec.cancel();
     }
   }
@@ -400,6 +425,14 @@ export class RemoteMapperGrid extends LitElement {
     this._actionDrop = undefined;
   }
 
+  /** The mark or pad of this grid at a viewport point. */
+  public dropHitAt(x: number, y: number): DropHit {
+    const el = this._elementAt(x, y);
+    const mark = el?.closest("[data-action]") as HTMLElement | null;
+    const cell = el?.closest(".cell.btn") as HTMLElement | null;
+    return { actionId: mark?.dataset.action, buttonId: cell?.dataset.button };
+  }
+
   private _onMarkMove(e: PointerEvent): void {
     const drag = this._actionDrag;
     if (!drag) return;
@@ -408,16 +441,32 @@ export class RemoteMapperGrid extends LitElement {
       const dx = e.clientX - drag.startX;
       const dy = e.clientY - drag.startY;
       if (dx * dx + dy * dy < DRAG_THRESHOLD * DRAG_THRESHOLD) return;
+      this._emit("mark-drag-start", { actionId: drag.action.action_id });
     }
     this._actionDrag = { ...drag, moved: true, x: e.clientX, y: e.clientY };
-    const el = this._elementAt(e.clientX, e.clientY);
-    const mark = el?.closest("[data-action]") as HTMLElement | null;
-    const cell = el?.closest(".cell.btn") as HTMLElement | null;
-    this._actionDrop = dropTargetFor(
-      { actionId: mark?.dataset.action, buttonId: cell?.dataset.button },
-      { actionId: drag.action.action_id, kind: drag.action.kind },
-      this.buttons
+    const source = { actionId: drag.action.action_id, kind: drag.action.kind };
+    const hit = this.dropHitAt(e.clientX, e.clientY);
+    this._actionDrop = dropTargetFor(hit, source, this.buttons);
+    if (hit.actionId || hit.buttonId) {
+      this._leaveForeign();
+      return;
+    }
+    // Outside this grid: another remote's card, in edit mode, under the
+    // pointer takes the mark. Its own hit test and buttons decide where.
+    const other = hostOf(
+      deepElementAt(document, e.clientX, e.clientY),
+      (h): h is RemoteMapperGrid => h instanceof RemoteMapperGrid
     );
+    if (!other || other === this || !other.editing || !other.entryId) {
+      this._leaveForeign();
+      return;
+    }
+    if (this._foreign && this._foreign.grid !== other) this._leaveForeign();
+    // two cards of one remote: the source is still itself over there
+    const there = other.entryId === this.entryId ? source : { kind: source.kind };
+    const target = dropTargetFor(other.dropHitAt(e.clientX, e.clientY), there, other.buttons);
+    this._foreign = { grid: other, target };
+    other.externalDrop = target;
   }
 
   private _onMarkUp(e: PointerEvent): void {
@@ -425,8 +474,10 @@ export class RemoteMapperGrid extends LitElement {
     if (!drag) return;
     e.stopPropagation();
     const target = this._actionDrop;
+    const foreign = this._foreign;
     this._actionDrag = undefined;
     this._actionDrop = undefined;
+    this._leaveForeign();
     if (!drag.moved) {
       // a tap on a mark opens the button, same as a tap on the pad
       const button = this.buttons.find((b) =>
@@ -437,18 +488,54 @@ export class RemoteMapperGrid extends LitElement {
     }
     if (target) {
       this._emit("move-action", { actionId: drag.action.action_id, targetId: target });
+    } else if (foreign?.target) {
+      this._emit("move-action", {
+        actionId: drag.action.action_id,
+        targetId: foreign.target,
+        target: foreign.grid.describe(foreign.target),
+      });
     }
+  }
+
+  /** Name an event of this grid for another card's question. */
+  public describe(actionId: string): ForeignTarget {
+    const layout = this.layout;
+    let label = actionId;
+    for (const button of this.buttons) {
+      const action = button.actions.find((a) => a.action_id === actionId);
+      if (action) {
+        label = `${layout ? buttonLabel(button, layout) : button.label} ${action.event}`;
+        break;
+      }
+    }
+    const slot = this.slots[actionId];
+    return {
+      entryId: this.entryId,
+      title: this.remoteTitle,
+      label,
+      swapWith: slot?.assigned ? slot.summary : undefined,
+    };
+  }
+
+  private _leaveForeign(): void {
+    if (this._foreign) this._foreign.grid.externalDrop = undefined;
+    this._foreign = undefined;
   }
 
   private _onMarkCancel(): void {
     this._actionDrag = undefined;
     this._actionDrop = undefined;
+    this._leaveForeign();
+  }
+
+  /** A mark dragged here, from this grid or another card, would land on the event. */
+  private _dropOn(actionId: string): boolean {
+    return this._actionDrop === actionId || this.externalDrop === actionId;
   }
 
   /** The pad a dragged mark would land on (same-kind drop), for its ring. */
   private _padDropFor(button: ButtonModel): boolean {
-    const target = this._actionDrop;
-    return !!target && button.actions.some((a) => a.action_id === target);
+    return button.actions.some((a) => this._dropOn(a.action_id));
   }
 
   // ── render ────────────────────────────────────────────────────────
@@ -577,7 +664,7 @@ export class RemoteMapperGrid extends LitElement {
             on ? "on" : "",
             linked ? "linked" : "",
             this.flash === a.action_id ? "flash" : "",
-            this._actionDrop === a.action_id ? "drop" : "",
+            this._dropOn(a.action_id) ? "drop" : "",
             this._actionDrag?.moved && this._actionDrag.action.action_id === a.action_id
               ? "dragging"
               : "",
@@ -616,7 +703,7 @@ export class RemoteMapperGrid extends LitElement {
             slot?.archived ? "archived" : "",
             linked ? "linked" : "",
             this.flash === a.action_id ? "flash" : "",
-            this._actionDrop === a.action_id ? "drop" : "",
+            this._dropOn(a.action_id) ? "drop" : "",
             this._actionDrag?.moved && this._actionDrag.action.action_id === a.action_id
               ? "dragging"
               : "",

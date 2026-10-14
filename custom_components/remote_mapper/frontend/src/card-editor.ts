@@ -10,7 +10,7 @@ import { customElement, property, state } from "lit/decorators.js";
 
 import { ensureHaForm } from "./canvas/ha-loader";
 import { KIND_ICON, KIND_TITLE, KINDS } from "./model";
-import { loadTipsSeen, resetTips } from "./onboarding";
+import { loadPrefs, resetTips } from "./onboarding";
 import {
   applyEditorValue,
   ASSISTED_TRIGGERS,
@@ -95,6 +95,8 @@ export class RemoteMapperCardEditor extends LitElement {
   // Reset section: the remote's remembered choices + this user's tips
   @state() private _options?: RemoteOptions;
   @state() private _tipsSeen?: number;
+  /** The one-time toast on the first event-mark drag was shown. */
+  @state() private _dragHintSeen = false;
   private _optionsFor?: string;
 
   public setConfig(config: RemoteMapperCardConfig): void {
@@ -167,9 +169,10 @@ export class RemoteMapperCardEditor extends LitElement {
     }
     this._fetchOptions();
     if (this._tipsSeen === undefined && this.hass) {
-      void loadTipsSeen(this.hass)
-        .then((seen) => {
-          this._tipsSeen = seen;
+      void loadPrefs(this.hass)
+        .then((prefs) => {
+          this._tipsSeen = prefs.tipsSeen;
+          this._dragHintSeen = prefs.dragHintSeen;
         })
         .catch(() => {
           /* no backend: the tips row stays hidden */
@@ -180,7 +183,7 @@ export class RemoteMapperCardEditor extends LitElement {
   /** Forget remembered choices; each button says what it undoes. */
   private _renderReset() {
     const options = this._options;
-    const seen = this._tipsSeen ?? 0;
+    const seen = (this._tipsSeen ?? 0) > 0 || this._dragHintSeen;
     if (!options && !seen) return nothing;
     return html`
       <div class="reset">
@@ -215,7 +218,7 @@ export class RemoteMapperCardEditor extends LitElement {
           : nothing}
         <div class="reset-row">
           <span class="hint">
-            Tips at the top of the card:
+            Tips at the top of the card and the hint on the first drag of an event mark:
             <b>${seen ? "seen" : "showing"}</b>
           </span>
           <button
@@ -224,6 +227,7 @@ export class RemoteMapperCardEditor extends LitElement {
               if (!this.hass) return;
               void resetTips(this.hass).then(() => {
                 this._tipsSeen = 0;
+                this._dragHintSeen = false;
               });
             }}
           >

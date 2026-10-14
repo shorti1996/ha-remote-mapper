@@ -102,7 +102,11 @@ device, where every button shows what it does and lets you change it.
   another event or button (*Move…* in the event editor does the same from
   a list); a set event swaps. An event linked to a native automation
   (its mark wears a link badge) moves too: the card re-keys that
-  automation's branch, or its trigger, to the new event.
+  automation's branch, or its trigger, to the new event. Another remote
+  is a target as well: *Move…* lists every event of every remote, and in
+  edit mode a mark dragged onto another remote's card (also in edit mode)
+  lands there after a confirmation. What travels is listed under
+  [Moving actions between remotes](#moving-actions-between-remotes).
 
   [![Assign an action: tap a button's event, pick Toggle entity, pick the light, save](docs/demo/03-assign-action.gif)](docs/demo/full/03-assign-action.gif)
 
@@ -224,6 +228,28 @@ event_icons:              # marks per press kind; unset = 1 2 3 ⧗ ↥ •
 Themes can set `--remote-mapper-button-color`, `--remote-mapper-accent-color`,
 `--remote-mapper-text-color`, `--remote-mapper-border-color`,
 `--remote-mapper-button-opacity`.
+
+## Moving actions between remotes
+
+*Move…* in the event editor, or a mark dragged onto another remote's
+card, moves an action to an event of that remote; a set event swaps the
+two. What the action does never matters: a toggle, a scene, a script or
+YAML is copied as is. Where it lives decides what happens:
+
+| the action lives… | moving it to another remote |
+|---|---|
+| in the card (*Create as automation* unticked), with or without a snapshot scene | moves; the scene stays as it is, now owned by the new event, so *Re-snapshot* keeps working there |
+| in an automation the card created for this event | that automation is deleted and made again with the other remote's trigger, title and id |
+| as a branch of the remote's automation | the branch is detached; it joins the other remote's automation when that remote has one, else it runs from the card there |
+| in your own automation with one trigger (linked) | the trigger becomes the other remote's; the link follows |
+| in your own automation with several triggers, or one branch per event (linked) | refused before anything changes: the automation would span two remotes. Link it from the other remote, or change its trigger in HA |
+| disabled, whichever of the above | stays disabled |
+
+Name and the disabled flag always travel. A swap goes both ways through
+this table, so it is refused when either direction is. An action absorbed
+from one of the remote's own automations (import, or an unticked link)
+leaves its trail behind: handing the first remote back turns that
+original on again, whichever remote runs the copy now.
 
 ## Leaving
 
