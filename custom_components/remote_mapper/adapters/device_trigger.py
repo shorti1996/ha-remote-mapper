@@ -108,6 +108,20 @@ async def async_z2m_exposed_actions(hass: HomeAssistant, device_id: str) -> list
         unsub()
 
 
+def action_ids_from_triggers(triggers: list[dict[str, Any]]) -> list[str]:
+    """Action ids for enumerated device triggers: unique subtypes, probe order.
+
+    A subtype listed under several types (ZHA ``remote_button_short_press``
+    and ``remote_button_long_press`` on ``turn_on``) yields one id;
+    tests/fixtures/*_triggers.json record where that happens.
+    """
+    seen: dict[str, None] = {}
+    for trigger in triggers:
+        if (subtype := trigger.get("subtype")) is not None:
+            seen.setdefault(str(subtype), None)
+    return list(seen)
+
+
 class DeviceTriggerAdapter:
     """Adapter over HA device triggers."""
 
@@ -143,9 +157,8 @@ class DeviceTriggerAdapter:
         seen: dict[str, None] = {}
         for action in await async_z2m_exposed_actions(hass, device_id):
             seen.setdefault(action, None)
-        for trigger in triggers:
-            if (subtype := trigger.get("subtype")) is not None:
-                seen.setdefault(str(subtype), None)
+        for action in action_ids_from_triggers(triggers):
+            seen.setdefault(action, None)
         return list(seen)
 
     def build_trigger(self, action_id: str, config: dict[str, Any]) -> dict[str, Any]:

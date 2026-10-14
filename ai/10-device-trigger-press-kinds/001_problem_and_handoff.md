@@ -1,6 +1,7 @@
 # Device-trigger press kinds — the adapter drops them for ZHA, deCONZ, Hue and Z-Wave
 
-Status: investigated, nothing implemented. 2026-10-14, found while planning
+Status: step 1 of §Recommended order done on 2026-10-14 (fixtures, script,
+catalog test; see the note under that table). Steps 2–5 open. Found while planning
 `ai/09-group-actions-into-buttons.md`. Line numbers below are against
 `master` at `e851c75`; plan 09 is being implemented in the main checkout
 as this is written and moves things in `buttons.py` and `naming.py`.
@@ -151,6 +152,33 @@ quirk-specific type names.
 | 3 | Migration for existing device-trigger remotes whose stored ids were collapsed (§Open 1). | With step 2 or right after; without it a ZHA user who refreshes sees stale badges. |
 | 4 | Z-Wave: value states in the probe, `value` in `build_trigger`, vocabulary fixture. | Yes, separate. Needs a node fixture; nothing in the test rig has one yet. |
 | 5 | README "Supported remotes" table: ZHA, deCONZ, Hue v2 and Z-Wave rows with "press kinds" instead of "should work, untested". | After 2 and 4. |
+
+Step 1 landed on 2026-10-14 (branch `device-trigger-fixtures`):
+
+- `scripts/device_triggers.py` writes the three fixtures; run it with
+  `uv run --with zha-quirks python scripts/device_triggers.py`. The
+  `--with` layers zha-quirks 2.3.0 on the project venv, nothing is added
+  to `pyproject.toml`. `--regroup` recomputes ids and buttons from the
+  saved pairs after an adapter or parser change; today it is a no-op diff.
+- The adapter's id rule is now the pure
+  `action_ids_from_triggers(triggers)` in `adapters/device_trigger.py`,
+  called by `async_default_actions`; the script and the test use it, so
+  step 2 changes that function and regroups.
+- `tests/test_trigger_catalogs.py`: per device, ids match the fixture,
+  grouping matches, every id sits on one button, and
+  `test_one_action_per_pair` is a strict xfail wherever the fixture
+  recorded fewer ids than pairs. The marks are computed from the fixture,
+  so a regroup after step 2 clears them without an edit.
+- Counts: deCONZ 56 devices, 536 pairs, 176 ids, 51 devices collapsed;
+  ZHA 166 quirks (130 v1 classes, 36 v2 entries), 2046 pairs, 768 ids,
+  138 collapsed; Hue 5 models by hand, 63 pairs, 17 ids, 4 collapsed.
+  193 xfails in total.
+- Every ZHA device also enumerates `("device_offline", "device_offline")`
+  (`zha/zigbee/device.py:149`); the fixture includes it, so today's
+  adapter lists `device_offline` as an action on every ZHA remote. Decide
+  in step 2 whether to filter it.
+- 22 of the ZHA v1 entries are base classes with triggers and no models
+  (IKEA, Tuya bases); their subclasses appear with models of their own.
 
 Plan 09 does not depend on any of this and this does not depend on 09.
 They touch `buttons.py` in different places (`_KIND_BY_TYPE` and
@@ -330,10 +358,12 @@ acts=[a for x in d['devices'] for a in x['actions']]; print(len(d['devices']),'d
    an alias. A display table (type → "long press") next to the kind
    table would fix the card and `event_label` at once; decide whether
    that belongs in `buttons.py` (server, one place) or the card.
-5. **ZHA v2 quirks** are not in the count above. Find where zha-quirks
-   2.x registers `QuirkBuilder` devices and whether their
-   `device_automation_triggers` are reachable without a running zigpy
-   application; if not, the fixture covers v1 only and says so.
+5. **ZHA v2 quirks**: resolved in step 1. `QuirkBuilder.add_to_registry`
+   compiles into `zha.quirks.DeviceRegistry._registry` (the default
+   `QuirkBuilder(...).registry`) at import time; each entry's
+   `zha_device_factory.quirk_definition.device_automation_triggers` is
+   reachable without a zigpy application. 36 entries carry triggers; the
+   fixture holds them as `quirk_version: 2`.
 6. **Devices with one type per subtype keep bare ids**, so a device that
    later gains a second type for a subtype (a quirk update) would change
    its id scheme on refresh. Rare; the same migration as 1 covers it.
