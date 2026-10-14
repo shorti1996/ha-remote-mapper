@@ -99,7 +99,7 @@ def _collapses(device: dict) -> bool:
             marks=pytest.mark.xfail(
                 _collapses(case.values[0]),
                 reason="subtype-only ids collapse press kinds; "
-                "ai/10-device-trigger-press-kinds",
+                "ai/10-device-trigger-press-kinds.md",
                 strict=True,
             ),
         )
