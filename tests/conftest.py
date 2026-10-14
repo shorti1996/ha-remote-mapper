@@ -90,3 +90,51 @@ async def remote_device(hass, mqtt_stopped_cleanly, device_registry) -> str:
 def fire_remote_action(hass, action: str) -> None:
     """Simulate a physical button press on the synthetic remote."""
     async_fire_mqtt_message(hass, REMOTE_TOPIC, action)
+
+
+KINDS_TOPIC = "zigbee2mqtt/kinds_remote/action"
+KINDS_IDENTIFIER = ("mqtt", "zigbee2mqtt_kinds_remote")
+# (type, subtype) → the payload that fires it. ZHA's shape: subtype =
+# button, type = press kind; turn_off has one kind, turn_on two.
+KINDS_TRIGGERS = {
+    ("remote_button_short_press", "turn_on"): "on_short",
+    ("remote_button_long_press", "turn_on"): "on_long",
+    ("remote_button_short_press", "turn_off"): "off_short",
+}
+
+
+@pytest.fixture
+async def kinds_device(hass, mqtt_stopped_cleanly, device_registry) -> str:
+    """Publish device triggers shaped like ZHA's; return the device id.
+
+    The same MQTT discovery as ``remote_device`` carries an arbitrary type
+    and subtype, so no radio is needed to get a subtype listed under two
+    trigger types.
+    """
+    for (kind, subtype), payload in KINDS_TRIGGERS.items():
+        config = {
+            "automation_type": "trigger",
+            "topic": KINDS_TOPIC,
+            "payload": payload,
+            "type": kind,
+            "subtype": subtype,
+            "device": {
+                "identifiers": [KINDS_IDENTIFIER[1]],
+                "name": "Kinds Remote",
+            },
+        }
+        async_fire_mqtt_message(
+            hass,
+            f"homeassistant/device_automation/kinds_remote/{payload}/config",
+            json.dumps(config),
+        )
+    await hass.async_block_till_done()
+
+    device = device_registry.async_get_device(identifiers={KINDS_IDENTIFIER})
+    assert device is not None
+    return device.id
+
+
+def fire_kinds_action(hass, kind: str, subtype: str) -> None:
+    """Simulate one press kind on one button of the ZHA-shaped remote."""
+    async_fire_mqtt_message(hass, KINDS_TOPIC, KINDS_TRIGGERS[(kind, subtype)])

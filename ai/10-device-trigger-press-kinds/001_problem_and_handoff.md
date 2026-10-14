@@ -1,7 +1,8 @@
 # Device-trigger press kinds — the adapter drops them for ZHA, deCONZ, Hue and Z-Wave
 
-Status: step 1 of §Recommended order done on 2026-10-14 (fixtures, script,
-catalog test; see the note under that table). Steps 2–5 open. Found while planning
+Status: steps 1, 2, 3 and the README half of 5 done on 2026-10-14, branch
+`device-trigger-fixtures` (see the notes under §Recommended order). Step 4,
+Z-Wave, is open. Found while planning
 `ai/09-group-actions-into-buttons.md`. Line numbers below are against
 `master` at `e851c75`; plan 09 is being implemented in the main checkout
 as this is written and moves things in `buttons.py` and `naming.py`.
@@ -180,6 +181,38 @@ Step 1 landed on 2026-10-14 (branch `device-trigger-fixtures`):
 - 22 of the ZHA v1 entries are base classes with triggers and no models
   (IKEA, Tuya bases); their subclasses appear with models of their own.
 
+Steps 2 and 3 landed on 2026-10-14, same branch:
+
+- Ids: `index_triggers` in `adapters/device_trigger.py` maps each id to
+  its probed triggers; bare subtype under one type, `subtype:type` per
+  pair under several. `action_ids_from_triggers`, `build_trigger` and
+  `async_subscribe` all read that index, so the card's dispatcher and a
+  written automation listen to the same pair. A never-probed pair id
+  gets a placeholder with both fields. `device_offline` is dropped
+  (`NOT_A_BUTTON_TYPES`).
+- Kinds: `_KIND_BY_TYPE` and `trigger_type_event` in `buttons.py`;
+  `derive_action` returns (button, event, kind) and `place_action` uses
+  it. The event shown is the type without `remote_button_`
+  (`long_press`), so chips and aliases read `turn_on long_press`. The
+  one post-pass, `_promote_short_release`: a button with no single and
+  one `short_release` clicks on release (deCONZ lists the Aqara Opple
+  and the IKEA remotes without a short press).
+- Migration in `async_refresh_actions` (`__init__.py`): a stale bare id
+  whose `id:` siblings were just added is a split; the slot and the
+  grouping override's button move to the short-press id with
+  `async_move_slot`, the bare id leaves the layout. A move that fails
+  keeps the id stale and in the layout. The result and the drift event
+  carry `split: {old: [new, …]}` when it happened.
+- Fixtures regrouped: 0 collapsed devices, the xfails are gone. Tests:
+  `kinds_device` in `tests/conftest.py` (MQTT discovery with ZHA's
+  type/subtype shape), three adapter tests, three grouping tests,
+  `test_refresh_moves_a_collapsed_slot_to_the_short_press` in
+  `tests/test_websocket.py`.
+- Hue bridge is covered by the same scheme: five types per button, so
+  the ids are `1:short_release` and so on, `short_release` → single by
+  the type table; the tap switch lists `initial_press` alone, so its ids
+  stay bare and read as a single press. No special case needed.
+
 Plan 09 does not depend on any of this and this does not depend on 09.
 They touch `buttons.py` in different places (`_KIND_BY_TYPE` and
 `split_action` here; `place_action`, `grouping_conflict` there).
@@ -331,33 +364,20 @@ acts=[a for x in d['devices'] for a in x['actions']]; print(len(d['devices']),'d
 
 ## Open questions
 
-1. **Migration of collapsed ids.** A ZHA remote added before this change
-   has `turn_on` in `layout.actions`, maybe with a slot. After the
-   change, refresh adds `turn_on:remote_button_short_press` and friends
-   and marks `turn_on` stale (`__init__.py:233`–`:245`); the slot stays
-   on the stale id, reachable only through the stale badge and the Move…
-   picker. Options: leave it and say so in the changelog (the Move…
-   picker exists), or move the slot to the short-press id when that id
-   appears and the stale one had a slot. Which press kind the user meant
-   is unknowable; short press is the common case. The user decides.
-2. **Hue `initial_press`.** On the Hue tap switch it is the only event,
-   so it is the single press there; on the dimmer `short_release` is the
-   click and `initial_press` fires before every kind. Mapping
-   `initial_press` to single would put two singles on a dimmer button
-   (plan 09 refuses that for overrides, and `actionOfKind` takes the
-   first). Either map it to other and let a tap-switch user regroup once
-   09 ships, or special-case "single when it is the button's only type".
+1. **Migration of collapsed ids**: decided by the user on 2026-10-14,
+   short press. Done in step 3 (`_async_move_split_slot`).
+2. **Hue `initial_press`**: moot, see the step 2 note. The tap switch's
+   ids are bare (one type per button); on the dimmer `initial_press` is
+   `other` and the click is `short_release`.
 3. **Z-Wave button labels.** `Endpoint 0 Scene 001` is the subtype; the
    grid cell would read that. `split_action` could shorten it to `1`
    for the device-trigger source when the subtype matches `Endpoint \d+
    Scene (\d+)`, or the user renames with the label field. Also whether
    to key the id on the raw subtype or the shortened form (the id must
    round-trip to the trigger, so the raw subtype is safer).
-4. **Event names in the card.** With the colon scheme the event shows as
-   the type, `remote_button_long_press`, which is long in a chip and in
-   an alias. A display table (type → "long press") next to the kind
-   table would fix the card and `event_label` at once; decide whether
-   that belongs in `buttons.py` (server, one place) or the card.
+4. **Event names in the card**: done in step 2, server side. The event
+   is the type with `remote_button_` stripped (`long_press`); the card
+   and `event_label` show it unchanged.
 5. **ZHA v2 quirks**: resolved in step 1. `QuirkBuilder.add_to_registry`
    compiles into `zha.quirks.DeviceRegistry._registry` (the default
    `QuirkBuilder(...).registry`) at import time; each entry's

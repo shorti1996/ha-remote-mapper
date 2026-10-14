@@ -5,6 +5,23 @@ move under a version heading when `make release VERSION=x.y.z` runs.
 
 ## Unreleased
 
+### Fixed
+
+- **ZHA, deCONZ and Hue bridge remotes keep their press kinds.** Those
+  platforms list a button under one device trigger per press kind
+  (`remote_button_short_press` and `remote_button_long_press` on
+  `turn_on`); the card used to fold them into one `turn_on` that fired
+  on every kind, and an automation written for it listened to one kind
+  only. Such a button now gets one action per kind, `turn_on:
+  remote_button_short_press`, shown as `short_press`, `long_press`,
+  `double_press`, … with the matching gesture. Zigbee2MQTT and Matter
+  ids do not change. A remote added before this release gets the new
+  ids on its next refresh; a slot on the old id moves to the short
+  press, the old id leaves the layout. ZHA's `device_offline` trigger
+  is no longer listed as a button. Catalog tests cover every remote in
+  HA's deCONZ table, every zha-quirks quirk and the Hue v2 vocabulary
+  (`tests/fixtures/*_triggers.json`).
+
 ### Added
 
 - **Group actions into buttons.** For a remote whose action names say

@@ -22,6 +22,7 @@ from pathlib import Path
 import pytest
 
 from custom_components.remote_mapper.adapters.device_trigger import (
+    NOT_A_BUTTON_TYPES,
     action_ids_from_triggers,
 )
 from custom_components.remote_mapper.buttons import group_buttons
@@ -79,9 +80,14 @@ def test_every_action_on_exactly_one_button(device: dict) -> None:
     assert sorted(placed) == sorted(device["actions"])
 
 
+def _button_pairs(device: dict) -> int:
+    """Pairs that stand for a button; ZHA's ``device_offline`` does not."""
+    return sum(kind not in NOT_A_BUTTON_TYPES for kind, _ in device["triggers"])
+
+
 def _collapses(device: dict) -> bool:
     """Whether the recorded ids are fewer than the pairs: press kinds lost."""
-    return len(device["actions"]) < len(device["triggers"])
+    return len(device["actions"]) < _button_pairs(device)
 
 
 @pytest.mark.parametrize(
@@ -107,4 +113,4 @@ def test_one_action_per_pair(device: dict) -> None:
     marks come from the fixture, so a regroup after the adapter change
     clears them by itself.
     """
-    assert len(device["actions"]) == len(device["triggers"])
+    assert len(device["actions"]) == _button_pairs(device)

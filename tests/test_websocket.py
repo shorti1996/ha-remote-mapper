@@ -454,6 +454,93 @@ async def test_refresh_actions(hass, hass_ws_client, remote_device) -> None:
     assert len(calls) == 1
 
 
+async def test_refresh_moves_a_collapsed_slot_to_the_short_press(
+    hass, hass_ws_client, kinds_device
+) -> None:
+    """A remote stored with one id per button gets one per press kind.
+
+    The slot on the collapsed ``turn_on`` lands on the short press, the
+    override keeps its button, the old id leaves the layout instead of
+    going stale. ``turn_off`` has one press kind and keeps its bare id.
+    """
+    from .conftest import fire_kinds_action
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Kinds Remote",
+        unique_id=kinds_device,
+        data={
+            "source": "device_trigger",
+            "source_config": {"device_id": kinds_device},
+            "layout": {"actions": ["turn_on", "turn_off"]},
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    # Setup already refreshed; put the record back the way 0.1.11 left it.
+    store = hass.data[DOMAIN]["store"]
+    remote = store.get_remote(entry.entry_id)
+    remote["layout"]["actions"] = ["turn_on", "turn_off"]
+    remote["grouping"] = {"turn_on": {"button": "power"}}
+    slot = default_slot()
+    slot["sequence"] = [{"action": "test.automation"}]
+    store.async_set_slot(entry.entry_id, "turn_on", slot)
+
+    client = await hass_ws_client(hass)
+    res = await _ws(
+        client, {"type": f"{DOMAIN}/refresh_actions", "entry_id": entry.entry_id}
+    )
+    assert res["success"]
+    assert res["result"] == {
+        "added": [
+            "turn_on:remote_button_short_press",
+            "turn_on:remote_button_long_press",
+        ],
+        "stale": [],
+        "probed": True,
+        "split": {
+            "turn_on": [
+                "turn_on:remote_button_short_press",
+                "turn_on:remote_button_long_press",
+            ]
+        },
+    }
+
+    res = await _ws(
+        client, {"type": f"{DOMAIN}/get_remote", "entry_id": entry.entry_id}
+    )
+    assert res["result"]["layout"]["actions"] == [
+        "turn_off",
+        "turn_on:remote_button_short_press",
+        "turn_on:remote_button_long_press",
+    ]
+    assert list(res["result"]["slots"]) == ["turn_on:remote_button_short_press"]
+    assert res["result"]["grouping"] == {
+        "turn_on:remote_button_short_press": {"button": "power"}
+    }
+    assert [b["id"] for b in res["result"]["buttons"]] == [
+        "power",
+        "turn_off",
+        "turn_on",
+    ]
+
+    # the moved slot runs on a short press only
+    calls = async_mock_service(hass, "test", "automation")
+    fire_kinds_action(hass, "remote_button_long_press", "turn_on")
+    await hass.async_block_till_done()
+    assert calls == []
+    fire_kinds_action(hass, "remote_button_short_press", "turn_on")
+    await hass.async_block_till_done()
+    assert len(calls) == 1
+
+    # a second refresh is quiet
+    res = await _ws(
+        client, {"type": f"{DOMAIN}/refresh_actions", "entry_id": entry.entry_id}
+    )
+    assert res["result"] == {"added": [], "stale": [], "probed": True}
+
+
 async def test_slot_name_round_trip(hass, hass_ws_client, remote_device) -> None:
     """A user name persists with the slot; empty clears it back to auto."""
     entry = await _setup_remote(hass, remote_device)

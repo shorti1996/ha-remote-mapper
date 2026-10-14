@@ -10,9 +10,10 @@ from homeassistant.helpers.trigger import async_validate_trigger_config
 
 from custom_components.remote_mapper.adapters.device_trigger import (
     DeviceTriggerAdapter,
+    action_ids_from_triggers,
 )
 
-from .conftest import fire_remote_action
+from .conftest import fire_kinds_action, fire_remote_action
 
 
 @pytest.fixture
@@ -75,6 +76,78 @@ async def test_subscribe_fires_and_unsubscribes(hass, remote_device, adapter) ->
     fire_remote_action(hass, "1_single")
     await hass.async_block_till_done()
     assert received == ["1_single", "1_double"]
+
+
+async def test_press_kinds_get_their_own_ids(hass, kinds_device, adapter) -> None:
+    """A subtype under two types yields ``subtype:type``; under one, the subtype."""
+    actions = await adapter.async_default_actions(hass, {"device_id": kinds_device})
+    assert actions == [
+        "turn_on:remote_button_short_press",
+        "turn_on:remote_button_long_press",
+        "turn_off",
+    ]
+
+
+async def test_press_kinds_fire_their_own_slot(hass, kinds_device, adapter) -> None:
+    """A long press reaches the long id only; the card and HA agree."""
+    received: list[str] = []
+    unsub = await adapter.async_subscribe(
+        hass,
+        {"device_id": kinds_device},
+        ["turn_on:remote_button_short_press", "turn_on:remote_button_long_press"],
+        lambda action_id, raw: received.append(action_id),
+        "Kinds Remote",
+    )
+    fire_kinds_action(hass, "remote_button_long_press", "turn_on")
+    await hass.async_block_till_done()
+    assert received == ["turn_on:remote_button_long_press"]
+    fire_kinds_action(hass, "remote_button_short_press", "turn_on")
+    await hass.async_block_till_done()
+    assert received == [
+        "turn_on:remote_button_long_press",
+        "turn_on:remote_button_short_press",
+    ]
+    unsub()
+
+
+async def test_build_trigger_carries_both_fields(hass, kinds_device, adapter) -> None:
+    """A pair id round-trips to a trigger with type and subtype, probed or not."""
+    config = {"device_id": kinds_device}
+    await adapter.async_default_actions(hass, config)  # warm probe cache
+
+    probed = adapter.build_trigger("turn_on:remote_button_long_press", config)
+    assert (probed["type"], probed["subtype"]) == (
+        "remote_button_long_press",
+        "turn_on",
+    )
+    placeholder = adapter.build_trigger("dim_up:remote_button_double_press", config)
+    assert (placeholder["type"], placeholder["subtype"]) == (
+        "remote_button_double_press",
+        "dim_up",
+    )
+    for trigger in (probed, placeholder):
+        cv.TRIGGER_SCHEMA([trigger])
+        validated = await async_validate_trigger_config(hass, [trigger])
+        assert validated[0]["subtype"] == trigger["subtype"]
+    assert adapter.build_trigger("turn_off", config)["subtype"] == "turn_off"
+
+
+def test_index_triggers_pure() -> None:
+    """The id rule on plain dicts: Z2M stays bare, ZHA pairs split, noise dropped."""
+    triggers = [
+        {"type": "action", "subtype": "1_single"},
+        {"type": "action", "subtype": "1_double"},
+        {"type": "remote_button_short_press", "subtype": "turn_on"},
+        {"type": "remote_button_long_press", "subtype": "turn_on"},
+        {"type": "device_offline", "subtype": "device_offline"},
+        {"type": "button_short_press", "subtype": None},  # an entity's trigger
+    ]
+    assert action_ids_from_triggers(triggers) == [
+        "1_single",
+        "1_double",
+        "turn_on:remote_button_short_press",
+        "turn_on:remote_button_long_press",
+    ]
 
 
 async def test_subscribe_placeholder_arms_on_discovery(

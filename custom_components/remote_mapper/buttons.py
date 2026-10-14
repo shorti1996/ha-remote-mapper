@@ -7,6 +7,11 @@ Grouping is per source:
 
 - ``matter``: ``{token}:{event}`` — namespaced at config time.
 - ``event_entity``: one entity == one button; every action is an event.
+- ``device_trigger`` ids with a colon: ``{subtype}:{type}``, the adapter's
+  id for a subtype the platform lists under several trigger types (ZHA,
+  deCONZ, Hue: subtype = button, type = press kind). Button = subtype,
+  event = the type without its ``remote_button_`` prefix, kind from
+  ``_KIND_BY_TYPE``.
 - everything else (device_trigger, z2m_mqtt, mqtt_generic): Zigbee2MQTT
   vocabulary ``{button}_{event}`` — split at the last suffix that is a
   known event token, two-token suffixes (``press_release``) tried first.
@@ -29,7 +34,7 @@ from __future__ import annotations
 import re
 from typing import Any, Final
 
-from .const import ADAPTER_EVENT_ENTITY, ADAPTER_MATTER
+from .const import ADAPTER_DEVICE_TRIGGER, ADAPTER_EVENT_ENTITY, ADAPTER_MATTER
 
 SINGLE_BUTTON_ID: Final = "button"
 DEFAULT_EVENT: Final = "press"
@@ -95,12 +100,42 @@ _KIND_BY_EVENT: Final[dict[str, str]] = {
     "multi_press_5": KIND_OTHER,
 }
 
+# Device-trigger type → kind, for ``{subtype}:{type}`` ids. ZHA and deCONZ
+# share the ``remote_button_*`` vocabulary; Hue v2 uses bare names, where
+# the click is ``short_release`` (``initial_press`` fires at the start of
+# every press, before the kind is known). ZHA quirks that put the kind in
+# the type as ``button_single`` are listed too; a type not here falls
+# back to ``_KIND_BY_EVENT`` on the stripped name, then ``other``.
+_KIND_BY_TYPE: Final[dict[str, str]] = {
+    "remote_button_short_press": KIND_SINGLE,
+    "remote_button_double_press": KIND_DOUBLE,
+    "remote_button_triple_press": KIND_TRIPLE,
+    "remote_button_long_press": KIND_HOLD,
+    "remote_button_short_release": KIND_RELEASE,
+    "remote_button_long_release": KIND_RELEASE,
+    "remote_button_quadruple_press": KIND_OTHER,
+    "remote_button_quintuple_press": KIND_OTHER,
+    "short_release": KIND_SINGLE,
+    "initial_press": KIND_OTHER,
+    "repeat": KIND_OTHER,
+    "button_single": KIND_SINGLE,
+    "button_double": KIND_DOUBLE,
+    "button_hold": KIND_HOLD,
+}
+_TYPE_PREFIX: Final = "remote_button_"
+
 _NATURAL_SPLIT = re.compile(r"(\d+)")
 
 
 def event_kind(event: str) -> str:
     """Classify an event token; unknown → ``other``."""
     return _KIND_BY_EVENT.get(event, KIND_OTHER)
+
+
+def trigger_type_event(trigger_type: str) -> tuple[str, str]:
+    """(event, kind) for a device-trigger type (``remote_button_long_press``)."""
+    event = trigger_type.removeprefix(_TYPE_PREFIX)
+    return event, _KIND_BY_TYPE.get(trigger_type, event_kind(event))
 
 
 def natural_key(value: str) -> tuple[Any, ...]:
@@ -135,14 +170,25 @@ def split_z2m_action(action_id: str) -> tuple[str, str]:
     return action_id, DEFAULT_EVENT
 
 
-def split_action(source: str | None, action_id: str) -> tuple[str, str]:
-    """Return (button_id, event) for one action id of the given source."""
+def derive_action(source: str | None, action_id: str) -> tuple[str, str, str]:
+    """Return (button_id, event, kind) for one action id, no grouping applied."""
     if source == ADAPTER_MATTER and ":" in action_id:
         token, _, event = action_id.partition(":")
-        return token, event
+        return token, event, event_kind(event)
+    if source == ADAPTER_DEVICE_TRIGGER and ":" in action_id:
+        subtype, _, trigger_type = action_id.partition(":")
+        event, kind = trigger_type_event(trigger_type)
+        return subtype, event, kind
     if source == ADAPTER_EVENT_ENTITY:
-        return SINGLE_BUTTON_ID, action_id
-    return split_z2m_action(action_id)
+        return SINGLE_BUTTON_ID, action_id, event_kind(action_id)
+    button_id, event = split_z2m_action(action_id)
+    return button_id, event, event_kind(event)
+
+
+def split_action(source: str | None, action_id: str) -> tuple[str, str]:
+    """Return (button_id, event) for one action id of the given source."""
+    button_id, event, _kind = derive_action(source, action_id)
+    return button_id, event
 
 
 def place_action(
@@ -155,12 +201,12 @@ def place_action(
     shows its action id as the event, so a sheet never lists two rows
     called ``press`` and says what fires.
     """
-    button_id, event = split_action(source, action_id)
+    button_id, event, derived_kind = derive_action(source, action_id)
     override = (grouping or {}).get(action_id)
     if not override:
-        return button_id, event, event_kind(event)
+        return button_id, event, derived_kind
     target = str(override.get("button") or button_id)
-    kind = str(override.get("kind") or event_kind(event))
+    kind = str(override.get("kind") or derived_kind)
     if kind not in _KIND_ORDER:
         kind = KIND_OTHER
     return target, event if target == button_id else action_id, kind
@@ -217,9 +263,31 @@ def group_buttons(
 
     buttons = []
     for button_id in sorted(grouped, key=natural_key):
+        if source == ADAPTER_DEVICE_TRIGGER:
+            _promote_short_release(grouped[button_id], grouping)
         actions = sorted(
             grouped[button_id],
             key=lambda a: (_KIND_ORDER[a["kind"]], natural_key(a["event"])),
         )
         buttons.append({"id": button_id, "label": button_id, "actions": actions})
     return buttons
+
+
+def _promote_short_release(
+    actions: list[dict[str, Any]], grouping: dict[str, Any] | None
+) -> None:
+    """A button with no single and one ``short_release`` clicks on release.
+
+    deCONZ lists the Aqara Opple and the IKEA remotes with long press,
+    long release and short release but no short press: the click is the
+    release. A button that has a short press keeps short release as the
+    release it is. A user kind override is left alone.
+    """
+    if any(a["kind"] == KIND_SINGLE for a in actions):
+        return
+    candidates = [a for a in actions if a["event"] == "short_release"]
+    if len(candidates) != 1:
+        return
+    override = (grouping or {}).get(candidates[0]["action_id"]) or {}
+    if not override.get("kind"):
+        candidates[0]["kind"] = KIND_SINGLE

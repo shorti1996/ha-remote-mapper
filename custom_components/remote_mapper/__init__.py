@@ -238,6 +238,15 @@ async def async_refresh_actions(
 
     added = [a for a in probed if a not in configured_actions]
     stale = sorted(a for a in configured_actions if a not in probed)
+    # A subtype the source now lists under several trigger types arrives
+    # as ``subtype:type`` ids while the bare id goes stale: the same
+    # button, split into press kinds (a ZHA remote added before 0.1.12,
+    # or a quirk update). The bare id leaves the layout instead of going
+    # stale; its slot moves to the short press, the common meaning of a
+    # slot set before the split.
+    split = {old: [a for a in added if a.startswith(f"{old}:")] for old in stale}
+    split = {old: ids for old, ids in split.items() if ids}
+    stale = [a for a in stale if a not in split]
     changed = False
     if added:
         remote["layout"][CONF_ACTIONS] = [*configured_actions, *added]
@@ -247,6 +256,14 @@ async def async_refresh_actions(
             entry.title,
             added,
         )
+        kept: set[str] = set()
+        for old, ids in split.items():
+            if not await _async_move_split_slot(hass, store, entry, remote, old, ids):
+                kept.add(old)
+        remote["layout"][CONF_ACTIONS] = [
+            a for a in remote["layout"][CONF_ACTIONS] if a not in split or a in kept
+        ]
+        stale = sorted([*stale, *kept])
         runtime = hass.data[DOMAIN].get(entry.entry_id) or {}
         if dispatcher := runtime.get("dispatcher"):
             try:
@@ -274,7 +291,62 @@ async def async_refresh_actions(
                 "stale": stale,
             },
         )
-    return {"added": added, "stale": stale, "probed": True}
+    result: dict[str, Any] = {"added": added, "stale": stale, "probed": True}
+    if split:
+        result["split"] = split
+    return result
+
+
+async def _async_move_split_slot(
+    hass: HomeAssistant,
+    store: RemoteMapperStore,
+    entry: ConfigEntry,
+    remote: dict[str, Any],
+    old: str,
+    ids: list[str],
+) -> bool:
+    """Carry what hung on a collapsed id over to its short-press id.
+
+    The slot travels with its automation (``async_move_slot``); a grouping
+    override keeps its button but not its kind, which the new id knows.
+    False when the slot could not move and the old id must stay.
+    """
+    from .buttons import KIND_SINGLE, derive_action
+    from .move import async_move_slot
+    from .naming import remote_name
+
+    target = next(
+        (a for a in ids if derive_action(remote["source"], a)[2] == KIND_SINGLE),
+        ids[0],
+    )
+    _LOGGER.info(
+        "Remote %s: %s now reports press kinds %s; slot and grouping go to %s",
+        entry.title,
+        old,
+        ids,
+        target,
+    )
+    override = remote.get("grouping", {}).pop(old, None) or {}
+    if button := override.get("button"):
+        remote["grouping"][target] = {"button": button}
+    if store.get_slot(entry.entry_id, old) is None:
+        return True
+    try:
+        await async_move_slot(
+            hass, store, entry.entry_id, old, target, remote_name(hass, entry)
+        )
+    except HomeAssistantError as err:
+        # The record stays on the old id, which stays in the layout as
+        # stale: reachable through the badge and the Move… picker.
+        _LOGGER.warning(
+            "Remote %s: could not move the slot on %s to %s: %s",
+            entry.title,
+            old,
+            target,
+            err,
+        )
+        return False
+    return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

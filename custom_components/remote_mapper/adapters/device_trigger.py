@@ -108,18 +108,45 @@ async def async_z2m_exposed_actions(hass: HomeAssistant, device_id: str) -> list
         unsub()
 
 
-def action_ids_from_triggers(triggers: list[dict[str, Any]]) -> list[str]:
-    """Action ids for enumerated device triggers: unique subtypes, probe order.
+# Trigger types every ZHA device lists that are not a button
+# (zha/zigbee/device.py get_device_automation_triggers).
+NOT_A_BUTTON_TYPES = frozenset({"device_offline"})
 
-    A subtype listed under several types (ZHA ``remote_button_short_press``
-    and ``remote_button_long_press`` on ``turn_on``) yields one id;
-    tests/fixtures/*_triggers.json record where that happens.
+
+def index_triggers(triggers: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    """Action id → the enumerated triggers it stands for, in probe order.
+
+    The id is the subtype alone when the platform lists it under one type
+    (every Zigbee2MQTT action: type ``action``). A subtype under several
+    types (ZHA, deCONZ, Hue: subtype = button, type = press kind) gets one
+    id per pair, ``{subtype}:{type}``, so short and long press stay apart.
+    tests/fixtures/*_triggers.json record the ids per catalogued remote.
     """
-    seen: dict[str, None] = {}
+    by_subtype: dict[str, list[dict[str, Any]]] = {}
     for trigger in triggers:
+        if trigger.get("type") in NOT_A_BUTTON_TYPES:
+            continue
         if (subtype := trigger.get("subtype")) is not None:
-            seen.setdefault(str(subtype), None)
-    return list(seen)
+            by_subtype.setdefault(str(subtype), []).append(trigger)
+    index: dict[str, list[dict[str, Any]]] = {}
+    for subtype, matches in by_subtype.items():
+        if len({str(m.get("type")) for m in matches}) == 1:
+            index[subtype] = matches
+            continue
+        for match in matches:
+            index.setdefault(f"{subtype}:{match.get('type')}", []).append(match)
+    return index
+
+
+def action_ids_from_triggers(triggers: list[dict[str, Any]]) -> list[str]:
+    """Action ids for enumerated device triggers; see ``index_triggers``."""
+    return list(index_triggers(triggers))
+
+
+def split_action_id(action_id: str) -> tuple[str, str | None]:
+    """``{subtype}:{type}`` → (subtype, type); a bare id has no type."""
+    subtype, colon, trigger_type = action_id.partition(":")
+    return subtype, trigger_type if colon else None
 
 
 class DeviceTriggerAdapter:
@@ -162,17 +189,24 @@ class DeviceTriggerAdapter:
         return list(seen)
 
     def build_trigger(self, action_id: str, config: dict[str, Any]) -> dict[str, Any]:
-        """Identity: the probed trigger dict whose subtype == action_id.
+        """Identity: the probed trigger dict the action id stands for.
 
-        Falls back to the Z2M MQTT shape when the subtype was never probed
-        (lazy discovery) — safe to attach, arms on discovery.
+        Falls back to the Z2M MQTT shape when the id was never probed (lazy
+        discovery) — safe to attach, arms on discovery. A ``subtype:type``
+        id carries both fields into the placeholder.
         """
         device_id = config[CONF_DEVICE_ID]
-        for trigger in self._probe_cache.get(device_id, []):
-            if str(trigger.get("subtype")) == action_id:
-                return dict(trigger)
-        template = self._template_trigger(device_id)
-        return {**template, "subtype": action_id}
+        index = index_triggers(self._probe_cache.get(device_id, []))
+        if matches := index.get(action_id):
+            return dict(matches[0])
+        return self._placeholder_trigger(device_id, action_id)
+
+    def _placeholder_trigger(self, device_id: str, action_id: str) -> dict[str, Any]:
+        subtype, trigger_type = split_action_id(action_id)
+        placeholder = {**self._template_trigger(device_id), "subtype": subtype}
+        if trigger_type is not None:
+            placeholder["type"] = trigger_type
+        return placeholder
 
     def _template_trigger(self, device_id: str) -> dict[str, Any]:
         """Base dict for not-yet-discovered subtypes.
@@ -205,16 +239,13 @@ class DeviceTriggerAdapter:
         device_id = config[CONF_DEVICE_ID]
         probed = await self._async_probe(hass, device_id)
 
-        by_subtype: dict[str, list[dict[str, Any]]] = {}
-        for trigger in probed:
-            if (subtype := trigger.get("subtype")) is not None:
-                by_subtype.setdefault(str(subtype), []).append(trigger)
+        index = index_triggers(probed)
 
         configs: list[dict[str, Any]] = []
         for action_id in action_ids:
-            if matches := by_subtype.get(action_id):
-                # A subtype can appear under several types (e.g. ZHA
-                # short/long press) — attach all, same action id.
+            if matches := index.get(action_id):
+                # Several probed triggers under one id (a duplicated
+                # discovery) all carry it; a pair id has exactly one.
                 configs.extend({**match, "id": action_id} for match in matches)
             else:
                 _LOGGER.debug(
@@ -223,11 +254,7 @@ class DeviceTriggerAdapter:
                     device_id,
                 )
                 configs.append(
-                    {
-                        **self._template_trigger(device_id),
-                        "subtype": action_id,
-                        "id": action_id,
-                    }
+                    {**self._placeholder_trigger(device_id, action_id), "id": action_id}
                 )
 
         # Validate per-config: one bad trigger (renamed subtype, foreign

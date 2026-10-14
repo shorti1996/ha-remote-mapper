@@ -176,6 +176,80 @@ def test_matter_namespaced_tokens() -> None:
     ]
 
 
+def test_device_trigger_pair_ids() -> None:
+    """``subtype:type`` groups by subtype; the type names the kind."""
+    buttons = group_buttons(
+        "device_trigger",
+        [
+            "turn_on:remote_button_long_press",
+            "turn_on:remote_button_short_press",
+            "turn_on:remote_button_long_release",
+            "turn_on:remote_button_short_release",
+            "turn_on:remote_button_double_press",
+            "turn_on:remote_button_alt_short_press",
+            "turn_off",
+        ],
+    )
+    assert _ids(buttons) == ["turn_off", "turn_on"]
+    assert _events(buttons[0]) == [("press", "single")]
+    assert _events(buttons[1]) == [
+        ("short_press", "single"),
+        ("double_press", "double"),
+        ("long_press", "hold"),
+        ("long_release", "release"),
+        ("short_release", "release"),
+        ("alt_short_press", "other"),
+    ]
+
+
+def test_device_trigger_short_release_is_the_click_without_short_press() -> None:
+    """deCONZ Aqara Opple shape: no short press, so short release is single."""
+    buttons = group_buttons(
+        "device_trigger",
+        [
+            "turn_on:remote_button_long_press",
+            "turn_on:remote_button_short_release",
+            "turn_on:remote_button_long_release",
+            "turn_on:remote_button_double_press",
+        ],
+    )
+    assert _events(buttons[0]) == [
+        ("short_release", "single"),
+        ("double_press", "double"),
+        ("long_press", "hold"),
+        ("long_release", "release"),
+    ]
+    # a kind override on that action wins
+    buttons = group_buttons(
+        "device_trigger",
+        ["turn_on:remote_button_short_release", "turn_on:remote_button_long_press"],
+        {"turn_on:remote_button_short_release": {"kind": "release"}},
+    )
+    assert _events(buttons[0]) == [("long_press", "hold"), ("short_release", "release")]
+
+
+def test_device_trigger_hue_v2_pairs() -> None:
+    """Hue bridge: the click is short_release; initial_press and repeat are other."""
+    buttons = group_buttons(
+        "device_trigger",
+        [
+            "1:initial_press",
+            "1:repeat",
+            "1:short_release",
+            "1:long_press",
+            "1:long_release",
+        ],
+    )
+    assert _ids(buttons) == ["1"]
+    assert _events(buttons[0]) == [
+        ("short_release", "single"),
+        ("long_press", "hold"),
+        ("long_release", "release"),
+        ("initial_press", "other"),
+        ("repeat", "other"),
+    ]
+
+
 def test_event_entity_is_single_button() -> None:
     """One event entity == one button, whatever the event names look like."""
     buttons = group_buttons("event_entity", ["multi_press_1", "long_press"])

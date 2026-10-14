@@ -150,7 +150,7 @@ Pick the source when adding a remote:
 
 | Source | Examples |
 |---|---|
-| **Device triggers** (default) | Zigbee2MQTT and ZHA remotes — Tuya, Aqara, IKEA, Hue, MOES, … (tested) |
+| **Device triggers** (default) | Zigbee2MQTT and ZHA remotes — Tuya, Aqara, IKEA, Hue, MOES, … (tested); deCONZ and Hue bridge remotes (press kinds checked against their catalogs, no device at hand) |
 | **Matter** multi-button | IKEA BILRESA and other Matter remotes exposing one `event.*` per button (tested) |
 | **Event entity** | any `event.*` entity with `event_types` |
 | **Zigbee2MQTT raw topic / generic MQTT** | deCONZ, ESPHome, custom firmware |
