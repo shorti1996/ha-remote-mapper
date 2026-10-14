@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.helpers import device_registry as dr
 
-from .buttons import split_action
+from .buttons import place_action
 from .const import AUTOMATION_ALIAS_TAG, DOMAIN
 
 if TYPE_CHECKING:
@@ -38,7 +38,9 @@ def event_label(remote: dict[str, Any], action_id: str, name: str | None) -> str
     if name:
         return name
     buttons = (remote.get("grid_layout") or {}).get("buttons") or {}
-    button_id, event = split_action(remote.get("source"), action_id)
+    button_id, event, _kind = place_action(
+        remote.get("source"), remote.get("grouping"), action_id
+    )
     if label := (buttons.get(button_id) or {}).get("label"):
         return f"{label} {event}"
     return action_id

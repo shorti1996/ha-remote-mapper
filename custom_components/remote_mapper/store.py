@@ -104,6 +104,8 @@ class RemoteMapperStore:
                 "snapshot_entities": [],
                 "card_layout": None,
                 "grid_layout": None,
+                # action id → {"button", "kind"} overrides (plan 09)
+                "grouping": {},
             },
         )
         remote["source"] = source

@@ -505,6 +505,7 @@ async def test_get_and_reset_options(hass, hass_ws_client, remote_device) -> Non
         "cleanup_policy": "always_delete",
         "snapshot_entities": ["light.a"],
         "snapshot_devices": [],
+        "grouping_count": 0,
     }
 
     res = await _ws(
@@ -535,8 +536,25 @@ async def test_get_and_reset_options(hass, hass_ws_client, remote_device) -> Non
         "cleanup_policy": "ask",
         "snapshot_entities": [],
         "snapshot_devices": [],
+        "grouping_count": 0,
     }
     assert [e.data["kind"] for e in events] == ["options_reset", "options_reset"]
+
+    # the editor's Regroup row counts the overrides
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/group_action",
+            "entry_id": entry.entry_id,
+            "action_id": "1_double",
+            "button": "top",
+        },
+    )
+    assert res["success"], res
+    res = await _ws(
+        client, {"type": f"{DOMAIN}/get_options", "entry_id": entry.entry_id}
+    )
+    assert res["result"]["grouping_count"] == 1
 
     res = await _ws(client, {"type": f"{DOMAIN}/get_options", "entry_id": "nope"})
     assert res["error"]["code"] == "not_found"
@@ -550,21 +568,173 @@ async def test_user_prefs_survive_on_the_server(
     client = await hass_ws_client(hass)
 
     res = await _ws(client, {"type": f"{DOMAIN}/get_prefs"})
-    assert res["result"] == {"tips_seen": 0, "drag_hint_seen": False}
+    assert res["result"] == {
+        "tips_seen": 0,
+        "drag_hint_seen": False,
+        "edit_help_collapsed": False,
+    }
 
     res = await _ws(client, {"type": f"{DOMAIN}/set_prefs", "tips_seen": 3})
     assert res["success"], res
-    assert res["result"] == {"tips_seen": 3, "drag_hint_seen": False}
-    # one key at a time: the other is kept
+    assert res["result"] == {
+        "tips_seen": 3,
+        "drag_hint_seen": False,
+        "edit_help_collapsed": False,
+    }
+    # one key at a time: the others are kept
     res = await _ws(client, {"type": f"{DOMAIN}/set_prefs", "drag_hint_seen": True})
-    assert res["result"] == {"tips_seen": 3, "drag_hint_seen": True}
+    assert res["result"] == {
+        "tips_seen": 3,
+        "drag_hint_seen": True,
+        "edit_help_collapsed": False,
+    }
+    res = await _ws(
+        client, {"type": f"{DOMAIN}/set_prefs", "edit_help_collapsed": True}
+    )
+    assert res["result"] == {
+        "tips_seen": 3,
+        "drag_hint_seen": True,
+        "edit_help_collapsed": True,
+    }
     res = await _ws(client, {"type": f"{DOMAIN}/get_prefs"})
-    assert res["result"] == {"tips_seen": 3, "drag_hint_seen": True}
+    assert res["result"] == {
+        "tips_seen": 3,
+        "drag_hint_seen": True,
+        "edit_help_collapsed": True,
+    }
 
     store = hass.data[DOMAIN]["store"]
     assert list(store.data["users"].values()) == [
-        {"tips_seen": 3, "drag_hint_seen": True}
+        {"tips_seen": 3, "drag_hint_seen": True, "edit_help_collapsed": True}
     ]
 
     res = await _ws(client, {"type": f"{DOMAIN}/set_prefs", "tips_seen": -1})
     assert not res["success"]
+
+
+async def test_group_action(hass, hass_ws_client, remote_device) -> None:
+    """group_action puts an action on a button; get_remote shows it; clashes refused."""
+    entry = await _setup_remote(hass, remote_device)
+    client = await hass_ws_client(hass)
+    events = async_capture_events(hass, EVENT_UPDATED)
+
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/group_action",
+            "entry_id": entry.entry_id,
+            "action_id": "1_double",
+            "button": " top ",
+            "kind": "hold",
+        },
+    )
+    assert res["success"]
+    assert res["result"]["grouping"] == {"1_double": {"button": "top", "kind": "hold"}}
+    assert events[-1].data["kind"] == "grouping_changed"
+
+    res = await _ws(
+        client, {"type": f"{DOMAIN}/get_remote", "entry_id": entry.entry_id}
+    )
+    assert res["result"]["grouping"] == {"1_double": {"button": "top", "kind": "hold"}}
+    assert res["result"]["buttons"] == [
+        {
+            "id": "1",
+            "label": "1",
+            "actions": [{"action_id": "1_single", "event": "single", "kind": "single"}],
+        },
+        {
+            "id": "top",
+            "label": "top",
+            "actions": [{"action_id": "1_double", "event": "1_double", "kind": "hold"}],
+        },
+    ]
+
+    # a second single on button 1 → refused, nothing stored
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/group_action",
+            "entry_id": entry.entry_id,
+            "action_id": "1_double",
+            "button": "1",
+            "kind": "single",
+        },
+    )
+    assert not res["success"]
+    assert res["error"]["code"] == "invalid_format"
+    assert "button 1 already has a single event: 1_single" in res["error"]["message"]
+
+    # unknown action / remote
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/group_action",
+            "entry_id": entry.entry_id,
+            "action_id": "nope",
+            "button": "1",
+        },
+    )
+    assert not res["success"]
+    assert res["error"]["code"] == "not_found"
+    res = await _ws(
+        client,
+        {"type": f"{DOMAIN}/group_action", "entry_id": "nope", "action_id": "1_double"},
+    )
+    assert res["error"]["code"] == "not_found"
+
+    # an empty button name fails the schema
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/group_action",
+            "entry_id": entry.entry_id,
+            "action_id": "1_double",
+            "button": "  ",
+        },
+    )
+    assert not res["success"]
+
+    # no button → back to derived
+    res = await _ws(
+        client,
+        {
+            "type": f"{DOMAIN}/group_action",
+            "entry_id": entry.entry_id,
+            "action_id": "1_double",
+        },
+    )
+    assert res["success"]
+    assert res["result"]["grouping"] == {}
+    assert [b["id"] for b in res["result"]["buttons"]] == ["1"]
+
+
+async def test_reset_grouping(hass, hass_ws_client, remote_device) -> None:
+    """reset_grouping clears every override in one go."""
+    entry = await _setup_remote(hass, remote_device)
+    client = await hass_ws_client(hass)
+    events = async_capture_events(hass, EVENT_UPDATED)
+
+    for action_id in ("1_single", "1_double"):
+        res = await _ws(
+            client,
+            {
+                "type": f"{DOMAIN}/group_action",
+                "entry_id": entry.entry_id,
+                "action_id": action_id,
+                "button": "x",
+            },
+        )
+        assert res["success"], res
+    res = await _ws(
+        client, {"type": f"{DOMAIN}/reset_grouping", "entry_id": entry.entry_id}
+    )
+    assert res["success"]
+    assert events[-1].data["kind"] == "grouping_changed"
+    res = await _ws(
+        client, {"type": f"{DOMAIN}/get_remote", "entry_id": entry.entry_id}
+    )
+    assert res["result"]["grouping"] == {}
+    assert [b["id"] for b in res["result"]["buttons"]] == ["1"]
+
+    res = await _ws(client, {"type": f"{DOMAIN}/reset_grouping", "entry_id": "nope"})
+    assert res["error"]["code"] == "not_found"

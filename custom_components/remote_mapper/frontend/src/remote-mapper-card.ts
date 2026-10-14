@@ -24,9 +24,11 @@ import {
   loadPrefs,
   nextTip,
   saveDragHintSeen,
+  saveEditHelpCollapsed,
   saveTipsSeen,
   TIPS,
-  TIPS_RESET_EVENT,
+  PREFS_EVENT,
+  type Prefs,
 } from "./onboarding";
 import {
   absorbsOnSave,
@@ -79,8 +81,10 @@ import {
   trimLabels,
   type ButtonModel,
   type GridLayout,
+  type Kind,
 } from "./model";
 import { errorText } from "./errors";
+import { isOverride, kindOptions, moveTargets, type Grouping } from "./grouping";
 import { moveGroups, moveTargetLabel, otherRemoteGroups, type MoveGroup } from "./move";
 import { inferName } from "./naming";
 import { clearRemoteCache, ONLY_REMOTE, readRemoteCache, writeRemoteCache } from "./remote-cache";
@@ -155,6 +159,8 @@ interface RemoteData {
   title: string;
   layout: { actions?: string[] };
   buttons?: ButtonModel[];
+  /** Per-action button/kind overrides (plan ai/09); buttons already reflect them. */
+  grouping?: Grouping;
   card_layout: CanvasLayout | null;
   grid_layout?: GridLayout | null;
   slots: Record<string, SlotRecord>;
@@ -318,9 +324,19 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   @state() private _tipsSeen?: number;
   /** The one-time toast on the first event-mark drag was shown (server side). */
   private _dragHintSeen = true;
-  /** The card editor's "Show again": the banner comes back on every open card. */
-  private _onTipsReset = (): void => {
-    void this._loadTips();
+  /** The edit-mode help lines are folded away (server side, per user). */
+  @state() private _editHelpCollapsed = false;
+  /**
+   * A pref saved by any card (or the editor) in this window: follow it, so
+   * the tips are dismissed once for every card on the page, not per card.
+   */
+  private _onPrefs = (e: Event): void => {
+    const changed = (e as CustomEvent<Partial<Prefs>>).detail ?? {};
+    if (changed.tipsSeen !== undefined) this._tipsSeen = changed.tipsSeen;
+    if (changed.dragHintSeen !== undefined) this._dragHintSeen = changed.dragHintSeen;
+    if (changed.editHelpCollapsed !== undefined) {
+      this._editHelpCollapsed = changed.editHelpCollapsed;
+    }
   };
 
   private async _loadTips(): Promise<void> {
@@ -329,9 +345,18 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       const prefs = await loadPrefs(this._hass);
       this._tipsSeen = prefs.tipsSeen;
       this._dragHintSeen = prefs.dragHintSeen;
+      this._editHelpCollapsed = prefs.editHelpCollapsed;
     } catch {
       /* no backend yet: no banner */
     }
+  }
+
+  /** Fold the edit-mode help away or back; remembered per user. */
+  private _toggleEditHelp(): void {
+    this._editHelpCollapsed = !this._editHelpCollapsed;
+    void saveEditHelpCollapsed(this._hass!, this._editHelpCollapsed).catch(() => {
+      /* the server did not take it: back to the stored state next load */
+    });
   }
 
   /** First drag of an event mark: say where it can go, once per user. */
@@ -354,6 +379,10 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   }
   @state() private _gridEditing = false;
   @state() private _gridDraft?: GridLayout;
+  /** Button sheet, edit mode: the event whose "Move to button" list is open. */
+  @state() private _moveRow?: string;
+  /** …and the name typed for "New button…" (undefined = input hidden). */
+  @state() private _newButton?: string;
   @state() private _pickerOpen = false;
   @state() private _buttonSheet?: string;
 
@@ -509,7 +538,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
       }
     });
     this._resizeObserver.observe(this);
-    window.addEventListener(TIPS_RESET_EVENT, this._onTipsReset);
+    window.addEventListener(PREFS_EVENT, this._onPrefs);
     if (this._edit.tryResume()) this.requestUpdate();
     if (this._fetchStarted && !this._unsubEvents) void this._subscribe();
   }
@@ -517,7 +546,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
   public override disconnectedCallback(): void {
     super.disconnectedCallback();
     this._resizeObserver?.disconnect();
-    window.removeEventListener(TIPS_RESET_EVENT, this._onTipsReset);
+    window.removeEventListener(PREFS_EVENT, this._onPrefs);
     this._unsubEvents?.();
     this._unsubEvents = undefined;
     this._unsubActions?.();
@@ -969,6 +998,40 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     } catch (err) {
       this.notify(`Layout save failed: ${String(err)}`);
     }
+  }
+
+  /**
+   * Put an event on a button with a press kind (plan ai/09). No button =
+   * back to the derived one; no kind = keep the derived kind. Saves right
+   * away, like event edits; the layout draft is re-flowed so a new button
+   * gets a cell and an emptied one loses its own. Returns false when the
+   * server refused (a named kind twice on one button) — the toast says why.
+   */
+  private async _groupAction(actionId: string, button?: string, kind?: Kind): Promise<boolean> {
+    try {
+      await this._hass!.callWS({
+        type: "remote_mapper/group_action",
+        entry_id: this._entryId,
+        action_id: actionId,
+        ...(button !== undefined ? { button } : {}),
+        ...(kind ? { kind } : {}),
+      });
+    } catch (err) {
+      this.notify(errorText(err));
+      return false;
+    }
+    this._moveRow = undefined;
+    this._newButton = undefined;
+    await this._fetchRemote();
+    const buttons = this._remote?.buttons ?? [];
+    if (this._gridEditing) this._setGridDraft(normalizeGrid(this._gridDraft, buttons));
+    // stay on this button; when its last event just left, follow the event
+    if (this._buttonSheet && !buttons.some((b) => b.id === this._buttonSheet)) {
+      this._buttonSheet = buttons.find((b) =>
+        b.actions.some((a) => a.action_id === actionId)
+      )?.id;
+    }
+    return true;
   }
 
   private _onGridPicked = (e: CustomEvent<{ rows: number; cols: number }>): void => {
@@ -1782,7 +1845,7 @@ export class RemoteMapperCard extends LitElement implements EditHost {
         </div>
         ${this._renderTip()}
         ${this.preview
-          ? html`<p class="hint grid-hint">· Edit buttons and events from the dashboard; this preview only shows the card</p>`
+          ? html`<p class="hint grid-hint">Edit buttons and events from the dashboard; this preview only shows the card</p>`
           : nothing}
         ${editing && this._pickerOpen
           ? html`<div class="picker-dock">
@@ -1795,22 +1858,39 @@ export class RemoteMapperCard extends LitElement implements EditHost {
             </div>`
           : nothing}
         ${editing
-          ? html`<p class="hint grid-hint">· Tap a button to rename it or edit its events</p>
-            <p class="hint grid-hint">· Drag a button onto another cell to swap</p>
-            <p class="hint grid-hint">· Drag an event mark onto another event or button to move its action</p>
+          ? html`<button
+              class="help-toggle"
+              type="button"
+              aria-expanded=${this._editHelpCollapsed ? "false" : "true"}
+              @click=${() => this._toggleEditHelp()}
+            >
+              <ha-icon
+                icon=${this._editHelpCollapsed ? "mdi:chevron-right" : "mdi:chevron-down"}
+              ></ha-icon>
+              <span>How to edit</span>
+            </button>`
+          : nothing}
+        ${editing && !this._editHelpCollapsed
+          ? html`<p class="hint grid-hint">Tap a button to rename it or edit its events</p>
+            <p class="hint grid-hint">
+              In a button's sheet, change an event's press kind or move it to another
+              button (for remotes the card grouped wrong)
+            </p>
+            <p class="hint grid-hint">Drag a button onto another cell to swap</p>
+            <p class="hint grid-hint">Drag an event mark onto another event or button to move its action</p>
             ${this._remoteCount > 1
               ? html`<p class="hint grid-hint">
-                  · Drag an event mark onto another remote's card (in edit mode too) to move
+                  Drag an event mark onto another remote's card (in edit mode too) to move
                   it there
                 </p>`
               : nothing}
             ${Object.values(this._slotViews()).some((v) => v.linked)
               ? html`<p class="hint grid-hint">
-                  · <ha-icon class="hint-icon" icon="mdi:link-variant"></ha-icon> marks an action kept in
+                  <ha-icon class="hint-icon" icon="mdi:link-variant"></ha-icon> marks an action kept in
                   your own automation; edits and moves change that automation
                 </p>`
               : nothing}
-            <p class="hint grid-hint">· Event edits save right away; ✓ saves the layout, ✕ discards it</p>`
+            <p class="hint grid-hint">Event edits save right away; ✓ saves the layout, ✕ discards it</p>`
           : nothing}
         ${buttons.length === 0
           ? nothing // an empty grid is just blank space; the hint below says what to do
@@ -1958,7 +2038,12 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     const views = this._slotViews();
     const close = () => {
       this._buttonSheet = undefined;
+      this._moveRow = undefined;
+      this._newButton = undefined;
     };
+    const editing = this._gridEditing;
+    const kinds = kindOptions(eventIconsOf(this._config));
+    const targets = editing ? moveTargets(remote.buttons ?? [], layout, button.id) : [];
     return html`
       <div class="modal-backdrop" @click=${this._backdropClick(close)}>
         <div class="modal" @click=${this._ghostGuard}>
@@ -2001,6 +2086,44 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                     <span class="ev-summary">${view?.summary ?? "not set"}</span>
                   </span>
                   <span class="ev-actions">
+                  ${editing
+                    ? html`
+                        <select
+                          class="kind-select"
+                          title="Press kind"
+                          @change=${async (e: Event) => {
+                            const select = e.target as HTMLSelectElement;
+                            const kind = select.value as Kind;
+                            if (!(await this._groupAction(a.action_id, button.id, kind))) {
+                              select.value = a.kind;
+                            }
+                          }}
+                        >
+                          ${kinds.map(
+                            (o) =>
+                              html`<option value=${o.kind} ?selected=${o.kind === a.kind}>
+                                ${o.label}
+                              </option>`
+                          )}
+                        </select>
+                        ${this._iconButton(
+                          "mdi:folder-move-outline",
+                          "Move to another button…",
+                          () => {
+                            this._moveRow = this._moveRow === a.action_id ? undefined : a.action_id;
+                            this._newButton = undefined;
+                          },
+                          { active: this._moveRow === a.action_id }
+                        )}
+                        ${isOverride(remote.grouping, a.action_id)
+                          ? this._iconButton(
+                              "mdi:undo-variant",
+                              "Back to the button and press kind the card derived",
+                              () => void this._groupAction(a.action_id)
+                            )
+                          : nothing}
+                      `
+                    : nothing}
                   ${this._iconButton("mdi:play", "Run now", () => void this._runSlot(a.action_id), {
                     disabled: !view?.assigned || !!view.archived,
                   })}
@@ -2054,6 +2177,47 @@ export class RemoteMapperCard extends LitElement implements EditHost {
                   ${this._iconButton("mdi:pencil", "Edit", () => void this._openEditor(a.action_id))}
                   </span>
                 </li>
+                ${editing && this._moveRow === a.action_id
+                  ? html`<li class="move-row">
+                      <span class="hint">Move <code>${a.event}</code> to:</span>
+                      ${targets.map(
+                        (t) =>
+                          html`<button @click=${() => void this._groupAction(a.action_id, t.id, a.kind)}>
+                            ${t.label}
+                          </button>`
+                      )}
+                      ${this._newButton === undefined
+                        ? html`<button
+                            @click=${() => {
+                              this._newButton = "";
+                            }}
+                          >
+                            New button…
+                          </button>`
+                        : html`<input
+                              class="label-input new-button"
+                              type="text"
+                              placeholder="Button name"
+                              autofocus
+                              .value=${this._newButton}
+                              @input=${(e: Event) => {
+                                this._newButton = (e.target as HTMLInputElement).value;
+                              }}
+                              @keydown=${(e: KeyboardEvent) => {
+                                if (e.key === "Enter" && this._newButton?.trim()) {
+                                  void this._groupAction(a.action_id, this._newButton.trim(), a.kind);
+                                }
+                              }}
+                            />
+                            <button
+                              ?disabled=${!this._newButton.trim()}
+                              @click=${() =>
+                                void this._groupAction(a.action_id, this._newButton!.trim(), a.kind)}
+                            >
+                              Move
+                            </button>`}
+                    </li>`
+                  : nothing}
               `;
             })}
           </ul>
@@ -3225,9 +3389,43 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     .picker-dock {
       padding: 0 var(--ha-space-4, 16px) var(--ha-space-2, 8px);
     }
+    /* edit mode: folds the help lines below it away; remembered per user.
+       The chevron and the lines' dots share one 20px column, so they line up. */
+    .help-toggle {
+      display: flex;
+      align-items: center;
+      gap: var(--ha-space-1, 4px);
+      min-height: var(--ha-space-9, 36px);
+      margin: 0 var(--ha-space-2, 8px) 0 var(--ha-space-3, 12px);
+      padding: 0;
+      border: none;
+      background: none;
+      color: var(--secondary-text-color);
+      cursor: pointer;
+      font: inherit;
+      font-size: var(--ha-font-size-m, 14px);
+      line-height: var(--ha-line-height-normal, 1.6);
+    }
+    .help-toggle ha-icon {
+      display: flex;
+      flex: none;
+      width: var(--ha-space-5, 20px);
+      justify-content: center;
+      --mdc-icon-size: var(--ha-space-5, 20px);
+    }
     .grid-hint {
-      padding: 0 var(--ha-space-4, 16px);
+      position: relative;
+      /* 12px margin + 20px marker column + 4px gap, as the toggle lays out */
+      padding: 0 var(--ha-space-4, 16px) 0 var(--ha-space-9, 36px);
       margin: 0 0 var(--ha-space-1, 4px);
+      line-height: var(--ha-line-height-normal, 1.6);
+    }
+    .grid-hint::before {
+      content: "·";
+      position: absolute;
+      left: var(--ha-space-3, 12px);
+      width: var(--ha-space-5, 20px);
+      text-align: center;
     }
     .grid-hint:last-child {
       margin-bottom: 0;
@@ -3268,6 +3466,47 @@ export class RemoteMapperCard extends LitElement implements EditHost {
     }
     .event-list li.on {
       opacity: 1;
+    }
+    /* native select: same size as HA's form controls (skill: m, 32px) */
+    .kind-select {
+      /* sized by its widest option ("3 triple press"); a cap clipped the text at phone width */
+      min-height: var(--ha-space-8, 32px);
+      padding: var(--ha-space-1, 4px);
+      border: 1px solid var(--divider-color, #444);
+      border-radius: var(--ha-border-radius-md, 8px);
+      background: var(--card-background-color, inherit);
+      color: inherit;
+      font: inherit;
+      font-size: var(--ha-font-size-m, 14px);
+    }
+    .event-list li.move-row {
+      opacity: 1;
+      gap: var(--ha-space-2, 8px);
+      padding: var(--ha-space-2, 8px) 0 var(--ha-space-2, 8px) var(--ha-space-9, 36px);
+    }
+    .move-row code {
+      font-family: var(--ha-font-family-code, monospace);
+      font-size: var(--ha-font-size-s, 12px);
+    }
+    .move-row button {
+      min-height: var(--ha-space-9, 36px);
+      padding: var(--ha-space-1, 4px) var(--ha-space-3, 12px);
+      border-radius: var(--ha-border-radius-pill, 9999px);
+      border: 1px solid var(--primary-color);
+      background: none;
+      color: var(--primary-color);
+      cursor: pointer;
+      font: inherit;
+      font-size: var(--ha-font-size-m, 14px);
+    }
+    .move-row button:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+    .move-row .new-button {
+      flex: 1 1 calc(var(--ha-space-20, 80px) * 2);
+      width: auto;
+      margin-top: 0;
     }
     .ev-icon {
       flex: none;

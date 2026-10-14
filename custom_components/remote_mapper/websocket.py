@@ -17,7 +17,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.script import async_validate_actions_config
 from homeassistant.util.yaml import parse_yaml
 
-from .buttons import group_buttons
+from .buttons import KIND_OTHER, group_buttons, grouping_conflict
 from .const import DOMAIN, EVENT_UPDATED, INTEGRATION_VERSION
 from .naming import remote_name
 from .store import default_slot
@@ -129,9 +129,13 @@ async def ws_ping(
 def ws_get_prefs(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
 ) -> None:
-    """This user's UI preferences: tips_seen (how many first-run tips) and
-    drag_hint_seen (the one-time toast on the first event-mark drag)."""
+    """This user's UI preferences: tips_seen (how many first-run tips),
+    drag_hint_seen (the one-time toast on the first event-mark drag) and
+    edit_help_collapsed (the edit-mode help lines folded away)."""
     connection.send_result(msg["id"], _prefs_view(hass, connection.user.id))
+
+
+PREF_KEYS: tuple[str, ...] = ("tips_seen", "drag_hint_seen", "edit_help_collapsed")
 
 
 def _prefs_view(hass: HomeAssistant, user_id: str) -> dict[str, Any]:
@@ -139,6 +143,7 @@ def _prefs_view(hass: HomeAssistant, user_id: str) -> dict[str, Any]:
     return {
         "tips_seen": int(prefs.get("tips_seen", 0)),
         "drag_hint_seen": bool(prefs.get("drag_hint_seen", False)),
+        "edit_help_collapsed": bool(prefs.get("edit_help_collapsed", False)),
     }
 
 
@@ -147,6 +152,7 @@ def _prefs_view(hass: HomeAssistant, user_id: str) -> dict[str, Any]:
         vol.Required("type"): f"{DOMAIN}/set_prefs",
         vol.Optional("tips_seen"): vol.All(int, vol.Range(min=0)),
         vol.Optional("drag_hint_seen"): bool,
+        vol.Optional("edit_help_collapsed"): bool,
     }
 )
 @callback
@@ -157,7 +163,7 @@ def ws_set_prefs(
 
     Only the keys given change; the result is the whole record.
     """
-    given = {k: msg[k] for k in ("tips_seen", "drag_hint_seen") if k in msg}
+    given = {k: msg[k] for k in PREF_KEYS if k in msg}
     if given:
         _store(hass).async_set_user_prefs(connection.user.id, **given)
     connection.send_result(msg["id"], _prefs_view(hass, connection.user.id))
@@ -230,7 +236,10 @@ async def ws_get_remote(
             "entry_id": entry.entry_id,
             "title": remote_name(hass, entry),
             "layout": layout,
-            "buttons": group_buttons(remote.get("source"), layout.get("actions", [])),
+            "buttons": group_buttons(
+                remote.get("source"), layout.get("actions", []), remote.get("grouping")
+            ),
+            "grouping": remote.get("grouping", {}),
             "card_layout": remote.get("card_layout"),
             "grid_layout": remote.get("grid_layout"),
             "slots": slots,
@@ -862,12 +871,15 @@ async def ws_get_options(
     if entry is None:
         connection.send_error(msg["id"], ERR_NOT_FOUND, "Unknown remote")
         return
+    remote = _store(hass).get_remote(msg["entry_id"]) or {}
     connection.send_result(
         msg["id"],
         {
             "cleanup_policy": get_policy(entry),
             "snapshot_entities": list(entry.options.get(CONF_SNAPSHOT_ENTITIES, [])),
             "snapshot_devices": list(entry.options.get(CONF_SNAPSHOT_DEVICES, [])),
+            # events moved to another button or given another press kind
+            "grouping_count": len(remote.get("grouping", {})),
         },
     )
 
@@ -988,6 +1000,80 @@ async def ws_save_layout(
         remote["grid_layout"] = msg["grid_layout"]
     store.async_schedule_save()
     _fire_updated(hass, msg["entry_id"], "layout_saved")
+    connection.send_result(msg["id"], {})
+
+
+KINDS: tuple[str, ...] = ("single", "double", "triple", "hold", "release", KIND_OTHER)
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/group_action",
+        vol.Required("entry_id"): str,
+        vol.Required("action_id"): str,
+        vol.Optional("button"): vol.All(str, vol.Strip, vol.Length(min=1)),
+        vol.Optional("kind"): vol.In(KINDS),
+    }
+)
+@callback
+def ws_group_action(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    """Put one action on a button with a press kind (plan 09).
+
+    No ``button`` removes the override (back to the derived button); no
+    ``kind`` keeps the action's derived kind. Refused when a named kind
+    would appear twice on one button — the card's gesture modes run one
+    action per kind.
+    """
+    store = _store(hass)
+    remote = store.get_remote(msg["entry_id"])
+    if remote is None:
+        connection.send_error(msg["id"], ERR_NOT_FOUND, "Unknown remote")
+        return
+    action_ids = list(remote.get("layout", {}).get("actions", []))
+    if msg["action_id"] not in action_ids:
+        connection.send_error(msg["id"], ERR_NOT_FOUND, "Unknown action")
+        return
+    grouping = {
+        k: v
+        for k, v in remote.get("grouping", {}).items()
+        if k != msg["action_id"] and k in action_ids
+    }
+    if "button" in msg:
+        override: dict[str, str] = {"button": msg["button"]}
+        if "kind" in msg:
+            override["kind"] = msg["kind"]
+        grouping[msg["action_id"]] = override
+    buttons = group_buttons(remote.get("source"), action_ids, grouping)
+    if conflict := grouping_conflict(buttons, msg["action_id"]):
+        connection.send_error(msg["id"], ERR_INVALID_FORMAT, conflict)
+        return
+    remote["grouping"] = grouping
+    store.async_schedule_save()
+    _fire_updated(hass, msg["entry_id"], "grouping_changed")
+    connection.send_result(msg["id"], {"grouping": grouping, "buttons": buttons})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/reset_grouping",
+        vol.Required("entry_id"): str,
+    }
+)
+@callback
+def ws_reset_grouping(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    """Forget every grouping override; buttons are derived again."""
+    store = _store(hass)
+    remote = store.get_remote(msg["entry_id"])
+    if remote is None:
+        connection.send_error(msg["id"], ERR_NOT_FOUND, "Unknown remote")
+        return
+    remote["grouping"] = {}
+    store.async_schedule_save()
+    _fire_updated(hass, msg["entry_id"], "grouping_changed")
     connection.send_result(msg["id"], {})
 
 
@@ -1182,6 +1268,8 @@ def async_register_websocket_commands(hass: HomeAssistant) -> None:
         ws_set_prefs,
         ws_move_slot,
         ws_save_layout,
+        ws_group_action,
+        ws_reset_grouping,
         ws_probe_device,
         ws_refresh_actions,
         ws_release_remote,

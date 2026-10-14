@@ -452,6 +452,9 @@ def test_managed_alias_names_the_event() -> None:
     assert event_label(remote, "1_single", "Lamp") == "Lamp"
     assert event_label(remote, "2_single", None) == "Kitchen single"
     assert event_label(remote, "1_single", None) == "1_single"
+    # after a regroup the label follows the button the action sits on now
+    regrouped = {**remote, "grouping": {"1_single": {"button": "2", "kind": "hold"}}}
+    assert event_label(regrouped, "1_single", None) == "Kitchen 1_single"
     alias = managed_alias("Desk", "Toggle lamp")
     assert alias == "Desk · Toggle lamp [remote_mapper]"
     assert managed_alias("Desk") == "Desk [remote_mapper]"

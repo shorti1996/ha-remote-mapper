@@ -6,6 +6,8 @@ from __future__ import annotations
 from custom_components.remote_mapper.buttons import (
     event_kind,
     group_buttons,
+    grouping_conflict,
+    place_action,
     split_z2m_action,
 )
 
@@ -194,3 +196,114 @@ def test_empty_and_none_source() -> None:
     """No actions → no buttons; unknown source falls back to Z2M parsing."""
     assert group_buttons(None, []) == []
     assert _ids(group_buttons(None, ["1_single"])) == ["1"]
+
+
+# ── grouping overrides (plan 09) ───────────────────────────────────────
+
+STYRBAR = [
+    "on",
+    "off",
+    "brightness_move_up",
+    "brightness_move_down",
+    "brightness_stop",
+    "arrow_left_click",
+    "arrow_left_hold",
+    "arrow_left_release",
+    "arrow_right_click",
+    "arrow_right_hold",
+    "arrow_right_release",
+]
+
+
+def test_grouping_merges_into_a_derived_button() -> None:
+    """A moved action joins the named button with the given kind, named by its id."""
+    grouping = {
+        "brightness_move_up": {"button": "on", "kind": "hold"},
+        "brightness_stop": {"button": "on", "kind": "release"},
+        "brightness_move_down": {"button": "off", "kind": "hold"},
+    }
+    buttons = group_buttons("z2m_mqtt", STYRBAR, grouping)
+    by_id = {b["id"]: b for b in buttons}
+    assert set(by_id) == {"on", "off", "arrow_left", "arrow_right"}
+    assert _events(by_id["on"]) == [
+        ("press", "single"),
+        ("brightness_move_up", "hold"),
+        ("brightness_stop", "release"),
+    ]
+    assert _events(by_id["off"]) == [
+        ("press", "single"),
+        ("brightness_move_down", "hold"),
+    ]
+    assert grouping_conflict(buttons) is None
+
+
+def test_grouping_makes_a_new_button() -> None:
+    """A name no derived button has creates a button; the rest stay derived."""
+    buttons = group_buttons(
+        "mqtt_generic",
+        ["shake", "tap", "slide"],
+        {"shake": {"button": "cube", "kind": "single"}, "tap": {"button": "cube"}},
+    )
+    assert _ids(buttons) == ["cube", "slide"]
+    # tap keeps its derived kind (single) → two singles on one button
+    assert _events(buttons[0]) == [("shake", "single"), ("tap", "single")]
+    assert grouping_conflict(buttons) == "button cube already has a single event: shake"
+    # the one being placed is never the one named
+    assert grouping_conflict(buttons, "shake") == (
+        "button cube already has a single event: tap"
+    )
+
+
+def test_grouping_kind_only_keeps_the_event_name() -> None:
+    """Staying on the derived button only changes the kind."""
+    buttons = group_buttons(
+        "z2m_mqtt",
+        ["arrow_left_click", "arrow_left_hold"],
+        {"arrow_left_click": {"button": "arrow_left", "kind": "double"}},
+    )
+    assert _events(buttons[0]) == [("click", "double"), ("hold", "hold")]
+    # no button at all: same thing
+    buttons = group_buttons(
+        "z2m_mqtt", ["arrow_left_click"], {"arrow_left_click": {"kind": "triple"}}
+    )
+    assert _events(buttons[0]) == [("click", "triple")]
+
+
+def test_grouping_other_may_repeat_and_unknown_kind_is_other() -> None:
+    """``other`` has no gesture, so any number of them is fine."""
+    buttons = group_buttons(
+        "mqtt_generic",
+        ["a", "b", "c"],
+        {
+            "a": {"button": "x", "kind": "other"},
+            "b": {"button": "x", "kind": "other"},
+            "c": {"button": "x", "kind": "nope"},
+        },
+    )
+    assert _events(buttons[0]) == [("a", "other"), ("b", "other"), ("c", "other")]
+    assert grouping_conflict(buttons) is None
+
+
+def test_grouping_ignores_unknown_action_ids() -> None:
+    """A stale override (action gone from the layout) changes nothing."""
+    buttons = group_buttons(
+        "device_trigger", ["1_single"], {"gone": {"button": "1", "kind": "hold"}}
+    )
+    assert _ids(buttons) == ["1"]
+    assert _events(buttons[0]) == [("single", "single")]
+
+
+def test_place_action_helper() -> None:
+    """Direct coverage: derived, kind-only, moved."""
+    assert place_action("z2m_mqtt", None, "1_single") == ("1", "single", "single")
+    assert place_action("z2m_mqtt", {}, "1_single") == ("1", "single", "single")
+    assert place_action("z2m_mqtt", {"1_single": {"kind": "hold"}}, "1_single") == (
+        "1",
+        "single",
+        "hold",
+    )
+    assert place_action("z2m_mqtt", {"1_single": {"button": "2"}}, "1_single") == (
+        "2",
+        "1_single",
+        "single",
+    )

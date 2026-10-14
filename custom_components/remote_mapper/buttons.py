@@ -16,6 +16,12 @@ Grouping is per source:
 
 ``kind`` classifies events for the card's gesture mapping and icons.
 Unknown events keep their name and get kind ``other`` — nothing is hidden.
+
+A remote's ``grouping`` (plan 09) overrides the derivation per action:
+``{action_id: {"button": id, "kind": kind}}``. An action listed there sits
+on that button with that kind; every other action is derived as above. A
+button id is just a name — naming a derived button merges into it, a new
+name makes a new button.
 """
 
 from __future__ import annotations
@@ -139,7 +145,55 @@ def split_action(source: str | None, action_id: str) -> tuple[str, str]:
     return split_z2m_action(action_id)
 
 
-def group_buttons(source: str | None, action_ids: list[str]) -> list[dict[str, Any]]:
+def place_action(
+    source: str | None, grouping: dict[str, Any] | None, action_id: str
+) -> tuple[str, str, str]:
+    """Return (button_id, event, kind) for one action, grouping applied.
+
+    An action that only changes kind keeps its derived event name
+    (``arrow_left_click`` stays ``click``). One moved to another button
+    shows its action id as the event, so a sheet never lists two rows
+    called ``press`` and says what fires.
+    """
+    button_id, event = split_action(source, action_id)
+    override = (grouping or {}).get(action_id)
+    if not override:
+        return button_id, event, event_kind(event)
+    target = str(override.get("button") or button_id)
+    kind = str(override.get("kind") or event_kind(event))
+    if kind not in _KIND_ORDER:
+        kind = KIND_OTHER
+    return target, event if target == button_id else action_id, kind
+
+
+def grouping_conflict(
+    buttons: list[dict[str, Any]], changed: str | None = None
+) -> str | None:
+    """A sentence naming the first named kind that appears twice on a button.
+
+    single, double, triple, hold and release each resolve to one action in
+    the card's gesture modes, so a second one would never run. ``other``
+    has no gesture and may repeat. The sentence names the action that was
+    already there, never ``changed`` (the one being placed).
+    """
+    for button in buttons:
+        by_kind: dict[str, list[str]] = {}
+        for action in button["actions"]:
+            if action["kind"] != KIND_OTHER:
+                by_kind.setdefault(action["kind"], []).append(action["action_id"])
+        for kind, ids in by_kind.items():
+            if len(ids) < 2:
+                continue
+            others = [i for i in ids if i != changed] or ids
+            return f"button {button['id']} already has a {kind} event: {others[0]}"
+    return None
+
+
+def group_buttons(
+    source: str | None,
+    action_ids: list[str],
+    grouping: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     """Group action ids into buttons; natural order, events in kind order.
 
     Result shape (JSON-ready, consumed by the card)::
@@ -147,6 +201,8 @@ def group_buttons(source: str | None, action_ids: list[str]) -> list[dict[str, A
         [{"id": "1", "label": "1",
           "actions": [{"action_id": "1_single", "event": "single",
                        "kind": "single"}, ...]}, ...]
+
+    ``grouping`` entries for ids not in ``action_ids`` are ignored.
     """
     grouped: dict[str, list[dict[str, Any]]] = {}
     seen: set[str] = set()
@@ -154,9 +210,9 @@ def group_buttons(source: str | None, action_ids: list[str]) -> list[dict[str, A
         if action_id in seen:
             continue
         seen.add(action_id)
-        button_id, event = split_action(source, action_id)
+        button_id, event, kind = place_action(source, grouping, action_id)
         grouped.setdefault(button_id, []).append(
-            {"action_id": action_id, "event": event, "kind": event_kind(event)}
+            {"action_id": action_id, "event": event, "kind": kind}
         )
 
     buttons = []

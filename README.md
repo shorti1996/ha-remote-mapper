@@ -168,6 +168,17 @@ button once and Remote Mapper picks them up — on HA start, when you open
 the card's edit mode, or with the ↻ button in the header. No restart
 needed; new actions are live immediately.
 
+Buttons are worked out from the action names (`1_single` is button 1,
+single press). A remote whose names say nothing about buttons, such as an
+IKEA STYRBAR (`on`, `brightness_move_up`, `brightness_stop`, …), comes up
+as one button per action. Fix it in the card: in edit mode, tap a button
+and, in its sheet, change an event's press kind or move it to another
+button, or to a new one. Three moves turn the STYRBAR's seven derived
+buttons into its four real ones (`on` = on / brightness_move_up as hold /
+brightness_stop as release). The same controls repair an auto-grouped
+remote that came out wrong. *Regroup* in the card editor's Start over
+section forgets every such change.
+
 ## Install
 
 [![Open this repository in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=shorti1996&repository=ha-remote-mapper&category=integration)

@@ -64,6 +64,8 @@ interface RemoteOptions {
   cleanup_policy: "ask" | "always_delete" | "never_delete";
   snapshot_entities: string[];
   snapshot_devices: string[];
+  /** Events moved to another button or given another press kind (plan ai/09). */
+  grouping_count?: number;
 }
 
 /** "2 devices, 3 entities", either half alone, or "none". */
@@ -97,6 +99,8 @@ export class RemoteMapperCardEditor extends LitElement {
   @state() private _tipsSeen?: number;
   /** The one-time toast on the first event-mark drag was shown. */
   @state() private _dragHintSeen = false;
+  /** The edit-mode help lines are folded away. */
+  @state() private _editHelpCollapsed = false;
   private _optionsFor?: string;
 
   public setConfig(config: RemoteMapperCardConfig): void {
@@ -124,15 +128,17 @@ export class RemoteMapperCardEditor extends LitElement {
       });
   }
 
-  private async _reset(what: "cleanup_policy" | "snapshot_entities"): Promise<void> {
+  private async _reset(
+    what: "cleanup_policy" | "snapshot_entities" | "grouping"
+  ): Promise<void> {
     const entryId = this._entryId();
     if (!this.hass || !entryId) return;
     try {
-      await this.hass.callWS({
-        type: "remote_mapper/reset_options",
-        entry_id: entryId,
-        [what]: true,
-      });
+      await this.hass.callWS(
+        what === "grouping"
+          ? { type: "remote_mapper/reset_grouping", entry_id: entryId }
+          : { type: "remote_mapper/reset_options", entry_id: entryId, [what]: true }
+      );
       this._optionsFor = undefined;
       this._fetchOptions();
     } catch (err) {
@@ -173,6 +179,7 @@ export class RemoteMapperCardEditor extends LitElement {
         .then((prefs) => {
           this._tipsSeen = prefs.tipsSeen;
           this._dragHintSeen = prefs.dragHintSeen;
+          this._editHelpCollapsed = prefs.editHelpCollapsed;
         })
         .catch(() => {
           /* no backend: the tips row stays hidden */
@@ -183,7 +190,7 @@ export class RemoteMapperCardEditor extends LitElement {
   /** Forget remembered choices; each button says what it undoes. */
   private _renderReset() {
     const options = this._options;
-    const seen = (this._tipsSeen ?? 0) > 0 || this._dragHintSeen;
+    const seen = (this._tipsSeen ?? 0) > 0 || this._dragHintSeen || this._editHelpCollapsed;
     if (!options && !seen) return nothing;
     return html`
       <div class="reset">
@@ -214,12 +221,24 @@ export class RemoteMapperCardEditor extends LitElement {
                   Forget
                 </button>
               </div>
+              <div class="reset-row">
+                <span class="hint">
+                  Events moved to another button or given another press kind:
+                  <b>${options.grouping_count || "none"}</b>
+                </span>
+                <button
+                  ?disabled=${!options.grouping_count}
+                  @click=${() => void this._reset("grouping")}
+                >
+                  Regroup
+                </button>
+              </div>
             `
           : nothing}
         <div class="reset-row">
           <span class="hint">
-            Tips at the top of the card and the hint on the first drag of an event mark:
-            <b>${seen ? "seen" : "showing"}</b>
+            Tips at the top of the card, the hint on the first drag of an event mark and the
+            edit-mode help: <b>${seen ? "seen" : "showing"}</b>
           </span>
           <button
             ?disabled=${!seen}
@@ -228,6 +247,7 @@ export class RemoteMapperCardEditor extends LitElement {
               void resetTips(this.hass).then(() => {
                 this._tipsSeen = 0;
                 this._dragHintSeen = false;
+                this._editHelpCollapsed = false;
               });
             }}
           >

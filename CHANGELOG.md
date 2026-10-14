@@ -7,6 +7,23 @@ move under a version heading when `make release VERSION=x.y.z` runs.
 
 ### Added
 
+- **Group actions into buttons.** For a remote whose action names say
+  nothing about buttons (IKEA STYRBAR: `on`, `brightness_move_up`, …),
+  or one the card grouped wrong: in edit mode a button's sheet lets you
+  change an event's press kind and move it to another button or a new
+  one. The remote keeps one override per action (`grouping`); the rest
+  stays derived. A named press kind (single, double, triple, hold,
+  release) can appear once per button, since the gesture modes run one
+  action per kind; the sheet says which event is in the way. New
+  WebSocket commands `group_action` and `reset_grouping`; `get_remote`
+  returns `grouping`; `get_options` counts the overrides for the card
+  editor's new *Regroup* row under Start over. Automation aliases follow
+  the button the event sits on now.
+- **The edit-mode help folds away.** A *How to edit* chevron above the
+  help lines in the grid's edit mode hides them; remembered per HA user
+  on the server (`edit_help_collapsed` in the prefs), and *Show again*
+  under Start over brings them back with the tips.
+
 - **Move actions between remotes.** *Move…* in the event editor lists
   every event of every other remote after this remote's own, and in edit
   mode an event mark dragged onto another remote's card (in edit mode
@@ -27,6 +44,11 @@ move under a version heading when `make release VERSION=x.y.z` runs.
 
 ### Fixed
 
+- **The first-run tips had to be dismissed on every card.** The count was
+  already kept per HA user on the server, but each card on a page held its
+  own copy until reload. A card now tells the others in the window what it
+  saved (`remote_mapper_prefs` on `window`): Next or Skip on one card moves
+  every card on the page; the same for the drag hint and the folded help.
 - **The card's messages never appeared.** "Found new actions", "Moved …",
   "Handed back: …" and the save, refresh and move errors were sent as a
   `hass-notification` event on `window`, and HA only listens on its own
